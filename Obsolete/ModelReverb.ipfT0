@@ -1,0 +1,388 @@
+#pragma rtGlobals=1		// Use modern global access method.
+
+Function ModelControlWindow()
+	DoWindow /K ModelControlWin
+	NewPanel /K=1 /W=(0,0,350,850) /N=ModelControlWin as "Model Control"
+	NewDataFolder /O/S root:Parameters
+	Variable i,inc
+	String variable_name,variable_names=StringByKey("VARIABLES",DataFolderDir(4))
+	variable_names=ReplaceString(",",variable_names,";")
+	variable_names=SortList(variable_names,";",4)
+	for(i=0;i<ItemsInList(variable_names);i+=1)
+		variable_name=StringFromList(i,variable_names)
+		NVar var=root:parameters:$variable_name
+		inc=(var==0) ? 1 : var/10
+		SetVariable /Z $variable_name,size={150,20},title=variable_name,limits={-inf,inf,inc},value=root:parameters:$variable_name,proc=ModelControlProc2
+		SetVariable /Z $variable_name userData=num2str(var)
+	endfor
+	Button ResetParameters,size={150,20},proc=ModelControlProc,title="Reset to Parameter Defaults"
+	Button RegenerateNetwork,size={150,20},proc=ModelControlProc,title="Regenerate Network"
+	Button Start,size={150,20},proc=ModelControlProc,title="Start"
+	Button ContinueZ,size={150,20},proc=ModelControlProc,title="Continue"
+End
+
+Function ModelControlProc2(ctrlName,varNum,varStr,varName) : SetVariableControl
+	String ctrlName
+	Variable varNum
+	String varStr,varName
+	Variable /G root:new_value=varNum
+	String /G root:curr_control=ctrlName
+	ModelControlProc("RegenerateWaves")
+End
+
+Function ModelControlProc(ctrlName) : ButtonControl
+	String ctrlName
+	
+	NewDataFolder /O/S root:Parameters
+	//print ctrlName
+	if(!StringMatch(ctrlName,"ResetParameters"))
+		NVar neurons,duration,delta_t,tau_d, tau_r,tau_l,tau_s,mu,Cm,gL,tau,R_input,a0
+		NVar gAMPA,AMPAR_mult,v_L,v_glut,v_reset,refractory,syn_delay
+		NVar connect_prob,v_thresh,threshold_stdev,thresh_inc,thresh_tau
+		NVar beta_Ca,nCa,k1Ca,i_Ca_passive,ca_rest,gamma_Ca,eta_max,sCa,k2Ca,CaO,xi
+	endif
+	
+	strswitch(ctrlName)
+		case "ResetParameters":
+			Variable /G neurons=64,duration=5000,delta_t=1
+			// Synaptic decay constant and time constant of recovery of vesicles to the active pool.  
+			Variable /G tau_d=10, tau_r=300
+			Variable /G tau_l=5000, tau_s=10000
+			Variable /G mu=0.35
+			// Membrane time constant, leak conductance, AHP conductance for each cell type
+			Variable /G tau=10, R_input=0.5, a0=0.1
+			// Synaptic conductances for each cell type; basically just two time constants for a general synaptic conductance
+			Variable /G gAMPA=10
+			Variable /G AMPAR_mult=1 // A multiplier for the AMPAR current, e.g. 0.5 would correspond to 50% AMPAR_Mult.  
+			// Reversal Vs, reset V, and thresholds
+			Variable /G v_L=-70, v_glut=0, v_reset=-70
+			// An absolute refractory period and a synaptic delay
+			Variable /G refractory=0, syn_delay=2;
+			// A connectivity ratio, e.g. only 30% of the cell pairs will even be connected (subject to the exponential distribution).  
+			Variable /G connect_prob=0.1
+			// This is actual firing rate adaptation, the threshInc's are the increment by which the firing threshold is incremented.  
+			// The taus are the rate at which this increase in the threshold decays. 
+			Variable /G v_thresh=-40, threshold_stdev=0;
+			Variable /G thresh_inc=10, thresh_tau=200
+			// Set all the phenotypes of the cells, excitatory or inhibitory. 
+			Variable /G ca_rest=0.05,beta_Ca=0.005,nCa=2,k1Ca=0.4,i_Ca_passive=0//15
+			Variable /G gamma_Ca=0.125,eta_max=0.3,sCa=4,k2Ca=0.4,caO=2000,xi=0.02
+			
+			// Old values
+			// eta_max=0.3
+			// sCa=4
+			// k2Ca=0.1
+			//
+			ModelControlProc("RegenerateWaves")
+			break
+		case "RegenerateNetwork":
+			Make /o/n=(neurons) ThresholdVariability=gnoise(1); //The baseline value of the firing threshold, randomized for each cell around a mean value.   
+			Make /o/n=(neurons,neurons) ConnectionMatrix=(abs(enoise(1))<connect_prob); // Generate connection strengths (to be multiplied by conductances). 
+			ConnectionMatrix*=ExpNoise(1) // Added 2007.12.12.2347
+			ModelControlProc("RegenerateWaves")
+			break
+		case "RegenerateWaves":
+			Make /o/n=(neurons,neurons) SynapseQ,ConnectionMatrix
+			Make /o/n=(neurons) V,deltaV,Calcium,Hill,CaForce,Eta,Spiking,Lastspike,EPSC
+			Make /o/n=(neurons) InitThreshold,Threshold
+			Make /o/n=(neurons) I_injected,I_ampa,I_total,Spike
+			Make /o/n=(neurons) StateX,StateY,StateZ,StateS,Available,Unavailable,Released,Imprisoned,Paroled,Sync,Async // The synaptic vesicle recycling states
+			
+			InitThreshold=v_thresh + gnoise(threshold_stdev)
+			SynapseQ=gAMPA*ConnectionMatrix[p][q]
+			MatrixTranspose SynapseQ // Transpose now to save time during the simulation.  
+			break
+		case "Start":
+			SimulReverb(no_reset=0)
+			break
+		case "ContinueZ":
+			SimulReverb(no_reset=1)
+			break
+	endswitch
+	SetDataFolder root:
+End
+
+Function SimulReverb([no_reset])
+	Variable no_reset
+	SetDataFolder root:Parameters
+	NVar neurons,duration,delta_t,tau_d, tau_r,tau_l,tau_s,mu,Cm,tau,R_input,a0
+	NVar gAMPA,AMPAR_mult,v_L,v_glut,v_reset,refractory,syn_delay
+	NVar connect_prob,v_thresh,threshold_stdev,thresh_inc,thresh_tau
+	NVar beta_Ca,nCa,k1Ca,i_Ca_passive,ca_rest,gamma_Ca,eta_max,sCa,k2Ca,CaO,xi
+	
+	Wave V,deltaV,Calcium,Hill,CaForce,Eta,Spiking,lastspike,EPSC
+	Wave Available,Unavailable,Released,Imprisoned,Paroled,Sync,Async
+	Wave InitThreshold,Threshold
+	Wave SynapseQ,StateX,StateY,StateZ,StateS
+	Wave I_injected,I_ampa,I_total,Spike
+	
+	Variable t,num_spiking,i,j,time_step,start_time,end_time
+	
+	SetDataFolder root:
+	if(!no_reset)
+		V=v_L; Calcium=Ca_rest; 
+		Spiking=0; Spike=0; Lastspike=-5; Threshold=InitThreshold
+		StateX=1; stateY=0; stateZ=0; stateS=0; EPSC=0; Eta=0; Sync=0; Async=0
+		I_injected=0;I_ampa=0;I_total=0
+		start_time=0
+		
+		// Initialize the storage of data
+		Make /o/n=0 history,histSpikes,histCalcium
+		Make /o/n=0 histTotal,oneCell,voltageClamp,currentClamp,histOther
+	else
+		NVar curr_time
+		start_time=curr_time
+	endif
+	
+	end_time=start_time+duration
+	
+	// Adapt to the time step
+	tau/=delta_t
+	thresh_tau/=delta_t
+	tau_r/=delta_t
+	tau_d/=delta_t
+	tau_l/=delta_t
+	tau_s/=delta_t
+	beta_Ca*=delta_t
+	i_Ca_passive*=delta_t
+	xi*=delta_t
+	
+	Redimension /n=(end_time,neurons) history,histSpikes,histCalcium
+	Redimension /n=(end_time) histTotal,oneCell,voltageClamp,currentClamp,histOther
+	SetScale /P x,0,delta_t,history,histCalcium,histSpikes,histTotal,oneCell,voltageClamp,currentClamp,histOther
+	
+	// Time course of current injection into cells from patch pipette(s)
+	Variable injection_current=2000,injection_start=300,injection_stop=302
+	
+	// The loop
+	//Tic()
+	for(t=start_time;t<end_time;t+=delta_t)
+   		// Reset
+   		V=Spiking ? v_reset : V; // Reset V
+   		Spiking=0; 
+		
+		// Currents
+		i_injected=(p==2 && t>injection_start && t<injection_stop) ? injection_current : 0
+		FastOp i_ampa=(v_glut*AMPAR_Mult)*EPSC-(AMPAR_Mult)*V*EPSC
+		FastOp i_total=i_ampa+i_injected
+		
+		// Membrane Potential; Quadratic Integrate and Fire dynamics
+		FastOp deltaV=(a0)*V*V-(a0)*V*Threshold-(a0*v_L)*V
+		FastOp deltaV=deltaV+(a0*v_L)*Threshold+(R_input)*I_total 
+	   	deltaV[0]=0
+		FastOp V=V+(1/tau)*deltaV
+	   	
+	   	// Spiking?
+	   	V=(V>v_glut) ? 0 : V
+	      	Spiking=(V>Threshold)
+	      	V=Spiking ? 30 : V //Assign spikes and their consequences to all cells that have reached threshold
+	    	lastspike=Spiking ? t : lastspike; // Record time of last spike for purposes of refractory period
+	 	
+	 	// Adaptation
+	    	FastOp Threshold=Threshold + (1/thresh_tau)*InitThreshold - (1/thresh_tau)*Threshold 
+	     	FastOp Threshold=Threshold + (thresh_inc)*spiking 
+	     
+	      // Presynaptic Calcium
+	      	spike=(lastspike==(t-syn_delay)) // Initiate synaptic conductance after the synaptic delay time.
+	      	Hill=((Calcium-Ca_rest)^nCa)/((Calcium-Ca_rest)^nCa + k1Ca^nCa)
+	      	CaForce=log(CaO/Calcium)
+	      	FastOp Calcium=Calcium+(i_Ca_passive)
+	     	FastOp Calcium=Calcium-(beta_Ca)*Hill+(gamma_Ca)*spike*CaForce; // Increment the Calcium
+	     	Eta=eta_max*(Calcium^sCa)/(Calcium^sCa + k2Ca^sCa)
+		
+		// Synaptic resource states
+	       FastOp Sync=(mu)*Spike*StateX
+	      	FastOp Async=(xi)*Eta*StateX
+	     
+	      	FastOp Released=Sync+Async
+	      Released=BinomialNoise(100,Released)/100 // Used to make this a stochastic values in 1/100ths of the total resources.  
+	      Released=Released>StateX ? StateX : Released
+	      
+	      	FastOp Available=(1/tau_r)*StateZ
+	      	FastOp Unavailable=(1/tau_d)*StateY
+	      	FastOp Imprisoned=(1/tau_l)*StateZ
+	      	FastOp Paroled=(1/tau_s)*StateS
+	      
+	      FastOp StateX=StateX-Released+Available; FastOp StateX=StateX+Paroled
+	      	FastOp StateY=StateY+Released-Unavailable
+	      FastOp StateZ=StateZ+Unavailable-Available; FastOp StateZ=StateZ-Imprisoned
+	      FastOp StateS=StateS+Imprisoned-Paroled   	
+	      
+	      	// Synaptic efficacy
+		MatrixOp /O EPSC = SynapseQ x StateY
+	     
+		// Store history
+		time_step=round(t/delta_t)
+		history[time_step][]=V[q]; 
+		histCalcium[time_step][]=calcium[q];
+		histSpikes[time_step][]=Spike[q]
+		histTotal[time_step]=1000*sum(spike)/neurons
+		histOther[time_step]=Calcium[2]
+		voltageClamp[time_step]=-I_total[0]
+	endfor
+	//Toc()
+	Variable /G curr_time=t
+	
+	// Reset time constants back to a time step of 1
+	tau*=delta_t
+	thresh_tau*=delta_t
+	tau_r*=delta_t
+	tau_d*=delta_t
+	tau_r*=delta_t
+	tau_s*=delta_t
+	beta_Ca/=delta_t
+	i_Ca_passive/=delta_t
+	xi/=delta_t
+	
+	// Adapt to the time step
+	tau/=delta_t
+	thresh_tau/=delta_t
+	tau_r/=delta_t
+	tau_d/=delta_t
+	
+	Wave CurrentClamp
+	CurrentClamp = history(x)[7]
+	// Add a baseline at the beginning
+//	if(start_time==0)
+//		InsertPoints /M=0 0,round(100/delta_t),histOther,histTotal,voltageClamp,currentClamp
+//		//Make /o/n=(round(end_time/10),neurons) raster
+//		//SetScale /P x,0,delta_t*10,raster
+//		//raster=sum(histSpike,x-delta_t*5,x+delta_t+4)
+//		currentClamp[0,round(100/delta_t)-1]=v_L	
+//	endif
+	
+	// Display the results
+	Duplicate /o histTotal histTotal2
+	Smooth round(5/delta_t),histTotal2
+	
+//	if(IsEmptyString(WinList("WaterfallPlot",";","")))
+//		NewWaterfall /W=(1,1,300,200)/K=1/N=WaterfallPlot history
+//		Label left "mV"
+//		Label right "Neuron #"
+//		ModifyGraph lblRot(right)=90
+//		ModifyGraph zColor(history)={history,*,*,Rainbow}
+//		ModifyWaterfall angle=45
+//	endif
+//	if(IsEmptyString(WinList("CalciumPlot",";","")))
+//		NewWaterfall /W=(301,1,600,200)/K=1/N=CalciumPlot histCalcium
+//		Label left "Calcium Concentration (µM)"
+//		Label right "Neuron #"
+//		ModifyGraph lblRot(right)=90
+//		ModifyGraph zColor(histCalcium)={histCalcium,*,*,Grays}
+//		ModifyWaterfall angle=45
+//	endif
+	if(IsEmptyString(WinList("RasterPlot",";","")))
+		Wave raster=histSpikes
+		Display /W=(0,0,400,250) /K=1/N=RasterPlot
+		AppendImage raster
+		Label left "Neuron #"
+	endif
+	if(strlen(WinList("ExamplePlots",";",""))==0)
+		Display /W=(0,0,400,400)/K=1/N=ExamplePlots
+		AppendToGraph /L=SpikeRate histTotal2
+		AppendToGraph /L=IClamp currentClamp
+		AppendToGraph /L=VClamp voltageClamp
+		Label VClamp "pA"
+		Label IClamp "mV"
+		Label SpikeRate "Spikes/s"
+		Label bottom "s"
+		ModifyGraph prescaleExp(bottom)=-3
+		SetAxis VClamp,-1000,0
+		ModifyGraph axisEnab(SpikeRate)={0,0.31}, axisEnab(IClamp)={0.33,0.64}, axisEnab(VClamp)={0.66,1}
+		ModifyGraph freePos(SpikeRate)={0,bottom}, freePos(IClamp)={0,bottom}, freePos(VClamp)={0,bottom}
+		ModifyGraph axisEnab(bottom)={0.1,1},btLen=2
+		ModifyGraph lblPos(SpikeRate)=45,lblPos(IClamp)=45,lblPos(VClamp)=45
+	endif
+	SetDataFolder root:
+End
+
+Function ReverbMovie()
+	//Wave HistSpikes
+	Make /o/n=(8,8,dimsize(HistSpikes,0)) HistSpikes2
+	Wave HistSpikes2
+	//HistSpikes2=HistSpikes[r][p*8+q]
+	NewPath /O/Q Desktop,desktop_dir
+	NewMovie /O /P=Desktop /F=10 as "Reverb4.mov"
+	NewImage /K=1 /S=0 HistSpikes2
+	//MoveWindow /W=$TopWindow() 0,0,300,300
+	ModifyImage HistSpikes2 ctab={0,1,Grays,0}
+	Variable i
+	for(i=0;i<1000;i+=1)
+		ModifyImage HistSpikes2 plane=i
+		//DoUpdate
+		AddMovieFrame 
+	endfor
+	CloseMovie
+	PlayMovie as "Reverb3.mov"
+End
+
+Function ReverbField()
+	//Variable s=1
+	Variable x=1,y=0,z=0,s=0,ca=1,rate=1/2
+	Make /o/n=(10000) XWave=0,YWave=0,ZWave=0,SWave=0,CaWave=0,RateWave=0
+	Variable t=0
+	XWave[t]=x; YWave[t]=y; ZWave[t]=z; SWave[t]=s; CaWave[t]=ca; RateWave[t]=rate
+	
+	Variable mu=0.1
+	Variable tau_d=50
+	Variable tau_r=50
+	Variable tau_l=100000
+	Variable tau_s=100000
+	Variable tau_ca=1000
+	Variable eta=0.01
+	Variable alpha=0.01
+	Variable sync=0.1,async=0.1,adapt=0,summ
+	for(t=1;t<=numpnts(RateWave);t+=1)
+		summ=5*sync+2*async-4*adapt-1
+		rate=sqrt(summ/(1-exp(-8*summ)))
+		sync+=rate*x/2 - sync/2
+		async+=rate*x*(1-async)/200 - async/200
+		adapt+=(sync+async-0.75)/50 -adapt/50
+//		y+= (rate*mu+eta*ca)*x - y/tau_d
+//		x+= -(rate*mu+eta*ca)*x + z/tau_r //+ s/tau_s
+//		z+= -z/tau_r +y/tau_d //- z/tau_l
+//		ca+= alpha*rate - (ca^1)/tau_ca
+//		//s+= +z/tau_l - s/tau_s
+//		rate=1/(1+exp(-10*(y-0.5)))
+//		XWave[t]=x; YWave[t]=y; ZWave[t]=z; SWave[t]=s; CaWave[t]=ca; RateWave[t]=rate
+		RateWave[t]=rate
+	endfor
+	
+	//Display /K=1 RateWave vs XWave
+	//ModifyGraph mode(RateWave)=4,marker(RateWave)=19,msize(RateWave)=1
+End
+
+Function DoseResponseModel(first,last,interval[,iterations,reset])
+	Variable first,last,interval,iterations,reset
+	iterations=ParamIsDefault(iterations) ? 1 : iterations
+	NewDataFolder /O/S root:DoseResponse
+	Make /o/n=0 Values; Wave Values
+	Variable i,j,value
+	for(value=first;value<=last;value+=interval)
+		InsertPoints 0,1,Values
+		Values[0]=value
+	endfor
+	NVar AMPAR_Mult=root:Parameters:AMPAR_Mult
+	NVar connect_prob=root:Parameters:connect_prob
+	if(!waveexists(Durations) || reset)
+		Make /o/n=0 Durations=NaN,Doses=NaN
+	endif
+	Wave Durations,Doses
+	root()
+	for(i=0;i<numpnts(Values);i+=1)
+		for(j=0;j<iterations;j+=1)
+			//AMPAR_Mult=Values[i]
+			connect_prob=Values[i]
+			ModelControlProc("RegenerateNetwork")
+			SimulReverb(no_reset=0)
+			Duplicate /o root:voltageClamp root:DoseResponse:$CleanUpName(num2str(Values[i]),1)
+			Wave VC=root:voltageClamp
+			Variable duration=LongestReverbVC(voltageClamp,downsample=100,off_trigger=200,on_trigger=200,down_time=800,subtract_med=0)
+			print Values[i],duration
+			InsertPoints 0,1,Durations,Doses
+			Doses[0]=Values[i]
+			Durations[0]=duration
+		endfor
+	endfor
+	Sort Doses,Doses,Durations
+End

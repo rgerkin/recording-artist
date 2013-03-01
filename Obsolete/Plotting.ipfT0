@@ -1,0 +1,1044 @@
+#pragma rtGlobals=1		// Use modern global access method.
+
+// ----------------- Windows -------------------
+
+// The window that plots the values of interest (like the peak amplitude of an EPSC)
+Function AnalysisWin() : Graph
+      	Display /N=Ampl_Analysis /W=(win_left+1,win_bottom*0.6+21,win_right*0.72-1,win_bottom) /L=Ampl_axis /B=Time_axis as "Amplitude Analysis"
+      	ControlBar/L 15 //All the amplitude axis sizing buttons
+      	Button Ampl_Axis_Up,pos={0,110},size={15,20},proc=Zoom,title="\\W617"
+      	Button Ampl_Axis_Down,pos={0,130},size={15,20},proc=Zoom,title="\\W623"
+	Button Ampl_Axis_Larger,pos={0,160},size={15,20},proc=Zoom,title="\\W606"
+      	Button Ampl_Axis_Smaller,pos={0,180},size={15,20},proc=Zoom,title="\\W622"
+      	ControlBar/B 15 //All the time axis sizing buttons
+	Button Time_Axis_Down,pos={375,33},size={20,15},proc=Zoom,title="\\W646"
+      	Button Time_Axis_Up,pos={395,33},size={20,15},proc=Zoom,title="\\W649"
+      	Button Time_Axis_Smaller,pos={425,33},size={20,15},proc=Zoom,title="\\W645"
+      	Button Time_Axis_Larger,pos={445,33},size={20,15},proc=Zoom,title="\\W648"
+      	SetDrawEnv fsize=6,save
+      	ControlBar/T 50
+      	NewDataFolder /O root:reanalysis
+      	Variable i,j
+	String channels=all_channels
+      	String pre,post,color
+      	for(i=0;i<ItemsInList(channels);i+=1)
+               pre=StringFromList(i,channels)
+               for(j=0;j<ItemsInList(channels);j+=1)
+                       post=StringFromList(j,channels)
+                       Channel2Color(post); NVar red,green,blue
+                       //r=Red(post); g=Green(post); b=Blue(post)
+                       Wave /Z Ampl=$("root:cell"+post+":ampl_"+pre+"_"+post)
+                       Wave /Z Ampl2=$("root:cell"+post+":ampl2_"+pre+"_"+post)
+                       if(waveexists(Ampl))
+                       	AppendToGraph/L=Ampl_axis /B=Time_axis $("root:cell"+post+":ampl_"+pre+"_"+post) vs root:sweep_t
+                       endif
+                       if(waveexists(Ampl2))
+                       	AppendToGraph/L=Ampl_axis /B=Time_axis $("root:cell"+post+":ampl2_"+pre+"_"+post) vs root:sweep_t
+                       endif
+                       ModifyGraph /Z rgb($("ampl_"+pre+"_"+post))=(red,green,blue), rgb($("ampl2_"+pre+"_"+post))=(red,green,blue)
+                       ModifyGraph /Z marker($("ampl_"+pre+"_"+post))=19,marker($("ampl2_"+pre+"_"+post))=8
+               endfor
+               Checkbox $("Reverse_"+pre), pos={305,1+16*i}, title="Sign "+pre, value=0
+               //SetVariable $(pre+"_start"), pos={322+115*i,6}, title=" ", value=$("root:parameters:first_stim_start_"+pre), limits={0,Inf,0.01}
+      	endfor
+      	if(WinExist("Sweeps"))
+      		PeakProc("",0)
+      	endif
+       SetAxis Ampl_axis -10,300; SetAxis Time_axis 0,30
+       ModifyGraph mode=3
+       ModifyGraph fSize(Ampl_axis)=fsize, fSize(Time_axis)=fsize, btLen(Ampl_axis)=2, btLen(Time_axis)=2
+       ModifyGraph lblPos(Ampl_axis)=lblpos,lblMargin(Time_axis)=3, freePos(Ampl_axis)={0.03,kwFraction}, freePos(time_axis)=0
+       ModifyGraph axisEnab(Ampl_axis)={0,1}, axisEnab(Time_axis)={0.03,1}//, rgb(zeroline2)=(0,0,0)
+       Label Ampl_axis "Peak Current (pA)"
+       Label Time_axis "Time (min)"
+
+       Checkbox Peak, pos={1,7}, value=1, proc=PeakProc, title="Pulse 1"
+       Checkbox Peak2, pos={1,30}, value=1, proc=PeakProc, title="Pulse 2"
+       PopupMenu Method, pos={75,5}, value=analysis_methods,proc=AnalysisMethodProc
+       SetVariable AnalysisValue, disable=1,pos={75,30} 
+       	
+       Button RegressionLine, pos={185,3},size={55,20},proc=RegressionLine,title="Trend"
+       Button Normalize, pos={240,3},size={55,20},proc=NormalizeToRegion,title="Normalize"
+       Button Recalculate, pos={185,27},size={110,20},proc=Recalculate,title="Recalculate"
+
+       SetVariable A_sweep,pos={645,6},title="A",value=root:reanalysis:cursor_A_sweep_number,proc=MoveCursor,limits={1,inf,1}
+       SetVariable B_sweep,pos={645,28},title="B",value=root:reanalysis:cursor_B_sweep_number,proc=MoveCursor,limits={1,inf,1}
+       
+       Cursors()
+       NVar cursor_A_sweep_number=root:reanalysis:cursor_A_sweep_number
+       NVar cursor_B_sweep_number=root:reanalysis:cursor_B_sweep_number
+       Cursor A, $CsrWave(A), cursor_A_sweep_number-1
+       Cursor B, $CsrWave(B), cursor_B_sweep_number-1
+       SetWindow Ampl_Analysis hook=RefreshHook, hookEvents=4
+       
+       DrugTags()
+       KillVariables /Z red,green,blue
+End
+
+// The window that plots data like the holding current, input resistance and series resistance.  
+Function MembraneWin() : Graph
+	//PauseUpdate; Silent 1		// building window...
+	Display /N=Membrane_Constants /W=(win_right*0.72+1,win_top,win_right,win_bottom*0.6-1) as "Membrane Constants Analysis"
+	Variable i
+	String channel,trace,axis_name
+	for(i=0;i<ItemsInList(all_channels);i+=1)
+		channel=StringFromList(i,all_channels)
+		if(!DataFolderExists("root:cell"+channel))
+			continue
+		endif
+		Channel2Color(channel); NVar red,green,blue
+		AppendToGraph/L=series_axis /c=(red,green,blue) $("root:cell"+channel+":series_res") vs root:sweep_t 
+		AppendToGraph/R=tau_Axis /c=(red,green,blue) $("root:cell"+channel+":timeConstant") vs root:sweep_t 
+		AppendToGraph/L=input_axis /c=(red,green,blue) $("root:cell"+channel+":input_res") vs root:sweep_t 
+		AppendToGraph/L=holding_axis  /c=(red,green,blue) $("root:cell"+channel+":holding_i") vs root:sweep_t
+	endfor
+	ModifyGraph mode=2, lsize=3,msize=1.5
+	for(i=0;i<ItemsInList(all_channels);i+=1)
+		trace="timeConstant#"
+		ModifyGraph /Z mode($(trace+num2str(i)))=3, lsize($(trace+num2str(i)))=5, marker($(trace+num2str(i)))=8, msize($(trace+num2str(i)))=2
+	endfor
+	ModifyGraph lblPos(tau_Axis)=15,lblPos(holding_axis)=26,lblPos(input_axis)=26,lblPos(series_axis)=26
+	ModifyGraph freePos(series_axis)={0,bottom}
+	ModifyGraph freePos(input_axis)={0,bottom}
+	ModifyGraph freePos(holding_axis)={0,bottom}
+	ModifyGraph freePos(tau_Axis)=0
+	ModifyGraph axisEnab(tau_Axis)={0,0.30}
+	ModifyGraph axisEnab(series_axis)={0,0.30}
+	ModifyGraph axisEnab(input_axis)={0.35,0.65}
+	ModifyGraph axisEnab(holding_axis)={0.70,1}
+	ModifyGraph axisEnab(bottom)={0.06,1}
+	ModifyGraph fSize=fsize;
+	ModifyGraph btLen(holding_axis)=1; ModifyGraph btLen(input_axis)=1; ModifyGraph btLen(series_axis)=1; ModifyGraph btLen(tau_axis)=1
+	ModifyGraph logTicks(input_axis)=4
+	//Wave zeroline2=root:zeroline2; zeroline2=0
+	//AppendToGraph /C=(0,0,0) /L=series_axis /B=bottom root:zeroline2 vs root:sweep_t
+	//AppendToGraph /C=(0,0,0) /L=input_axis /B=bottom root:zeroline2 vs root:sweep_t
+	//AppendToGraph /C=(0,0,0) /L=holding_axis /B=bottom root:zeroline2 vs root:sweep_t
+	Label tau_Axis "\\Z06TimeConstant (ms)"
+	Label series_axis"Series (Mohm)"
+	Label input_axis "Input (Mohm)"
+	Label holding_axis "Holding (pA)"
+	Label bottom "Time (min)"
+	//SetAxis tau_Axis 0,10; SetAxis series_axis 0,150; SetAxis input_axis 0,2000; SetAxis holding_axis -150,0; SetAxis bottom 0,30
+	ControlBar /T 20
+	Button initial_axis_values win=Membrane_Constants, pos={0,0}, size={178,20}, title="Initial Vertical Axis Values", proc=InitialMembraneAxisValues
+	Button recalc_membrane_constants win=Membrane_Constants, pos={178,0}, size={177,20}, title="Recalculate", proc=RecalcMembraneConstants
+	String axis_list="Holding_Axis;Input_Axis;Series_Axis"; 
+	DoUpdate
+	ControlBar /L 15
+	GetWindow Membrane_Constants, gsizeDC; Variable graph_height=V_bottom-V_top-40,axis_center; String enab_info
+	for(i=0;i<ItemsInList(axis_list);i+=1)
+		axis_name=StringFromList(i,axis_list)
+		enab_info=GetAxisEnab(axis_name,win="Membrane_Constants")
+		axis_center=0.5*(1-NumFromList(0,enab_info)+1-NumFromList(1,enab_info))*graph_height
+		Button $(axis_name+"_Up"),pos={0,15-45+axis_center},size={15,20},proc=Zoom,title="\\W617"
+		Button $(axis_name+"_Down"),pos={0,15-25+axis_center},size={15,20},proc=Zoom,title="\\W623"
+		Button $(axis_name+"_Larger"),pos={0,15+5+axis_center},size={15,20},proc=Zoom,title="\\W606"
+		Button $(axis_name+"_Smaller"),pos={0,15+25+axis_center},size={15,20},proc=Zoom,title="\\W622"
+	endfor
+	SetAxis bottom 0,30
+	KillVariables /Z red,green,blue
+	InitialMembraneAxisValues("")
+End
+
+// The window that plots the region right after stimulation, as well as the stimulus artifact (sodium current), and the beginning of the test pulse.  
+Function SweepWin() : Graph
+	//PauseUpdate; Silent 1		// building window...
+	//NVar offset=root:parameters:stagger_offset
+	SetDataFolder root:
+	Display /N=Sweeps /W=(win_left+1,win_top,win_right*0.72-1,win_bottom*0.6-1) /K=0 as "Sweeps"
+	ControlBar/L 15 //All the amplitude axis sizing buttons
+	Button VC_Axis_Up,pos={0,210},size={15,20},proc=Zoom,title="\\W617"
+	Button VC_Axis_Down,pos={0,230},size={15,20},proc=Zoom,title="\\W623"
+	Button VC_Axis_Larger,pos={0,260},size={15,20},proc=Zoom,title="\\W606"
+	Button VC_Axis_Smaller,pos={0,280},size={15,20},proc=Zoom,title="\\W622"
+	ControlBar/B 15 //All the time axis sizing buttons
+	Button Time_Axis_Down,pos={305,36},size={20,15},proc=Zoom,title="\\W646"
+	Button Time_Axis_Up,pos={325,36},size={20,15},proc=Zoom,title="\\W649"
+	Button Time_Axis_Smaller,pos={355,36},size={20,15},proc=Zoom,title="\\W645"
+	Button Time_Axis_Larger,pos={375,36},size={20,15},proc=Zoom,title="\\W648"	
+	Button RestoreAxes,pos={405,36},size={50,15},proc=ResetSweepAxes,title="Restore"
+	ControlBar/T 53
+	Checkbox A_sweep_show,pos={388,1}, title=" ",value=0,proc=SweepShow
+	Checkbox B_sweep_show,pos={388,18},title=" ",value=0,proc=SweepShow
+	SetVariable A_sweep,pos={404,1},title="A",value=root:reanalysis:cursor_A_sweep_number,proc=MoveCursor,limits={1,inf,1}
+	SetVariable B_sweep,pos={404,18},title="B",value=root:reanalysis:cursor_B_sweep_number,proc=MoveCursor,limits={1,inf,1}
+	Checkbox persist_trace,pos={305,1}, title="Persist",value=0//,proc=PersistProc
+	Checkbox last_sweep,pos={305,18},title="Last Sweep",value=1,proc=LastSweepProc
+	DoUpdate; GetWindow Sweeps,wsizeDC
+	Button SwitchView, pos={V_right-385,5},size={100,29},proc=SwitchView,title="Switch View",userData=default_view
+	Button RemoveAllTraces pos={V_right-284,5}, size={100,29}, title="Remove Traces", proc=RemoveTracesWrap
+	Button waves_btn,pos={V_right-183,5},size={60,29},proc=Waveselector,title="\\Z10Waves"
+	Button drug_btn,pos={V_right-122,5},size={60,29},proc=Drugwindow,title="\\Z10Drugs"
+	Button LogViewer,pos={V_right-61,5},size={60,29},proc=Show_Log,title="\\Z10Log"
+	//Textbox/N=Recording/F=0/X=7/Y=1 "\\Z08Waiting..."
+	//NVar test_pulse_start=root:parameters:test_pulse_start
+	Variable stim_point_start,test_point_start
+	Variable i,j,index,clamp=default_clamp
+	String pre,post
+	for(i=0;i<ItemsInList(all_channels);i+=1)
+		pre=StringFromList(i,all_channels)
+		Checkbox $pre, pos={1,1+18*i}, value=1, proc=TraceSelector, title=pre
+		for(j=0;j<ItemsInList(all_channels);j+=1)
+			post=StringFromList(j,all_channels)
+			Checkbox $(pre+"_"+post), pos={69+69*i,1+18*j}, value=1, proc=Traceselector, title=pre+"->"+post
+		endfor
+	endfor
+	Textbox/A=LT/N=time_stamp/F=0/X=25/Y=1 "\\Z08\\{root:sweeps_this_waveForm} (\\{root:current_sweep_number}) -- \\{secs2time(60*root:sweep_t[root:current_sweep_number],3)} -- \\{time()}"
+	WaveSelector("");DoWindow /B Selector
+	WaveUpdate()
+	SwitchView(default_view) // Set broad or focused (check user data for SwitchView button)	
+	ResetSweepAxes(default_view)
+	KillVariables /Z red,green,blue
+End
+
+Function SaveAxes(name,[win])
+	String name,win
+	if(ParamIsDefault(win))
+		win=WinName(0,1)
+	endif
+	NewDataFolder /O root:GraphData
+	String axis_list=AxisList(win)
+	Variable i; String axis_name
+	for(i=0;i<ItemsInList(axis_list);i+=1)
+		axis_name=StringFromList(i,axis_list)
+		GetAxis /W=$win /Q $axis_name
+		Variable /G root:GraphData:$(name+"_"+axis_name+"_min")=V_min
+		Variable /G root:GraphData:$(name+"_"+axis_name+"_max")=V_max
+	endfor
+End
+
+Function RestoreAxes(name,[win])
+	String name,win
+	if(ParamIsDefault(win))
+		win=WinName(0,1)
+	endif
+	String axis_list=AxisList(win)
+	Variable i; String axis_name
+	for(i=0;i<ItemsInList(axis_list);i+=1)
+		axis_name=StringFromList(i,axis_list)
+		if(exists("root:GraphData:"+name+"_"+axis_name+"_min") && exists("root:GraphData:"+name+"_"+axis_name+"_max"))
+			NVar minn=$("root:GraphData:"+name+"_"+axis_name+"_min")
+			NVar maxx=$("root:GraphData:"+name+"_"+axis_name+"_max")
+			SetAxis /W=$win $axis_name minn,maxx
+		endif
+	endfor
+End
+
+Function ResetSweepAxes(mode)
+	String mode
+	if(StringMatch(mode,"SwitchView"))
+		mode=GetUserData("Sweeps","SwitchView","")
+	endif
+	if(WhichListItem(mode,"Broad;Focused;SwitchView")<0)
+		ControlInfo /W=Sweeps SwitchView
+		mode=S_userdata
+	endif
+	ModifyGraph /Z/W=Sweeps axisEnab(VC_axis)={0.01,0.98},axisEnab(CC_axis)={0.01,0.98}
+	ModifyGraph /Z/W=Sweeps lsize=0.5, marker=3, fSize=fsize,btLen=2
+	Label /Z/W=Sweeps time_axis "s"
+	Label /Z/W=Sweeps VC_axis "pA"
+	Label /Z/W=Sweeps CC_axis "mV"
+	Label /Z/W=Sweeps stim_time_axis " "
+	Label /Z/W=Sweeps test_pulse_time_axis " "
+	ModifyGraph /Z/W=Sweeps lblPos(VC_axis)=27, lblPos(CC_Axis)=27
+	SetAxis /Z/W=Sweeps VC_Axis -500,50
+	SetAxis /Z/W=Sweeps CC_Axis -80,40
+	strswitch(mode)
+		case "Broad":
+			SetAxis/Z/W=Sweeps /A time_axis
+			ModifyGraph /Z/W=Sweeps freePos(VC_axis)={0.05,kwFraction}, freepos(CC_axis)={0.05,kwFraction}
+			ModifyGraph /Z/W=Sweeps freePos(time_axis)={0,$TraceYAxis(TopTrace(win="Sweeps"),win="Sweeps")}
+			ModifyGraph /Z/W=Sweeps axisEnab(time_axis)={0.03,0.96}
+			//ModifyGraph /Z/W=Sweeps axisEnab(stim_mag_axis)={0.99,1}, axisEnab(test_pulse_mag_axis)={0.99,1}
+			//ModifyGraph /Z/W=Sweeps axisEnab(stim_time_axis)={0.99,1}, axisEnab(test_pulse_time_axis)={0.99,1}
+			Textbox /W=Sweeps/C/N=time_stamp /X=40
+			//HideAxes(1,axes="test_pulse_mag_axis;test_pulse_time_axis;stim_mag_axis;stim_time_axis")
+			//DoUpdate; GetAxis /Q time_axis
+			ModifyGraph /Z/W=Sweeps freePos(VC_axis)={0.03,kwFraction}, freePos(CC_axis)={0.96,kwFraction}
+			SetAxis /Z/W=Sweeps/A time_axis;
+			break
+		case "Focused":
+			SetAxis /Z/W=Sweeps time_axis,-0.01,0.15
+			SetAxis /Z/W=Sweeps stim_time_axis,-0.001,0.005; SetAxis /Z/W=Sweeps stim_mag_axis,-2000,5000
+			SetAxis /Z/W=Sweeps test_pulse_time_axis,-0.001,0.020; SetAxis /Z/W=Sweeps test_pulse_mag_axis,-300,10
+			ModifyGraph /Z/W=Sweeps freePos(stim_mag_axis)={0.005,stim_time_axis}, freePos(test_pulse_mag_axis)={0.02,test_pulse_time_axis}
+			ModifyGraph /Z/W=Sweeps freePos(stim_time_axis)={0,stim_mag_axis}, freePos(test_pulse_time_axis)={0,test_pulse_mag_axis}
+			String top_trace=TopVisibleTrace(win="Sweeps")
+			ModifyGraph /Z/W=Sweeps freePos(time_axis)={0,$TraceYAxis(top_trace,win="Sweeps")}
+			ModifyGraph /Z/W=Sweeps tick(stim_mag_axis)=2, tick(test_pulse_mag_axis)=2
+			ModifyGraph /Z/W=Sweeps nticks(test_pulse_time_axis)=3
+			ModifyGraph /Z/W=Sweeps axisEnab(time_axis)={0.03,0.65}
+			ModifyGraph /Z/W=Sweeps axisEnab(stim_mag_axis)={0.52,1}, axisEnab(test_pulse_mag_axis)={0,0.48}
+			ModifyGraph /Z/W=Sweeps axisEnab(stim_time_axis)={0.70,0.98}, axisEnab(test_pulse_time_axis)={0.70,0.98}
+			ModifyGraph /Z/W=Sweeps freePos(VC_axis)={-0.010,time_axis}, freePos(CC_axis)={0.15,time_axis}
+			Textbox /W=Sweeps/C/N=time_stamp /X=25
+			break
+	endswitch
+End
+
+// A window that show whole sweeps.  By default it shows the last sweep from each channel, and other
+// sweeps can be shown, too.  
+Function SwitchView(mode)
+	String mode
+	Variable i,j,k,index,last_clamp,show,sweep_num,pre_active,post_active,last,synapse
+	Variable new_sweep=0,curs_show,instance,sweep_clamp,trace_clamp,stim_start2,appended=0
+	String pre,post,type,clamp_axis,entry,sweep_name,pathway,color,curs
+	String sweeps=TraceNameList("Sweeps",";",3)
+	sweeps=ListMatch(sweeps,"sweep*")
+	NVar kHz=root:parameters:kHz
+	//DoWindow /F Sweeps
+	String curr_mode=GetUserData("Sweeps","SwitchView","")
+	SaveCursors(curr_mode,win="Sweeps")
+	SaveAxes(curr_mode,win="Sweeps")
+	if(StringMatch(mode,"New Sweep"))
+		new_sweep=1
+	endif
+	if(StringMatch(mode,"SwitchView"))
+		mode=GetUserData("Sweeps","SwitchView","")
+		mode=SelectString(StringMatch(mode,"*Focused*"),"Focused","Broad") // If Broad, go to Focused; If Focused, go to Broad
+	endif
+	if(WhichListItem(mode,"Focused;Broad;SwitchView")<0) // For all other cases, just restore the view according to the current settings
+		ControlInfo /W=Sweeps SwitchView
+		mode=S_userdata
+	endif
+	if(IsEmptyString(mode))
+		mode="Focused"
+	endif
+	Button SwitchView  win=Sweeps, userData=mode
+	strswitch(mode)
+		case "Focused": 
+			// Append all the traces
+			NVar sweep=root:current_sweep_number
+			NVar test_pulse_start=root:parameters:test_pulse_start
+			for(i=0;i<ItemsInList(all_channels);i+=1)
+				pre=StringFromList(i,all_channels)
+				Wave /Z SweepParamsPre=root:$("sweep_parameters_"+pre)
+				if(!waveexists(SweepParamsPre))
+					continue
+				endif
+				ControlInfo /W=Sweeps $pre; pre_active=V_Value
+				ControlInfo /W=Sweeps last_sweep; last=V_Value
+				Channel2Color(pre); NVar red,green,blue
+				// Existing sweeps
+				for(k=0;k<2;k+=1)
+					curs=StringFromList(k,"A;B")
+					ControlInfo /W=Sweeps $(curs+"_sweep_show"); curs_show=V_Value
+					NVar cursor_sweep_num=root:reanalysis:$("cursor_"+curs+"_sweep_number")
+					if(curs_show && pre_active && exists("root:cell"+pre+":sweep"+num2str(cursor_sweep_num)))//&& WhichListItem("sweep"+num2str(cursor_sweep_num),sweeps)<0))
+						Wave SweepParamsPre=root:$("sweep_parameters_"+pre)
+						Wave SweepWave=$("root:cell"+pre+":sweep"+num2str(cursor_sweep_num))
+						stim_start2=SweepParamsPre[cursor_sweep_num][4]
+						AppendToGraph /W=Sweeps /c=(red,green,blue) /R=stim_mag_axis /B=stim_time_axis SweepWave[(stim_start2-1)*kHz,(stim_start2+5)*kHz]
+						ModifyGraph /W=Sweeps offset($TopTrace(win="Sweeps"))={-stim_start2/1000,0}
+						AppendToGraph /W=Sweeps /c=(red,green,blue) /R=test_pulse_mag_axis /B=test_pulse_time_axis SweepWave[(test_pulse_start*1000-1)*kHz,(test_pulse_start*1000+20)*kHz]
+						ModifyGraph /W=Sweeps offset($TopTrace(win="Sweeps"))={-test_pulse_start,0}
+						appended+=2
+					endif
+				endfor
+				// Current sweep
+				NVar stim_start=root:parameters:$(pre+"_begin")
+				if(pre_active && last)
+					AppendToGraph /W=Sweeps /c=(red,green,blue) /R=stim_mag_axis /B=stim_time_axis $("root:input_"+pre)
+					ModifyGraph /W=Sweeps offset($TopTrace(win="Sweeps"))={-stim_start/1000,0}
+					AppendToGraph /W=Sweeps /c=(red,green,blue) /R=test_pulse_mag_axis /B=test_pulse_time_axis $("root:input_"+pre)
+					ModifyGraph /W=Sweeps offset($TopTrace(win="Sweeps"))={-test_pulse_start,0}
+					appended+=2
+				endif
+				for(j=0;j<ItemsInList(all_channels);j+=1)
+					post=StringFromList(j,all_channels)
+					Wave /Z SweepParamsPost=root:$("sweep_parameters_"+post)
+					if(!waveexists(SweepParamsPost))
+						continue
+					endif
+					Channel2Color(post); NVar red,green,blue
+					ControlInfo /W=Sweeps $post; post_active=V_Value
+					ControlInfo /W=Sweeps $(pre+"_"+post); synapse=V_Value
+					// Existing synapses
+					for(k=0;k<2;k+=1)
+						curs=StringFromList(k,"A;B")
+						ControlInfo /W=Sweeps $(curs+"_sweep_show"); curs_show=V_Value
+						NVar cursor_sweep_num=root:reanalysis:$("cursor_"+curs+"_sweep_number")
+						//print pre_active,post_active
+						if(curs_show && pre_active && post_active && synapse && exists("root:cell"+post+":sweep"+num2str(cursor_sweep_num)))
+							sweep_clamp=SweepParamsPost[cursor_sweep_num][5]
+							Wave SweepWave=$("root:cell"+post+":sweep"+num2str(cursor_sweep_num))
+							stim_start2=SweepParamsPre[cursor_sweep_num][4]
+							if(stim_start2>0) // If there is a stimulus on that channel
+								if(sweep_clamp) // Voltage clamp
+									AppendToGraph /W=Sweeps /c=(red,green,blue) /L=VC_Axis /B=Time_Axis SweepWave[(stim_start2-5)*kHz,(stim_start2+150)*kHz]
+								else // Current clamp
+									AppendToGraph /W=Sweeps /c=(red,green,blue) /L=CC_Axis /B=Time_Axis SweepWave[(stim_start2-5)*kHz,(stim_start2+150)*kHz]
+								endif
+								ModifyGraph /W=Sweeps offset($TopTrace(win="Sweeps"))={-stim_start2/1000,0}
+								appended+=1
+							endif
+						endif
+					endfor
+					// Current synapse
+					if(pre_active && post_active && last && synapse)
+						if(stim_start>0) // If there is a stimulus on that channel
+							NVar VC=root:parameters:$(post+"_VC")
+							if(VC)
+								AppendToGraph /W=Sweeps /c=(red,green,blue) /L=VC_Axis /B=Time_Axis $("root:input_"+post)
+							else
+								AppendToGraph /W=Sweeps /c=(red,green,blue) /L=CC_Axis /B=Time_Axis $("root:input_"+post)
+							endif
+							ModifyGraph /W=Sweeps offset($TopTrace(win="Sweeps"))={-stim_start/1000,0}
+							appended+=1
+						endif
+					endif
+				endfor
+			endfor
+			// Set all the axes
+			//HideAxes(0,axes="test_pulse_mag_axis;test_pulse_time_axis;stim_mag_axis;stim_time_axis")
+			break
+		case "Broad": 
+			// Append all the traces
+			for(i=0;i<ItemsInList(all_channels);i+=1)
+				pre=StringFromList(i,all_channels)
+				NVar /Z VC=root:parameters:$(pre+"_VC")
+				if(!NVar_Exists(VC))
+					continue
+				endif
+				ControlInfo /W=Sweeps $pre; pre_active=V_Value
+				ControlInfo /W=Sweeps last_sweep; last=V_Value
+				Channel2Color(pre); NVar red,green,blue
+				// Current sweep
+				if(pre_active && last)
+					if(VC)
+						AppendToGraph /W=Sweeps /c=(red,green,blue) /L=VC_Axis /B=Time_Axis $("root:input_"+pre)
+					else
+						AppendToGraph /W=Sweeps /c=(red,green,blue) /L=CC_Axis /B=Time_Axis $("root:input_"+pre)
+					endif
+					appended+=1
+				endif
+				// Existing sweeps
+				for(j=0;j<2;j+=1)
+					curs=StringFromList(j,"A;B")
+					ControlInfo /W=Sweeps $(curs+"_sweep_show"); curs_show=V_Value
+					NVar cursor_sweep_num=root:reanalysis:$("cursor_"+curs+"_sweep_number")
+					if(curs_show && pre_active && exists("root:cell"+pre+":sweep"+num2str(cursor_sweep_num))) // && WhichListItem("sweep"+num2str(cursor_sweep_num),sweeps)<0 
+						Wave SweepParams=root:$("sweep_parameters_"+pre)
+						sweep_clamp=SweepParams[cursor_sweep_num][5]
+						if(sweep_clamp)
+							AppendToGraph /W=Sweeps /c=(red,green,blue) /L=VC_Axis /B=Time_Axis $("root:cell"+pre+":sweep"+num2str(cursor_sweep_num))
+						else
+							AppendToGraph /W=Sweeps /c=(red,green,blue) /L=CC_Axis /B=Time_Axis $("root:cell"+pre+":sweep"+num2str(cursor_sweep_num))
+						endif
+						appended+=1
+					endif
+				endfor
+			endfor
+			// Set all the axes
+			break
+	endswitch
+	// Remove the old traces
+	sweeps=TraceNameList("Sweeps",";",3)
+	String remove_list=""
+	ControlInfo /W=Sweeps persist_trace
+	for(i=0;i<ItemsInList(sweeps)-appended;i+=1)
+		sweep_name=StringFromList(i,sweeps)
+		remove_list+=sweep_name+";"
+	endfor
+	remove_list=SortList(remove_list,";",16)
+	//print remove_list
+	if(V_Value==0)
+		for(i=ItemsInList(remove_list)-1;i>=0;i-=1)
+			sweep_name=StringFromList(i,remove_list)
+			RemoveFromGraph /W=Sweeps $sweep_name
+		endfor
+	else
+		ChannelColorCode(win="Sweeps")
+		LightenTraces(2,traces=remove_list,win="Sweeps")
+		// Figure out how to implement persist with this new code
+	endif
+	RestoreCursors(TopAxisTrace("Time_Axis",win="Sweeps"),mode,win="Sweeps")
+	ResetSweepAxes(mode)
+	RestoreAxes(mode,win="Sweeps")
+	KillVariables /Z red,green,blue
+End
+
+// A window that can show the columns of a matrix, and in which those columns can be browsed.  
+Function BrowseMatrix(Matrix)
+	Wave Matrix
+	if(WinExist("MatrixBrowser"))
+		DoWindow/f MatrixBrowser
+	else
+		Display /K=1 /N=MatrixBrowser /W=(0,0,400,300)
+		ControlBar /T 35
+		//Cursors()
+		Variable /G root:matrix_sweep_num
+		SetVariable sweep,pos={35,10},size={120,10},title="Sweep",value=root:matrix_sweep_num,proc=NewMatrixSweep,limits={1,inf,1}
+		PopupMenu matrix_win,pos={235,10},size={120,10},title="Window",value=";"+WinList("*",";","WIN:1")
+		Checkbox transpose,pos={435,10},size={120,10},title="Transpose"
+		SetWindow MatrixBrowser, userData=GetWavesDataFolder(Matrix,2)
+		NVar num=root:matrix_sweep_num; num=0
+		NewMatrixSweep("",0,"","")
+	endif
+End
+
+// A window that can show the columns of a matrix, and in which those columns can be browsed.  
+Function BrowseFolder(folder,prefix)
+	String folder // Full folder path. 
+	String prefix // e.g. "Sweep".   
+	if(WinExist("FolderBrowser"))
+		DoWindow/F FolderBrowser
+	else
+		Display /K=1 /N=FolderBrowser /W=(0,0,400,300)
+		ControlBar /T 35
+		//Cursors()
+		Variable /G root:folder_sweep_num
+		SetVariable sweep,pos={35,10},size={120,10},title="Sweep",value=root:folder_sweep_num,proc=NewFolderSweep,limits={0,inf,1}
+		String curr_folder=GetDataFolder(1)
+		SetDataFolder root:
+		PopupMenu Folder,pos={235,10},size={120,10},title="Folder",value=AllFolders()
+		SetDataFolder $curr_folder
+		//Checkbox transpose,pos={435,10},size={120,10},title="Transpose"
+		SetWindow FolderBrowser, userData(folder)=folder
+		SetWindow FolderBrowser, userData(prefix)=prefix
+		NVar num=root:folder_sweep_num; num=0
+		NewFolderSweep("",0,"","")
+	endif
+End
+
+// An auxiliary function for BrowseMatrix()
+Function NewMatrixSweep(ctrlName,popNum,popStr,other) : SetVariableControl
+	String ctrlName; Variable popNum; String popStr,other
+	GetWindow MatrixBrowser, userData; String source=S_Value
+	RemoveTraces()
+	//print popNum,S_Value
+	ControlInfo /W=MatrixBrowser transpose; Variable transpose=V_Value
+	if(transpose)
+		Duplicate /o /R=[popNum-1,popNum-1][] $source root:MatrixSweep
+		Redimension /n=(numpnts(root:MatrixSweep)) root:MatrixSweep
+		SetScale /P x,dimoffset($source,1),dimdelta($source,1),root:MatrixSweep
+	else
+		Duplicate /o /R=[][popNum-1,popNum-1] $source root:MatrixSweep
+		SetScale /P x,dimoffset($source,0),dimdelta($source,0),root:MatrixSweep
+	endif
+	AppendToGraph root:MatrixSweep
+	ControlInfo /W=MatrixBrowser matrix_win; String win=S_Value
+	if(WinExist(win))
+		RemoveFromGraph /W=$win /Z line
+		Make /o/n=2 line=0
+		Variable scaled_val
+		if(transpose)
+			DoUpdate
+			GetAxis /W=$win /Q left
+			SetScale /I x,V_min,V_max,line
+			scaled_val=pnt2x2($source,popNum,0)
+			//line=scaled_val
+			AppendToGraph /VERT /W=$win line
+			//lineX={-Inf,Inf};lineY={popNum,popNum}
+		else
+			DoUpdate
+			GetAxis /W=$win /Q bottom
+			SetScale /I x,V_min,V_max,line
+			scaled_val=pnt2x2($source,popNum,1)
+			//print V_min,V_max,scaled_val
+			//line=scaled_val
+			AppendToGraph /W=$win line
+		endif
+		ModifyGraph /W=$win rgb(line)=(0,0,0)
+		//AppendToGraph /W=$win lineY vs lineX
+	endif
+End
+
+// An auxiliary function for BrowseFolder()
+Function NewFolderSweep(ctrlName,popNum,popStr,other) : SetVariableControl
+	String ctrlName; Variable popNum; String popStr,other
+	ControlInfo /W=FolderBrowser Folder
+	SetWindow FolderBrowser, userData(folder)=S_Value
+	String folder=GetUserData("FolderBrowser","","folder") 
+	String prefix=GetUserData("FolderBrowser","","prefix")
+	//GetAxis /Q left
+	String sweep_name=folder+":"+prefix+num2str(popNum)
+	//print sweep_name
+	Wave /Z FolderSweep=$sweep_name
+	//SetScale /P x,dimoffset($source,0),dimdelta($source,0),FolderSweep
+	if(waveexists(FolderSweep))
+		AppendToGraph FolderSweep
+	endif
+	RemoveTraces(except=TopTrace())
+	//SetAxis left V_min,V_max
+End
+
+Function PeakProc(ctrlName,var)
+	String ctrlName
+	variable var
+	Variable i,j,synapse_active,peak_active; String pre,post,synapse
+	for(i=0;i<ItemsInList(all_channels);i+=1)
+		pre=StringFromList(i,all_channels)
+		for(j=0;j<ItemsInList(all_channels);j+=1)
+			post=StringFromList(j,all_channels)
+			synapse=pre+"_"+post
+			ControlInfo /W=Sweeps $synapse; synapse_active=V_Value
+			ControlInfo /W=Ampl_Analysis Peak; peak_active=V_Value
+			ModifyGraph /Z/W=Ampl_Analysis hideTrace($("ampl_"+synapse))=!(synapse_active*peak_active)
+			ModifyGraph /Z/W=Ampl_Analysis hideTrace($("fit_ampl_"+synapse))=!(synapse_active*peak_active)
+			ControlInfo /W=Ampl_Analysis Peak2; peak_active=V_Value
+			ModifyGraph /Z/W=Ampl_Analysis hideTrace($("ampl2_"+synapse))=!(synapse_active*peak_active)
+			ModifyGraph /Z/W=Ampl_Analysis hideTrace($("fit_ampl2_"+synapse))=!(synapse_active*peak_active)
+		endfor
+	endfor
+End
+
+Function SweepShow(ctrlName,activate) 
+	String ctrlName
+	Variable activate
+	ControlInfo /W=Sweeps $ctrlName
+	Checkbox $ctrlName win=Sweeps, value=activate
+	String cursor_name=ctrlName[0]
+	NVar cursor_sweep_number=$("root:reanalysis:cursor_"+cursor_name+"_sweep_number")
+	Wave sweep_t=root:sweep_t
+	ValDisplay $(cursor_name+"_SweepTime") win=Sweeps, pos={460,1+16*(char2num(cursor_name)-65)}, size={40,20}, disable=!activate, format="%2.2f", value=#("root:sweep_t[root:reanalysis:cursor_"+cursor_name+"_sweep_number-1]")
+	SwitchView("")
+End
+
+// ----------------------- Functions to alter the content of the windows -------------------------
+
+Function AnalysisMethodProc(ctrlName,popNum,method) :PopupMenuControl
+	String ctrlName
+	Variable popNum
+	String method
+	String top_trace=TopVisibleTrace(win="Ampl_Analysis")
+	String channel=StringFromList(2,top_trace,"_")
+	NVar VC=root:parameters:$(channel+"_VC")
+	NewDataFolder /O root:reanalysis
+	SetVariable AnalysisValue, disable=1, win=Ampl_Analysis 
+	strswitch(method)
+		case "Peak":
+			Label /W=Ampl_Analysis Ampl_axis, SelectString(VC,"Peak Voltage (mV)","Peak Current (pA)")
+			Checkbox Peak title="Pulse 1", win=Ampl_Analysis
+			Checkbox Peak2 title="Pulse 2", win=Ampl_Analysis
+			break
+		case "Charge":
+			Label /W=Ampl_Analysis Ampl_axis, SelectString(VC,"Integrated Voltage (mV*s)","Total Charge (pC)")
+			Checkbox Peak title="Pulse 1", win=Ampl_Analysis
+			Checkbox  Peak2 title="Pulse 2", win=Ampl_Analysis
+			break
+		case "Slope":
+			Label /W=Ampl_Analysis Ampl_axis, SelectString(VC,"Slope (mV/ms)","Sloep (pA/ms)")
+			Checkbox Peak title="Pulse 1", win=Ampl_Analysis
+			Checkbox  Peak2 title="Pulse 2", win=Ampl_Analysis
+			break
+		case "Average":
+			Label /W=Ampl_Analysis Ampl_axis, SelectString(VC,"Average Voltage (mV)","Average Current (pA)")
+			Checkbox Peak title="After", win=Ampl_Analysis
+			Checkbox Peak2 title="Before", win=Ampl_Analysis
+			break
+		case "St. Dev.":
+			Label /W=Ampl_Analysis Ampl_axis, "Standard Deviation"
+			Checkbox Peak title="St. Dev.", win=Ampl_Analysis
+			Checkbox Peak2 title="Skewness", win=Ampl_Analysis
+			break
+		case "Median - Mean":
+			Label /W=Ampl_Analysis Ampl_axis, "Median - Mean"
+			Checkbox Peak title="M - M", win=Ampl_Analysis
+			Checkbox Peak2 title="", win=Ampl_Analysis
+			break
+		case "Mode - Mean":
+			Label /W=Ampl_Analysis Ampl_axis, "Mode - Mean"
+			Checkbox Peak title="M - M", win=Ampl_Analysis
+			Checkbox Peak2 title="", win=Ampl_Analysis
+			break
+		case "Mode Dev.":
+			Label /W=Ampl_Analysis Ampl_axis, "Deviation from Mode"
+			Checkbox Peak title="Dev. Mode", win=Ampl_Analysis
+			Checkbox Peak2 title="", win=Ampl_Analysis
+			break
+		case "Spikes":
+			Label /W=Ampl_Analysis Ampl_axis, "Number of Spikes"
+			Checkbox Peak title="Pulse 1", win=Ampl_Analysis
+			Checkbox Peak2 title="Pulse 2", win=Ampl_Analysis
+			break
+		case "Minis":
+			Label /W=Ampl_Analysis Ampl_axis, "Mini Size/Frequency"
+			Checkbox Peak title="Size", win=Ampl_Analysis
+			Checkbox Peak2 title="Freq", win=Ampl_Analysis
+			NewDataFolder /O root:Minis
+			if(!exists("root:Minis:mini_thresh"))
+				Variable /G root:Minis:mini_thresh=5
+			endif
+			SetVariable AnalysisValue, disable=0, limits={0,Inf,0.5}, value=root:Minis:mini_thresh, title=" ", help={"Cutoff value for mini detection in pA"}, win=Ampl_Analysis
+			Checkbox Exclude_Stimuli pos={140,30}, title="XS", win=Ampl_Analysis
+			break
+		case "Bek-Clem":
+			Label /W=Ampl_Analysis Ampl_axis, "BC Frequency/Noise"
+			Checkbox Peak title="Frequency", win=Ampl_Analysis
+			Checkbox Peak2 title="Noise", win=Ampl_Analysis
+			if(!exists("root:parameters:BC_thresh"))
+				Variable /G root:parameters:BC_thresh=5
+			endif
+			SetVariable AnalysisValue, disable=0, limits={0,Inf,0.5}, value=root:parameters:BC_thresh, title=" ", help={"Threshold BC score to count as value for mini detection in pA"}, win=Ampl_Analysis
+			Checkbox Exclude_Stimuli pos={140,30}, title="XS", win=Ampl_Analysis // For excluding analysis of sweeps with stimuli.  
+			break
+		case "Events":
+			Label /W=Ampl_Analysis Ampl_axis, "Spontaneous Event Rate"
+			Checkbox Peak title="Frequency", win=Ampl_Analysis
+			Checkbox Peak2 title="", win=Ampl_Analysis
+			break
+		default:
+			break
+	endswitch
+	//Recalculate("")
+End
+
+// Brings the experiment notebook to the front.  
+Proc Show_Log (LogViewer) : ButtonControl
+	String LogViewer
+	DoWindow /f Experiment_log
+End
+
+// Adds or removes traces corresponding to the various possible synapses (e.g. R1->L2, L2->L2)
+// Uses the checkboxes in the upper left corner of Sweeps as input.  
+Function TraceSelector(synapse,activate) : CheckboxControl
+	String synapse
+	Variable activate
+	Checkbox $synapse value=activate,win=Sweeps
+	SwitchView("")
+	PeakProc("",0)
+End
+
+// Adds or removes the last sweep(s) the window Sweeps and removes or lightens other sweeps.  
+Function LastSweepProc(ctrlName,val)
+	String ctrlName
+	Variable val
+	ControlInfo /W=Sweeps last_sweep
+	Checkbox last_sweep win=Sweeps, value=val
+	TextBox /C/V=(val)/N=time_stamp
+	SwitchView("")
+End
+
+Function PersistProc(ctrlName,checked)
+	String ctrlName
+	Variable checked
+//	String keep=""
+//	NVar A_num=root:reanalysis:cursor_A_sweep_number
+//	NVar B_num=root:reanalysis:cursor_B_sweep_number
+//	//print checked
+//	if(checked==0)
+//		ControlInfo /W=Sweeps A_sweep_show; keep+=SelectString(V_Value,"","sweep"+num2str(A_num)+"*"+";")
+//		ControlInfo /W=Sweeps B_sweep_show; keep+=SelectString(V_Value,"","sweep"+num2str(B_num)+"*"+";")
+//		RemoveTraces(except=keep+"input*",win="Sweeps")
+//	endif
+End
+
+// Adds sweeps indicated by the numeric box in the window Sweeps and removes or lightens others.  
+Function AddActiveTrace(ctrlName,num,str,other) : SetVariableControl
+	String ctrlName
+	Variable num
+	String str,other
+	SwitchView("")
+End
+
+// Removes all traces except the last sweep
+Function RemoveTracesWrap(ctrlName) : ButtonControl
+	String ctrlName
+	RemoveTraces(except="input*")
+End
+
+Function /S GetTraceDataFolder(trace_name[,win])
+	String trace_name,win
+	if(ParamIsDefault(win))
+		win=WinName(0,1)
+	endif
+	Wave theWave=TraceNameToWaveRef(win,trace_name)
+	return GetWavesDataFolder(theWave,0)
+End
+
+// Sets the vertical axes in MembraneConstants back to their original values (useful after an autoscale).  
+Function InitialMembraneAxisValues(ctrlName) : ButtonControl
+	String ctrlName
+	ModifyGraph log(series_axis)=1, log(input_axis)=1
+	SetAxis tau_Axis 0,10; SetAxis series_axis 10,100; SetAxis input_axis 100,10000; SetAxis holding_axis -150,20; //SetAxis bottom 0,30
+	SetDataFolder root:parameters
+	//Make /o series_tick_locs={10,20,30,45,60,80,100,150,200}
+	//Make /o /T series_tick_labels=num2str(series_tick_locs)
+	//ModifyGraph userticks(series_axis)={series_tick_locs,series_tick_labels}
+	SetDataFolder root:
+End
+
+// Moves cursors in the graph to match the value of the cursor variables
+Function MoveCursor(ctrlName,popNum,popString,other) : SetVariableControl
+	String ctrlName
+	Variable popNum
+	String popString,other
+	NVar current_sweep_number=root:current_sweep_number
+	if(!CursorExists("A",win="Ampl_Analysis"))
+		Cursors(win="Ampl_Analysis")
+	endif
+	if(popNum>current_sweep_number)
+		NVar cursor_sweep_number=$("root:reanalysis:cursor_"+ctrlName+"_number")
+		cursor_sweep_number=current_sweep_number
+		return 0
+	endif
+	String cursor_name=StringFromList(0,ctrlName,"_")
+	String cursor_info=CsrInfo($cursor_name,"Ampl_Analysis")
+	String cursor_trace=StringByKey("TName",cursor_info)
+	// If the cursor's trace is hidden, move to the cursor to the top visible trace
+	if(!IsTraceVisible(cursor_trace,win="Ampl_Analysis"))
+		cursor_trace=TopVisibleTrace(win="Ampl_Analysis")
+	endif
+	// If the new value is a NaN or beyond the range of the trace, move the cursor to another trace
+	if(!IsTraceValued(popNum-1,cursor_trace,win="Ampl_Analysis"))
+		cursor_trace=TopValuedTrace(popNum-1,win="Ampl_Analysis")
+	endif
+	// If no trace can be found to move the cursor to, don't move the cursor.  
+	if(IsEmptyString(cursor_trace))
+		RefreshHook("WINDOW:Ampl_Analysis;EVENT:cursormoved;CURSOR:"+cursor_name+";POINT:"+num2str(popNum-1)+";")
+		return 0
+	endif
+	if(StringMatch(ctrlName,"A_sweep"))
+		Cursor /W=Ampl_Analysis /P $cursor_name $cursor_trace popNum-1
+	elseif(StringMatch(ctrlName,"B_sweep"))
+		Cursor /W=Ampl_Analysis /P $cursor_name $cursor_trace popNum-1
+	endif
+	if(StringMatch(TopWindow(),"Sweeps"))
+		Checkbox $(ctrlName+"_show") value=1, win=Sweeps
+	endif
+	// There is a hook function in Ampl_Analysis that checks to see if the cursor has moved.  
+	// If it has, it updates the window "Sweeps".  
+End
+
+// Resizes a window that has zoom buttons.  
+Function Zoom(ctrlName): ButtonControl
+	String ctrlName
+	//print ctrlName
+	String direction=StringFromList(ItemsInList(ctrlName,"_")-1,ctrlName,"_")
+	String axis_name=RemoveFromList(direction,ctrlName,"_")
+	axis_name=axis_name[0,strlen(axis_name)-2] // Remove the last "_".  
+	String win_name=WinName(0,1)
+	String axis_list=AxisList(win_name)
+	if(WhichListItem(axis_name,axis_list)<0)
+		if(WhichListItem("CC_Axis",axis_list)>=0)
+			axis_name="CC_Axis"
+		endif
+	endif
+	GetAxis/Q /W=$win_name $axis_name
+	String axis_type=AxisInfo(win_name,axis_name)
+	axis_type=StringByKey("AxType",axis_type)
+	Variable new_Top, new_Bottom
+	strswitch(direction)
+		case "Up":
+			new_Top=V_max+(V_max-V_min)/10
+			new_Bottom=V_min+(V_max-V_min)/10
+			break
+		case "Down":
+			new_Top=V_max-(V_max-V_min)/10
+			new_Bottom=V_min-(V_max-V_min)/10
+			break
+		case "Larger":
+			new_Top=V_max+abs(V_max)/4
+			if(WhichListItem(axis_type,"bottom;top")>-1)
+				new_Bottom=V_min
+			else
+				new_Bottom=V_min-abs(V_min)/4
+			endif
+			break
+		case "Smaller":
+			new_Top=V_max-abs(V_max)/5
+			if(WhichListItem(axis_type,"bottom;top")>-1)
+				new_Bottom=V_min
+			else
+				new_Bottom=V_min+abs(V_min)/5
+			endif
+			break
+	endswitch
+	SetAxis /W=$win_name $axis_name new_Bottom,new_Top
+	if(StringMatch(axis_name,"Time_Axis") && StringMatch(win_name,"Ampl_Analysis"))
+		SetAxis /W=Membrane_Constants bottom new_Bottom, new_Top
+	endif
+End
+
+// Adds linear regression lines between the cursors on all active traces
+Function RegressionLine(ctrlName) : ButtonControl
+	String ctrlName
+	Variable i,existing_lines=str2num(GetUserData("","","regression_lines"))
+	if(!existing_lines)
+		//SetDataFolder root:
+		Variable first=xcsr(A)
+		Variable last=xcsr(B)
+		Variable red,green,blue
+		String traces=TraceNameList("",";",3)
+		String fit=ListMatch(traces,"*fit*")
+		traces=RemoveFromList("zeroline2;"+fit,traces)
+		String trace, trace_info, trace_colors
+		for(i=0;i<ItemsInList(traces);i+=1)
+			trace=StringFromList(i,traces)
+			Wave TraceWave=TraceNameToWaveRef("",trace)
+			Wave XTraceWave=XWaveRefFromTrace("",trace)
+			if(last<=first)
+				last=numpnts(TraceWave)-1
+				if(last==first)
+					first=last-1
+				endif
+			endif
+			Duplicate /o XTraceWave XWave
+			Redimension /n=(numpnts(TraceWave)) XWave
+			CurveFit /Q line TraceWave(first,last) /X=XWave /D
+			trace_info=TraceInfo("Ampl_Analysis",trace,0)
+			trace_colors=StringByKey("rgb(x)",trace_info,"=")
+			trace_colors=ReplaceString("(",trace_colors,"")
+			trace_colors=ReplaceString(")",trace_colors,"")
+			red=str2num(StringFromList(0,trace_colors,","))
+			green=str2num(StringFromList(1,trace_colors,","))
+			blue=str2num(StringFromList(2,trace_colors,","))
+			ModifyGraph rgb($("fit_"+trace))=(red,green,blue), lsize($("fit_"+trace))=0.5
+			Wave W_Coef=W_coef; Wave W_Sigma=W_Sigma
+			print "For trace "+trace+", the slope is "+num2str(W_Coef(2))+" +/- "+num2str(W_Sigma(2))
+			KillWaves XWave
+			KillVariables /Z red,green,blue
+		endfor
+		SetWindow kwTopWin userData(regression_lines)="1"
+	else
+		String trace_names,fit_names,fit_name
+		Do // Must do this way to account for traces changing names from #2 to #1, etc. as traces are removed.  
+			trace_names=TraceNameList("",";",3)
+			fit_names=ListMatch(trace_names,"fit_*")
+			if(ItemsInList(fit_names)>0)
+				for(i=0;i<ItemsInList(fit_names);i+=1)
+					fit_name=StringFromList(i,fit_names)
+					RemoveFromGraph /Z $fit_name
+				endfor
+			else
+				break
+			endif
+		While(1)
+		SetWindow kwTopWin userData(regression_lines)="0"
+	endif
+End
+
+// Adds linear regression lines between the cursors on all active traces
+Function NormalizeToRegion(ctrlName) : ButtonControl
+	String ctrlName
+	Variable normed=str2num(GetUserData("","","Normed"))
+	Variable normed_degree=str2num(GetUserData("","","Normed_Degree"))
+	DoUpdate
+	GetAxis /Q /W=Ampl_Analysis Ampl_Axis
+	Variable minn=V_min,maxx=V_max
+	if(normed)
+		ModifyGraph muloffset={0,0}
+		SetWindow kwTopWin userData(Normed)="0"
+		SetWindow kwTopWin userData(Normed_Degree)=""
+		SetAxis /W=Ampl_Analysis ampl_axis, minn*normed_degree,maxx*normed_degree
+	else
+		if(!IsEmptyString(CsrInfo(A))) // If the Cursor A is in the top graph
+			WaveStats /Q /R=(xcsr(A),xcsr(B)) CsrWaveRef(A)
+			ModifyGraph muloffset={0,1/V_avg}
+			SetWindow kwTopWin userData(Normed)="1"
+			SetWindow kwTopWin userData(Normed_Degree)=num2str(V_avg)
+			SetAxis /W=Ampl_Analysis ampl_axis,minn/V_avg,maxx/V_avg
+		endif
+	endif
+End
+
+// Handles all hooks for windows
+Function RefreshHook(info_str)
+	String info_str
+	String win= StringByKey("WINDOW",info_str)
+	String event= StringByKey("EVENT",info_str)
+	strswitch(win)
+		case "Selector":	
+			//print "Selectorpoop"
+			//SetDataFolder root:stimWaves
+			//print EVENT
+			break
+		case "DrugWin":
+			//print "Drugpoop"
+			SetDataFolder root:drugs:drugnames
+			break
+		case "Ampl_Analysis":
+			//print infoStr
+			if(StringMatch(event,"cursormoved"))
+				String cursor_name=StringByKey("CURSOR",info_str)
+				NVar /Z cursor_num=$("root:reanalysis:cursor_"+cursor_name+"_sweep_number")
+				Variable value
+				Variable sweep_num=str2num(StringByKey("POINT",info_str))+1
+				if(NVar_exists(cursor_num))
+					cursor_num=sweep_num
+					value=xcsr($cursor_name,"Ampl_Analysis")
+					Cursor /H=2/W=Membrane_Constants $cursor_name,$LongestVisibleTrace(win="Membrane_Constants"),value
+				endif
+				SwitchView("New Sweep")
+				if(lock_cursors && StringMatch(cursor_name,"A"))
+					Variable spacing=10
+					Cursor /W=Ampl_Analysis B,$LongestVisibleTrace(win="Ampl_Analysis"),value+spacing
+					Cursor /H=2/W=Membrane_Constants B,$LongestVisibleTrace(win="Membrane_Constants"),value+spacing
+				endif
+			endif
+			break
+	endswitch
+End
+
+// Applies tags in Ampl_Analysis where the drugs were added and washed out.  
+Function DrugTags()
+	Wave /Z/T info=root:drugs:info
+	Variable i,j,conc,multiplier,thyme; String entry,subentry,name,units,tag_text
+	if(!waveexists(info))
+		return 0
+	endif
+	for(i=0;i<numpnts(info);i+=1)
+		entry=info[i]
+		tag_text=""
+		for(j=0;j<ItemsInList(entry);j+=1)
+			subentry=StringFromList(j,entry)
+			units=StringFromList(3,subentry,",")
+			if(strlen(units)>2)
+				multiplier=str2num(units[0,strlen(units)-4])
+				units=units[strlen(units)-2,strlen(units)-1]
+			else
+				multiplier=1
+			endif
+			conc=str2num(StringFromList(2,subentry,","))
+			name=StringFromList(1,subentry,",")
+			thyme=str2num(StringFromList(0,subentry,","))
+			tag_text+=num2str(conc*multiplier)+" "+units+" "+name+"\r"
+		endfor
+		tag_text=tag_text[0,strlen(tag_text)-2]
+		if(StringMatch(tag_text,"*Washout*"))
+			tag_text="All drugs washed out"
+		endif
+		Tag /W=Ampl_Analysis /F=0/B=1/X=0/Y=40 time_axis,thyme,"\Z"+num2ndigits(fsize-1,2)+tag_text
+	endfor
+End
+
+// Applies tags onto an x-axis that corresponds to cumulative recorded time.  Absolute times coded in root:Drugs:Info are converted into cumulative
+// recorded times.  
+Function DrugTags2()
+	Wave /Z/T info=root:drugs:info
+	Variable i,j,conc,multiplier,thyme; String entry,subentry,name,units,tag_text
+	if(!waveexists(info))
+		return 0
+	endif
+	for(i=0;i<numpnts(info);i+=1)
+		entry=info[i]
+		tag_text=""
+		for(j=0;j<ItemsInList(entry);j+=1)
+			subentry=StringFromList(j,entry)
+			units=StringFromList(3,subentry,",")
+			if(strlen(units)>2)
+				multiplier=str2num(units[0,strlen(units)-4])
+				units=units[strlen(units)-2,strlen(units)-1]
+			else
+				multiplier=1
+			endif
+			conc=str2num(StringFromList(2,subentry,","))
+			name=StringFromList(1,subentry,",")
+			thyme=str2num(StringFromList(0,subentry,","))
+			Wave sweep_t=root:sweep_t
+			Variable sweep_num=2+BinarySearch(sweep_t,thyme)
+			thyme=SweepNum2CumulativeDuration(sweep_num)/60
+			tag_text+=num2str(conc*multiplier)+" "+units+" "+name+"\r"
+		endfor
+		tag_text=tag_text[0,strlen(tag_text)-2]
+		if(StringMatch(tag_text,"*Washout*"))
+			tag_text="All drugs washed out"
+		endif
+		Tag /F=0/B=1/X=0/Y=(25-2*i) bottom,thyme,"\Z"+num2ndigits(7,2)+tag_text
+	endfor
+End
+
+
+
