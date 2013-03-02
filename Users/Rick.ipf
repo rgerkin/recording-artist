@@ -21,7 +21,7 @@
 //#include "Data Browser"
 //#include "Experiment Browser"
 #include "GraphBrowser2"
-#include "::Recording Artist:Acquisition:Experiment Update"
+#include "::Acquisition:Experiment Update"
 //#include "Manual Upstate Detection"
 //#include "Model Reverb"
 #include "Minis"
@@ -41,6 +41,7 @@
 #endif
 #endif
 
+#ifdef Basics
 #include "ACL_WindowDesktops"
 #include "Databases"
 #include "Fit Functions"
@@ -54,6 +55,7 @@
 #include "SQLUtils"
 #endif
 #include "Stats Plot"
+#endif
 
 Function ProfileHook()
 	Execute /Q/Z "SetIgorOption colorize,UserFuncsColorized=1"
@@ -82,19 +84,9 @@ Function BeforeDebuggerOpensHook(pathToErrorFunction,isUserBreakpoint)
 End
 #endif // End of Rick's section.  
 
-#ifdef Bob
-#ifdef Acq // Only load Bob's procedure files if the acquistion procedure files are loaded.  
-#endif
-#endif
+//#ifdef Bob
+//#ifdef Acq // Only load Bob's procedure files if the acquistion procedure files are loaded.  
+//#endif
+//#endif
 
-#ifdef Craig
-#ifdef Dev
-#ifdef Basics
-#include "Load Neuralynx"
-#include "Neuralynx Analysis"
-#include "Neuralynx Analysis2"
-#include "Progress Window"
-#endif
-#endif
-#endif
 

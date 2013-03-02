@@ -22,7 +22,7 @@ static strconstant module=Acq
 Menu "Ac&quisition" , dynamic			
 	"Initialize Experiment From Scratch",/Q,Initialization()
 	SubMenu "&Initialize Experiment From Saved Settings"
-		ListPackageInstances("Acq","Acq",quiet=0,load=1,onDisk=1),/Q,GetLastUserMenuInfo;Initialization(acqInstance=s_value) // TO DO: Add acqInstance="last"
+		Core#ListPackageInstances("Acq","Acq",quiet=0,load=1,onDisk=1),/Q,GetLastUserMenuInfo;Initialization(acqInstance=s_value) // TO DO: Add acqInstance="last"
 	End
 	SelectString(GetAcqInited(),"","Super&Clamp"),/Q,SuperClamp()
 	SelectString(GetAcqInited(),"","&Log Panel"),/Q,MakeLogPanel()
@@ -82,7 +82,7 @@ Function Initialization([profileName,acqInstance])
 	Core#GetProfileInfo(profile)
 	acqInstance=selectstring(!paramisdefault(acqInstance),"_default_",acqInstance)
 	acqInstance=InitializeVariables(acqInstance=acqInstance)			// Calls profile-defined parameters in Values.ipf
-	SetSelectedInstance(module,"Acq",acqInstance)
+	Core#SetSelectedInstance(module,"Acq",acqInstance)
 	
 	variable defaults=stringmatch(acqInstance,"_default_")
 
@@ -91,15 +91,15 @@ Function Initialization([profileName,acqInstance])
 	Make /o/D/n=0 root:SweepT // Time of each sweep, in minutes since experiment start.  
 	BoardInit() // Initializes A/D Interface.  
 	DoWindow /K AnalysisWin; DoWindow /K SweepsWin; DoWindow /K Selector // Removes all graphs 
-	if(defaults || ExecuteProfileMacro(module,"SweepsWin","",1)<0)
+	if(defaults || Core#ExecuteProfileMacro(module,"SweepsWin","",1)<0)
 		SweepsWindow()
 	endif
-	if(defaults || ExecuteProfileMacro(module,"AnalysisWin","",1)<0 || AnalysisMethodListBoxUpdate())
+	if(defaults || Core#ExecuteProfileMacro(module,"AnalysisWin","",1)<0 || AnalysisMethodListBoxUpdate())
 		AnalysisWindow()
 	endif
 
 	string defaultDataDir=SpecialDirPath("Desktop",0,0,0)+"Data"
-	string dataDir=StrPackageSetting(module,"random","","dataDir",default_=defaultDataDir)
+	string dataDir=Core#StrPackageSetting(module,"random","","dataDir",default_=defaultDataDir)
 	NewPath /C/Z/O/Q Data, dataDir
 	if(v_flag)
 		NewPath /C/O/Q Data, defaultDataDir
@@ -122,7 +122,7 @@ Function /s InitializeVariables([acqInstance,noContainers,quiet])
 	string acqInstance // Name of an acquisition instance to load.  
 	variable noContainers,quiet
 	
-	if(paramisdefault(acqInstance) || stringmatch(acqInstance,"_default_") || !strlen(InstanceDiskLocation(module,module,acqInstance,quiet=quiet)))
+	if(paramisdefault(acqInstance) || stringmatch(acqInstance,"_default_") || !strlen(Core#InstanceDiskLocation(module,module,acqInstance,quiet=quiet)))
 		variable default_=1
 		acqInstance="_default_"
 	endif
@@ -149,30 +149,30 @@ Function /s InitializeVariables([acqInstance,noContainers,quiet])
 	make /O/T/N=1 drugsDF:history=""				// A wave contains the drug state during each sweep.  
 
 	// Load all packages for this profile.    
-	String packages=ListPackages(modules=module,quiet=quiet)
-	String packageInstancesLoaded=LoadPackages(module,packages=packages,quiet=quiet)
+	String packages=Core#ListPackages(modules=module,quiet=quiet)
 	if(default_)
-		LoadDefaultPackages(module,packages=packages,quiet=quiet)
+		Core#LoadDefaultPackages(module,packages=packages,quiet=quiet)
 	endif
+	String packageInstancesLoaded=Core#LoadPackages(module,packages=packages,quiet=quiet)
 	
 	// Load current DAQs.  
 	variable chan=0
 	if(default_)
 		make /free/t/n=1 acqInstanceDAQs="_default_"
 	else
-		wave /t acqInstanceDAQs=WavPackageSetting(module,module,acqInstance,"DAQs",quiet=quiet)
+		wave /t acqInstanceDAQs=Core#WavPackageSetting(module,module,acqInstance,"DAQs",quiet=quiet)
 	endif
 	for(i=0;i<numpnts(acqInstanceDAQs);i+=1)
-		string DAQ=InstanceOrDefault(module,"DAQs",acqInstanceDAQs[i],quiet=quiet)
+		string DAQ=Core#InstanceOrDefault(module,"DAQs",acqInstanceDAQs[i],quiet=quiet)
 		InitDAQ(i,instance=DAQ,quiet=quiet)
 		if(default_)
 			make /free/t/n=1 daqInstanceChannelConfigs="_default_"
 		else
-			wave /t daqInstanceChannelConfigs=WavPackageSetting(module,"DAQs",DAQ,"channelConfigs",quiet=quiet)	
+			wave /t daqInstanceChannelConfigs=Core#WavPackageSetting(module,"DAQs",DAQ,"channelConfigs",quiet=quiet)	
 		endif
 		DAQ=GetDaqName(i)
 		for(j=0;j<numpnts(daqInstanceChannelConfigs);j+=1)
-			string channelConfigInstance=InstanceOrDefault(module,"channelConfigs",daqInstanceChannelConfigs[j],quiet=quiet)
+			string channelConfigInstance=Core#InstanceOrDefault(module,"channelConfigs",daqInstanceChannelConfigs[j],quiet=quiet)
 			string chanName=GetChanName(chan)
 			InitChan(chan,DAQ=DAQ,instance=selectstring(default_,channelConfigInstance,"_default_"),noContainer=noContainers,quiet=quiet)
 			chan+=1
@@ -210,7 +210,7 @@ Function SetNumChannels(info) : SetVariableControl
 		endif
 		Variable numDAQChannels=oldNumDAQChannels+sign(targetNumDAQChannels-oldNumDAQChannels) // Add or remove at most one channel in each iteration of the loop.  
 		SetVariable NumChannels, userData=num2str(numDAQChannels), win=$info.win
-		wave /t DAQchannelConfigs=WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs")
+		wave /t DAQchannelConfigs=Core#WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs")
 		redimension /n=(numDAQChannels) DAQchannelConfigs
 		
 		Variable i,j
@@ -226,7 +226,7 @@ Function SetNumChannels(info) : SetVariableControl
 		
 		// Fix the part below.  Doesn't work if you remove "ch2", because "ch3" will become "ch2".  
 		if(add) // Add channel.  
-			DAQchannelConfigs[chan]=DefaultInstance(module,"DAQs")
+			DAQchannelConfigs[chan]=Core#DefaultInstance(module,"DAQs")
 			ActivateChan(chan,DAQ=DAQ)
 			i+=1
 		else // Remove channel.  
@@ -262,7 +262,7 @@ function ActivateChan(chan[,DAQ])
 	DAQ=selectstring(!paramisdefault(DAQ) && strlen(DAQ),Chan2DAQ(chan),DAQ)
 	//dfref chanDF=GetChanDF(chan,create=1)
 	InitChan(chan,DAQ=DAQ)
-	SetVarPackageSetting(module,"channelConfigs",GetChanName(chan),"active",1)
+	Core#SetVarPackageSetting(module,"channelConfigs",GetChanName(chan),"active",1)
 	Checkbox $("Show_"+num2str(chan)), value=1, win=SweepsWin
 	dfref daqDF=GetDaqDF(DAQ)
 	//wave /z input=daqDF:$("input_"+num2str(chan))
@@ -286,13 +286,13 @@ Function InitChan(chan[,DAQ,instance,noContainer,label_,quiet])
 	string context
 	sprintf context,"_chan_:%d",chan
 	if(paramisdefault(instance) || stringmatch(instance,"_default_"))
-		InheritInstancesOrDefault(module,"DAQs","channelConfigs",{name},parentInstance=DAQ,context=context,quiet=quiet)
+		Core#InheritInstancesOrDefault(module,"DAQs","channelConfigs",{name},parentInstance=DAQ,context=context,quiet=quiet)
 	else
-		CopyInstance(module,"channelConfigs",instance,name,context=context,quiet=quiet)
+		Core#CopyInstance(module,"channelConfigs",instance,name,context=context,quiet=quiet)
 	endif
-	SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ,quiet=quiet)
-	InheritInstancesOrDefault(module,"channelConfigs","stimuli",{name},parentInstance=name,context=context,quiet=quiet)
-	InheritInstancesOrDefault(module,"channelConfigs","filters",{name},parentInstance=name,context=context,quiet=quiet)
+	Core#SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ,quiet=quiet)
+	Core#InheritInstancesOrDefault(module,"channelConfigs","stimuli",{name},parentInstance=name,context=context,quiet=quiet)
+	Core#InheritInstancesOrDefault(module,"channelConfigs","filters",{name},parentInstance=name,context=context,quiet=quiet)
 	//SetAcqSetting("channelConfigs",name,"DAQ",DAQ)
 	SetUniqueChanLabel(chan,label_=label_,quiet=quiet)
 	SetUniqueChanColor(chan,quiet=quiet)
@@ -314,7 +314,7 @@ function InitChanContainer(chan[,quiet])
 	LabelChanHistory(w)
 	
 	// Make waves to hold the analysis values for analysis methods active on this channel.  
-	wave /t analysisMethods=WavTPackageSetting(module,"channelConfigs",GetChanName(chan),"analysisMethods")
+	wave /t analysisMethods=Core#WavTPackageSetting(module,"channelConfigs",GetChanName(chan),"analysisMethods")
 	variable i
 	for(i=0;i<numpnts(analysisMethods);i+=1)
 		string method=analysisMethods[i]
@@ -468,7 +468,7 @@ function /s GetListenHook(DAQ)
 	if(!strlen(DAQ))
 		DAQ=MasterDAQ()
 	endif
-	return StrPackageSetting(module,"DAQs",DAQ,"listenHook")
+	return Core#StrPackageSetting(module,"DAQs",DAQ,"listenHook")
 end
 
 // If the given Igor channel is a child of another channel (same raw data, different filter settings), returns the channel number; otherwise returns -1.    
@@ -494,7 +494,7 @@ Function FinalUpdate([DAQ])
 	err+=1*WaveUpdate(DAQ=DAQ)
 	err+=10*SetInputWaves(DAQ=DAQ)
 	err+=100*SetOutputWaves(DAQ=DAQ)
-	variable startTrigger=VarPackageSetting("Acq","DAQs",DAQ,"startTrigger",default_=6)
+	variable startTrigger=Core#VarPackageSetting("Acq","DAQs",DAQ,"startTrigger",default_=6)
 	err+=1000*SetupTriggers(startTrigger,DAQs=DAQ) // Setup pin 6 to be the trigger for starting stimulation
 	err+=10000*SwitchView("") // Update the window "Sweeps"
 	SetListenHook("CollectSweep(\"_daq_\")",DAQ=DAQ)
@@ -603,7 +603,7 @@ Function CollectSweep(DAQ) // This function is called when the input data has be
 			endif
 		else
 			//SpeakReset(1) // Really slow on ITC (and unnecessary).  
-			string feedbackProcess=StrPackageSetting(module,"random","","feedbackProcess")
+			string feedbackProcess=Core#StrPackageSetting(module,"random","","feedbackProcess")
 			if(strlen(feedbackProcess))
 				FeedbackProc(feedbackProcess)
 			endif
@@ -737,8 +737,8 @@ Function SaveSweepParameters()
 	variable sweep=GetCurrSweep()
 	string channel
 	variable i,j,k,numChannels=GetNumChannels()
-	string acqModes=ListPackageInstances(module,"acqModes")
-	string params=ListPackageObjects(module,"stimuli")
+	string acqModes=Core#ListPackageInstances(module,"acqModes")
+	string params=Core#ListPackageObjects(module,"stimuli")
 	for(i=0;i<numChannels;i+=1)
 		wave chanHistory=GetChanHistory(i)	
 		string DAQ=Chan2DAQ(i)
@@ -749,15 +749,15 @@ Function SaveSweepParameters()
 		Redimension/n=(rows,cols,layers) chanHistory
 		if(IsChanActive(i))
 			string name=GetChanName(i)
-			dfref stimDF=InstanceHome(module,"stimuli",name)
+			dfref stimDF=Core#InstanceHome(module,"stimuli",name)
 			for(j=0;j<pulseSets;j+=1)
 				for(k=0;k<ItemsInList(params);k+=1)
 					string param=StringFromList(k,params)
-					string type=ObjectType(joinpath({getdatafolder(1,stimDF),param}))
+					string type=Core#ObjectType(joinpath({getdatafolder(1,stimDF),param}))
 					variable col=FindDimLabel(chanHistory,1,param)
 					strswitch(type)
 						case "WAV":
-							wave /z w=WavPackageSetting(module,"stimuli",name,param)
+							wave /z w=Core#WavPackageSetting(module,"stimuli",name,param)
 							if(waveexists(w))
 								chanHistory[sweep][col][j]=w[j] // Fill in the current sweep's parameter values
 							endif
@@ -786,7 +786,7 @@ Function OnlineAnalysis(ISI[,DAQ])
 	Variable ISI
 	String DAQ
 	
-	variable minimumAnalysisISI=VarPackageSetting(module,"random","","minimumAnalysisISI",default_=0)
+	variable minimumAnalysisISI=Core#VarPackageSetting(module,"random","","minimumAnalysisISI",default_=0)
 	if(ISI>=minimumAnalysisISI)
 		variable sweepNum=GetCurrSweep()
 		string sweep=num2str(sweepNum)
@@ -903,7 +903,7 @@ Function StartAcquisition([DAQ])
 		// Guard against a large stimulus in voltage clamp
 		variable numChannels=GetNumChannels()
 		for(i=0;i<numChannels;i+=1)
-			wave Ampl=WavPackageSetting(module,"stimuli",GetChanName(i),"Ampl")
+			wave Ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(i),"Ampl")
 			if(StringMatch(GetModeOutputUnits(GetAcqMode(i)),"mV") && wavemax(Ampl)>300)
 				string alert
 				sprintf alert,"Are you sure you want to stimulate with %d mV in voltage clamp?",wavemax(Ampl)
@@ -998,7 +998,7 @@ Function ResetExperiment()
 	// Reset drug data.  
 	dfref drugsDF=GetDrugsDF()
 	redimension /n=(0,-1,-1,-1) drugsDF:info,drugsDF:history
-	drugsDF=PackageHome(module,"drugs")
+	drugsDF=Core#PackageHome(module,"drugs")
 	i=1
 	do // Washout.  f
 		dfref df=drugsDF:$("drug"+num2str(i+1))

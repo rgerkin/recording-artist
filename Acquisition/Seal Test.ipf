@@ -20,7 +20,7 @@ Function SealTest(chanBits[,instance,DAQ])
 	String instance,DAQ
 	
 	if(paramisdefault(instance))
-		string instances=ListPackageInstances(module,"sealTest")
+		string instances=Core#ListPackageInstances(module,"sealTest")
 		instance=stringfromlist(0,instances)
 	endif
 	DAQ=SelectString(ParamIsDefault(DAQ),DAQ,MasterDAQ())
@@ -28,7 +28,7 @@ Function SealTest(chanBits[,instance,DAQ])
 	if(numType(chanBits) || chanBits<=0)
 		return -1
 	endif
-	dfref packageDF=PackageHome(module,"sealTest")
+	dfref packageDF=Core#PackageHome(module,"sealTest")
 	string /g packageDF:instance=instance
 	dfref df=SealTestDF()
 	dfref daqDF=GetDaqDF(DAQ)
@@ -138,7 +138,7 @@ end
 function /df SealTestDF()
 	string instance
 	
-	dfref df=PackageHome(module,"sealTest")
+	dfref df=Core#PackageHome(module,"sealTest")
 	return df
 end
 
@@ -167,7 +167,7 @@ Function SealTestPoints(DAQ)
 End
 
 function /s SealTestInstance()
-	dfref packageDF=PackageHome(module,"sealTest")
+	dfref packageDF=Core#PackageHome(module,"sealTest")
 	svar /z/sdfr=packageDF instance
 	if(svar_exists(instance))
 		return instance
@@ -855,7 +855,7 @@ Function SealTestHook(infostr)
 			
 			// Store the seal test window coordinates.  
 			struct rect coords
-			GetWinCoords("SealTestWin",coords)
+			Core#GetWinCoords("SealTestWin",coords)
 			string DAQ=GetUserData("SealTestWin","","DAQ")
 			variable /g df:left=coords.left, df:top=coords.top, df:right=coords.right, df:bottom=coords.bottom
 			

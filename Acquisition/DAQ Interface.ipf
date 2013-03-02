@@ -58,7 +58,7 @@ function /s GetDAQDevices([types])
 		string funcName=type+"#"+GetRTStackInfo(1)
 		if(exists(funcName)==6 && strlen(type))
 			FuncRef GetDAQDevices f=$funcName
-			string typeDevices=f()
+			string typeDevices=f(types=types)
 			devices+=removeending(typeDevices,";")+";"
 		endif 
 	endfor
@@ -68,9 +68,9 @@ end
 function /s GetDAQs([tries,quiet])
 	variable tries,quiet
 	
-	dfref df=PackageManifest(module,"DAQs",quiet=quiet)
+	dfref df=Core#PackageManifest(module,"DAQs",quiet=quiet)
 	svar /z/sdfr=df ignore
-	df=PackageHome(module,"DAQs",quiet=quiet)
+	df=Core#PackageHome(module,"DAQs",quiet=quiet)
 	string DAQs=""
 	variable i
 	for(i=0;i<CountObjectsDFR(df,4);i+=1)
@@ -80,9 +80,9 @@ function /s GetDAQs([tries,quiet])
 		endif
 	endfor
 	if(!strlen(DAQs))
-		string defaultDAQ=DefaultInstance(module,"DAQs",quiet=quiet)
+		string defaultDAQ=Core#DefaultInstance(module,"DAQs",quiet=quiet)
 		if(strlen(defaultDAQ))
-			SetVarPackageSetting(module,"DAQs",defaultDAQ,"active",1,quiet=quiet)
+			Core#SetVarPackageSetting(module,"DAQs",defaultDAQ,"active",1,quiet=quiet)
 			if(!quiet)
 				printf "No selected DAQs were active.  Activating DAQ '%s'.\r",defaultDAQ
 			endif
@@ -97,15 +97,15 @@ function InitDAQ(daqNum[,instance,quiet])
 	variable daqNum,quiet
 	string instance
 	
-	string acqInstance=GetSelectedInstance(module,module,quiet=quiet)
+	string acqInstance=Core#GetSelectedInstance(module,module,quiet=quiet)
 	string DAQ=GetDAQName(daqNum)
 	string context
 	sprintf context,"_daqNum_:%d",daqNum
 	RemoveDAQTraces(DAQ,quiet=quiet)
 	if(paramisdefault(instance) || stringmatch(instance,"_default_"))
-		InheritInstancesOrDefault(module,"Acq","DAQs",{DAQ},context=context,quiet=quiet)
+		Core#InheritInstancesOrDefault(module,"Acq","DAQs",{DAQ},context=context,quiet=quiet)
 	else
-		CopyInstance(module,"DAQs",instance,DAQ,context=context,quiet=quiet)
+		Core#CopyInstance(module,"DAQs",instance,DAQ,context=context,quiet=quiet)
 	endif
 	dfref df=GetDaqDF(DAQ)
 	variable i,numChannels=GetNumChannels(DAQ=DAQ,quiet=quiet)
@@ -159,7 +159,7 @@ end
 function IsDAQActive(DAQ)
 	string DAQ
 	
-	return VarPackageSetting(module,"DAQs",DAQ,"active")
+	return Core#VarPackageSetting(module,"DAQs",DAQ,"active")
 end
 
 Function /s MasterDAQ([type,quiet])
@@ -190,7 +190,7 @@ function /df GetDAQdf(DAQ[,quiet])
 	string DAQ
 	variable quiet
 	
-	return InstanceHome(module,"DAQs",daq,create=1,quiet=quiet)
+	return Core#InstanceHome(module,"DAQs",daq,create=1,quiet=quiet)
 end
 
 function /s GetDAQInfo(DAQs)
@@ -201,7 +201,7 @@ function /s GetDAQInfo(DAQs)
 	variable i
 	for(i=0;i<itemsinlist(DAQs);i+=1)
 		string DAQ=stringfromlist(i,DAQs)
-		dfref df=InstanceHome(module,"DAQs",DAQ,create=0)
+		dfref df=Core#InstanceHome(module,"DAQs",DAQ,create=0)
 		svar /z/sdfr=df type,device
 		if(svar_exists(type))
 			sprintf info,"%s%s,%s%s;"info,DAQ,type,device
@@ -216,7 +216,7 @@ function /s DAQType(DAQ[,quiet])
 	string DAQ
 	variable quiet
 	
-	return StrPackageSetting(module,"DAQs",DAQ,"type",quiet=quiet)
+	return Core#StrPackageSetting(module,"DAQs",DAQ,"type",quiet=quiet)
 end
 
 //// Returns 1 if this channel name is consistent with this type of DAQ.  
@@ -234,27 +234,27 @@ end
 function GetDuration(daq)
 	string daq
 	
-	return VarPackageSetting(module,"DAQs",DAQ,"duration")
+	return Core#VarPackageSetting(module,"DAQs",DAQ,"duration")
 end
 
 function GetKHz(daq)
 	string daq
 	
-	return VarPackageSetting(module,"DAQs",DAQ,"kHz")
+	return Core#VarPackageSetting(module,"DAQs",DAQ,"kHz")
 end
 
 function GetNumPulseSets(daq)
 	string daq
 	
-	return VarPackageSetting(module,"DAQs",DAQ,"pulseSets")
+	return Core#VarPackageSetting(module,"DAQs",DAQ,"pulseSets")
 end
 
 Function /S Chan2DAQ(chan)
 	Variable chan
 	
 	string name=GetChanName(chan)
-	if(InstanceExists(module,"channelConfigs",name))
-		string DAQ=StrPackageSetting(module,"channelConfigs",name,"DAQ",default_=MasterDAQ())
+	if(Core#InstanceExists(module,"channelConfigs",name))
+		string DAQ=Core#StrPackageSetting(module,"channelConfigs",name,"DAQ",default_=MasterDAQ())
 	else
 		DAQ=MasterDAQ()
 	endif
@@ -264,13 +264,13 @@ End
 function DaqVarSetting(DAQ,setting)
 	string DAQ,setting
 	
-	return VarPackageSetting(module,"DAQs",DAQ,setting)
+	return Core#VarPackageSetting(module,"DAQs",DAQ,setting)
 end
 
 function /s DaqStrSetting(DAQ,setting)
 	string DAQ,setting
 	
-	return StrPackageSetting(module,"DAQs",DAQ,setting)
+	return Core#StrPackageSetting(module,"DAQs",DAQ,setting)
 end
 
 //Function NumDAQChannels(DAQ)
@@ -292,7 +292,7 @@ Function /S InputChannelList([DAQ])
 	if(numberbykey("ISPROTO",FuncRefInfo(f)) || !strlen(type))
 		return "N"
 	endif
-	return f()
+	return f(DAQ=DAQ)
 End
 
 Function /S OutputChannelList([DAQ])
@@ -304,7 +304,7 @@ Function /S OutputChannelList([DAQ])
 	if(numberbykey("ISPROTO",FuncRefInfo(f)) || !strlen(type))
 		return "N"
 	endif
-	return f()
+	return f(DAQ=DAQ)
 End
 
 // Returns the number of real outputs in the current output wave list on the given DAQ, that are not on the null channel.  

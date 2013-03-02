@@ -27,7 +27,7 @@ function /df CameraHome([instance,create])
 	
 	instance = selectstring(!paramisdefault(instance),"default",instance)
 	create = paramisdefault(create) ? 1 : create
-	dfref df = InstanceHome("Acq","camera","default",create=create)
+	dfref df = Core#InstanceHome("Acq","camera","default",create=create)
 	return df
 end
 

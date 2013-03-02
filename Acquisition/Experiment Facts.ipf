@@ -42,7 +42,7 @@ Function /wave StimulusWave(channel,sweepNum)
 	
 	string mode=GetDimLabel(w,0,min(sweepNum,lastSweepNum-1)) // Mode of that sweep, or if it is in the future, of the most recent sweep.  
 	if(strlen(mode))
-		dfref df=InstanceHome(module,"acqModes",mode)
+		dfref df=Core#InstanceHome(module,"acqModes",mode)
 		nvar /sdfr=df testPulseStart,testPulseLength,testPulseAmpl
 		if(nvar_exists(testPulseStart))
 			variable testPulseFound=1

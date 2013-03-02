@@ -112,7 +112,7 @@ static Function /wave MakePETHfromPanel([dataDF,keepTrials])
 //			return NULL
 //	endswitch
 	if(paramisdefault(keepTrials))
-		keepTrials=VarPackageSetting(module,"PETH",instance,"keepTrials",default_=0)
+		keepTrials=Core#VarPackageSetting(module,"PETH",instance,"keepTrials",default_=0)
 	endif
 	wave NlxPETH=NlxA#MakePETH(dataDF,trigSourceDF,instance,keepTrials=keepTrials)
 	wave counts=denseHistogram(triggerValues)
@@ -138,13 +138,13 @@ static Function /wave MakePETH(dataDF,eventsDF,pethInstance[,show,mask,keepTrial
 	
 	shuffle=selectstring(!paramisdefault(shuffle),"",shuffle)
 	wave /wave intervals=PETHIntervals(eventsDF,pethInstance)//WavTPackageSetting(module,"PETH",pethInstance,"Intervals")
-	string normalize=StrPackageSetting(module,"PETH",pethInstance,"Normalize",default_="rate")
+	string normalize=Core#StrPackageSetting(module,"PETH",pethInstance,"Normalize",default_="rate")
 	//wave /z/t triggers=WavTPackageSetting(module,"PETH",pethInstance,"triggers")
-	variable binWidth=VarPackageSetting(module,"PETH",pethInstance,"binWidth")
-	variable tPre=VarPackageSetting(module,"PETH",pethInstance,"tPre")
-	variable tPost=VarPackageSetting(module,"PETH",pethInstance,"tPost")
-	variable angles=VarPackageSetting(module,"PETH",pethInstance,"angles") // The data is angular, so average by taking cosines first.  
-	keepTrials = paramisdefault(keepTrials) ? VarPackageSetting(module,"PETH",pethInstance,"keepTrials") : keepTrials
+	variable binWidth=Core#VarPackageSetting(module,"PETH",pethInstance,"binWidth")
+	variable tPre=Core#VarPackageSetting(module,"PETH",pethInstance,"tPre")
+	variable tPost=Core#VarPackageSetting(module,"PETH",pethInstance,"tPost")
+	variable angles=Core#VarPackageSetting(module,"PETH",pethInstance,"angles") // The data is angular, so average by taking cosines first.  
+	keepTrials = paramisdefault(keepTrials) ? Core#VarPackageSetting(module,"PETH",pethInstance,"keepTrials") : keepTrials
 	//wave eventTimes=eventsDF:times
 	//duplicate /free eventTimes,triggerVals
 	//triggerVals=0
@@ -406,17 +406,17 @@ End
 static function /s PETHTriggers(pethInstance)
 	string pethInstance
 	
-	wave /t triggers=WavTPackageSetting(module,"PETH",pethInstance,"Triggers")
+	wave /t triggers=Core#WavTPackageSetting(module,"PETH",pethInstance,"Triggers")
 	variable i
 	string triggerList=""
 	for(i=0;i<numpnts(triggers);i+=1)
 		string trigger=triggers[i]
-		if(!IsBlank(trigger))
+		if(!Core#IsBlank(trigger))
 			triggerList+=trigger+";"
 		endif
 	endfor
 	if(!strlen(triggerList))
-		triggerList=ListPackageInstances(module,"Trigger")
+		triggerList=Core#ListPackageInstances(module,"Trigger")
 	endif
 	return triggerList
 end
@@ -443,8 +443,8 @@ end
 static function /wave TriggerTimes(events,triggerInstance)
 	dfref events
 	string triggerInstance
-	string type=StrPackageSetting(module,"Trigger",triggerInstance,"type")
-	variable value=VarPackageSetting(module,"Trigger",triggerInstance,"value")	
+	string type=Core#StrPackageSetting(module,"Trigger",triggerInstance,"type")
+	variable value=Core#VarPackageSetting(module,"Trigger",triggerInstance,"value")	
 	wave /z/sdfr=events times
 	strswitch(type)
 		case "TTL":
@@ -454,7 +454,7 @@ static function /wave TriggerTimes(events,triggerInstance)
 			wave /z/sdfr=events data
 			break
 	endswitch	
-	string condition=StrPackageSetting(module,"Trigger",triggerInstance,"condition")
+	string condition=Core#StrPackageSetting(module,"Trigger",triggerInstance,"condition")
 	strswitch(condition)
 		case "All":
 			extract /free times,result,1
@@ -514,8 +514,8 @@ static function /wave PETHIntervals(events,pethInstance[,absolute])
 	string triggers=PETHTriggers(pethInstance)
 	variable i,numTriggers=itemsinlist(triggers)
 	make /free/n=(numTriggers)/wave result
-	variable tPre=VarPackageSetting(module,"PETH",pethInstance,"tPre")
-	variable tPost=VarPackageSetting(module,"PETH",pethInstance,"tPost")
+	variable tPre=Core#VarPackageSetting(module,"PETH",pethInstance,"tPre")
+	variable tPost=Core#VarPackageSetting(module,"PETH",pethInstance,"tPost")
 	for(i=0;i<numTriggers;i+=1)
 		string trigger=stringfromlist(i,triggers)
 		if(absolute)
@@ -550,14 +550,14 @@ end
 static function /wave TriggerIntervals(triggerInstance)
 	string triggerInstance
 	
-	wave /t intervals=WavTPackageSetting(module,"Trigger",triggerInstance,"Intervals")
+	wave /t intervals=Core#WavTPackageSetting(module,"Trigger",triggerInstance,"Intervals")
 	variable i
 	make /o/n=0 result
 	for(i=0;i<numpnts(intervals);i+=1)
 		string interval=intervals[i]
-		if(!IsBlank(interval))
-			variable start=VarPackageSetting(module,"Intervals",interval,"start")
-			variable finish=VarPackageSetting(module,"Intervals",interval,"finish")	
+		if(!Core#IsBlank(interval))
+			variable start=Core#VarPackageSetting(module,"Intervals",interval,"start")
+			variable finish=Core#VarPackageSetting(module,"Intervals",interval,"finish")	
 			redimension /n=(2,dimsize(result,1)+1) result
 			result[][dimsize(result,1)-1]={start,finish}
 		endif
@@ -593,7 +593,7 @@ static function /s TriggerDescription(trigInstance)
 	string trigInstance
 	
 	string result=trigInstance
-	string desc=StrPackageSetting(module,"trigger",trigInstance,"desc")
+	string desc=Core#StrPackageSetting(module,"trigger",trigInstance,"desc")
 	if(strlen(desc))
 		result=desc
 	endif
@@ -833,21 +833,21 @@ static Function DisplayPETH(df[,colLabels,layer])
 					labell=stringfromlist(j,colLabels)
 				else
 					eventType=getdimlabel(PETH,2,j)
-					if(InstanceExists(module,"trigger",eventType))
+					if(Core#InstanceExists(module,"trigger",eventType))
 						labell=TriggerDescription(eventType)
 					endif
 				endif
 				labell=selectstring(strlen(labell),"Event "+num2str(j),labell)
 				Label $eventAxis labell+"\rTime (s)"
-				if(InstanceExists(module,"trigger",eventType))
-					wave /t intervals=WavPackageSetting(module,"trigger",eventType,"intervals")
+				if(Core#InstanceExists(module,"trigger",eventType))
+					wave /t intervals=Core#WavPackageSetting(module,"trigger",eventType,"intervals")
 					if(waveexists(intervals))
 						for(k=0;k<numpnts(intervals);k+=1)
 							if(strlen(intervals[k])==0 || stringmatch(intervals[k]," "))
 								continue
 							endif
-							variable start=VarPackageSetting(module,"Intervals",intervals[k],"start")
-							variable finish=VarPackageSetting(module,"Intervals",intervals[k],"finish")
+							variable start=Core#VarPackageSetting(module,"Intervals",intervals[k],"start")
+							variable finish=Core#VarPackageSetting(module,"Intervals",intervals[k],"finish")
 							if(numtype(start)==0 && numtype(finish)==0 && finish>start)
 								doupdate
 								getaxis /q $eventAxis
@@ -879,22 +879,22 @@ function /s TTLValue2Label(TTLvalue[,pethInstance])
 	
 	pethInstance=selectstring(!paramisdefault(pethInstance),"",pethInstance)
 	string labell=""
-	wave /t triggers=WavTPackageSetting(module,"PETH",pethInstance,"triggers")
+	wave /t triggers=Core#WavTPackageSetting(module,"PETH",pethInstance,"triggers")
 	if(waveexists(triggers) && (numpnts(triggers)>1 || !stringmatch(triggers[0]," ")))
 	else
-		string instances=ListPackageInstances(module,"trigger")
+		string instances=Core#ListPackageInstances(module,"trigger")
 		make /free/t/n=0 triggers=stringfromlist(p,instances)
 	endif
 	variable k
 	for(k=0;k<numpnts(triggers);k+=1)
 		string triggerInstance=triggers[k]
-		string triggerType=StrPackageSetting(module,"trigger",triggerInstance,"type")
+		string triggerType=Core#StrPackageSetting(module,"trigger",triggerInstance,"type")
 		if(!stringmatch(triggerType,"TTL"))
 			continue
 		endif
-		variable trigValue=VarPackageSetting(module,"trigger",triggerInstance,"value")
+		variable trigValue=Core#VarPackageSetting(module,"trigger",triggerInstance,"value")
 		if(TTLvalue==trigValue)
-			string desc=StrPackageSetting(module,"trigger",triggerInstance,"desc")
+			string desc=Core#StrPackageSetting(module,"trigger",triggerInstance,"desc")
 			if(strlen(desc))
 				labell=desc
 			else
@@ -3017,7 +3017,7 @@ Function DisplayClusterStats([df,clusters,recalc,periods])
 	recalc=paramisdefault(recalc) ? 1 : recalc
 	clusters=removeending(replacestring(";",clusters,"_"),"_")
 	if(paramisdefault(periods))
-		string pethInstance=DefaultInstance(module,"PETH")
+		string pethInstance=Core#DefaultInstance(module,"PETH")
 		wave periods=DefaultPrePostPeriods(pethInstance)
 	endif
 	
@@ -4605,7 +4605,7 @@ Function /wave MannWhitney([df,periods,aprx,freshTrials])
 		dfref df=$("root:"+S_Value)
 	endif
 	if(paramisdefault(periods) || dimsize(periods,0)<=1)
-		string pethInstance=DefaultInstance(module,"PETH")
+		string pethInstance=Core#DefaultInstance(module,"PETH")
 		wave periods=DefaultPrePostPeriods(pethInstance)
 	endif
 
@@ -4675,8 +4675,8 @@ End
 
 function /wave DefaultPrePostPeriods(pethInstance)
 	string pethInstance
-	variable tPre=VarPackageSetting(module,"PETH",pethInstance,"tPre")
-	variable tPost=VarPackageSetting(module,"PETH",pethInstance,"tPost")
+	variable tPre=Core#VarPackageSetting(module,"PETH",pethInstance,"tPre")
+	variable tPost=Core#VarPackageSetting(module,"PETH",pethInstance,"tPost")
 	make /free/n=(2,2) periods={{-tPre,0},{0,tPost}}
 	return periods
 end
@@ -4701,20 +4701,20 @@ function DoStats([df])
 	make /free/n=(2,2,numEventTypes) periods // BaselineResponse x StartFinish x numEventTypes 
 	for(i=0;i<numpnts(eventTypes);i+=1)
 		string trigger=eventTypes[i]
-		string trigType=StrPackageSetting(module,"Trigger",trigger,"type")
+		string trigType=Core#StrPackageSetting(module,"Trigger",trigger,"type")
 		strswitch(trigType)
 			case "TTL":
 				eventLabels[i]=TriggerDescription(trigger)
 				break
 		endswitch
-		wave /t intervals=WavTPackageSetting(module,"Trigger",trigger,"Intervals")
+		wave /t intervals=Core#WavTPackageSetting(module,"Trigger",trigger,"Intervals")
 		if(numpnts(intervals)>=2)
 			string baselineInterval=intervals[0]
 			string responseInterval=intervals[1]
-			periods[0][0][i]=VarPackageSetting(module,"Intervals",baselineInterval,"start")
-			periods[0][1][i]=VarPackageSetting(module,"Intervals",baselineInterval,"finish")
-			periods[1][0][i]=VarPackageSetting(module,"Intervals",responseInterval,"start")
-			periods[1][1][i]=VarPackageSetting(module,"Intervals",responseInterval,"finish")
+			periods[0][0][i]=Core#VarPackageSetting(module,"Intervals",baselineInterval,"start")
+			periods[0][1][i]=Core#VarPackageSetting(module,"Intervals",baselineInterval,"finish")
+			periods[1][0][i]=Core#VarPackageSetting(module,"Intervals",responseInterval,"start")
+			periods[1][1][i]=Core#VarPackageSetting(module,"Intervals",responseInterval,"finish")
 		else // Use the full pre-trigger and the full post-trigger as the analysis periods.   
 			wave periodsLayer=DefaultPrePostPeriods(pethInstance)
 			periods[][][i]=periodsLayer[p][q]

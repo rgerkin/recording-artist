@@ -137,6 +137,14 @@ Function /S DevString()
 	return str
 End
 
+function DPrintF(str)
+	string str
+	
+#ifdef Dev
+	print(str)
+#endif
+end
+
 Function /S ProfileList()
 	String fullPath = SpecialDirPath("Packages", 0, 0, 0)+"Profiles:" // Get path to Packages preferences directory on disk.
 	NewPath/O/C/Q/Z profilesPath, fullPath // Create a directory in the Packages directory for this package
@@ -157,16 +165,13 @@ Function /S Core(load)
 	Variable load // 1 to load, 0 to unload.  
 	
 	Execute /Q "SetIgorOption independentModuleDev=1"
-	string userProcs=SpecialDirPath("Igor Pro User Files",0,0,0)+"User Procedures"
-	NewPath /O/Z/Q CodeCorePath, userProcs+":Code:Core:"
-	if(v_flag)
-		NewPath /O/Z/Q CodeCorePath, userProcs+":Core:"
-	endif
+	string core_path = joinpath({RecordingArtistDiskLocation(),"Core"})
+	NewPath /O/Z/Q CorePath, core_path
 	String coreList=""
 	String currProcs=WinList("*",";","WIN:128,INDEPENDENTMODULE:1")
 	Variable i=0
 	Do
-		String file=IndexedFile(CodeCorePath,i,".ipf")
+		String file=IndexedFile(CorePath,i,".ipf")
 		if(StringMatch(file,"Symbols*"))
 			if(!load)
 				i+=1
@@ -210,10 +215,9 @@ Function SVNUpdate()
 			Execute /Q/P cmd // Execute each procedure closing.  This does 
 		endfor
 		cmd="TortoiseProc /command:update /path:"
-		String codePath=specialdirpath("Igor Pro User Files",0,0,0);
-		codePath=removeending(codePath,":")+":User Procedures"
-		NewPath /O/Q CodePath, codePath
-		Execute /Q/P "ExecuteScriptText /B/Z \""+cmd+"\\\""+codePath+"\\\"\"" // Extra slashes needed to escape the quotes in the command.  
+		String code_path=RecordingArtistDiskLocation()
+		NewPath /O/Q CodePath, code_path
+		Execute /Q/P "ExecuteScriptText /B/Z \""+cmd+"\\\""+code_path+"\\\"\"" // Extra slashes needed to escape the quotes in the command.  
 		//Execute /Q/P "Silent 101" // Recompile so Igor knows that every procedure has been closed.  
 		Execute /Q/P "OpenProc /P=CodePath /V=1 \":Core:Symbols.ipf\""//; printf \"Open Symbols\""
 		Execute /Q/P "Silent 101"//; printf \"Recompile\"" // Recompile to get access to functions in 'Symbols'.  
@@ -225,7 +229,7 @@ End
 
 Function SVNVersion()
 	variable version=0
-	NewPath /o/q/z CodeSVN removeending(SpecialDirPath("Igor Pro User Files",0,0,0),":")+":User Procedures:.svn"
+	NewPath /o/q/z CodeSVN joinpath({RecordingArtistDiskLocation(),".svn"})
 	if(!v_flag)
 		variable refNum
 		open /z/r/p=CodeSVN refNum as "entries"

@@ -9,10 +9,10 @@ static strconstant module=Acq
 static Function EditPackagesSetVariables(info) : SetVariableControl
 	Struct WMSetVariableAction &info
 	
-	string package=GetControlUserData(info.ctrlName,"PACKAGE",win=info.win)
-	string instance=GetControlUserData(info.ctrlName,"INSTANCE",win=info.win)
-	string object=GetControlUserData(info.ctrlName,"OBJECT",win=info.win)
-	string action=GetControlUserData(info.ctrlName,"ACTION",win=info.win)
+	string package=Core#GetControlUserData(info.ctrlName,"PACKAGE",win=info.win)
+	string instance=Core#GetControlUserData(info.ctrlName,"INSTANCE",win=info.win)
+	string object=Core#GetControlUserData(info.ctrlName,"OBJECT",win=info.win)
+	string action=Core#GetControlUserData(info.ctrlName,"ACTION",win=info.win)
 	
 	strswitch(package)
 		case "acqModes":
@@ -30,14 +30,14 @@ End
 static Function EditPackagesButtons(info) : ButtonControl
 	struct wmbuttonaction &info
 	
-	string package=GetControlUserData(info.ctrlName,"PACKAGE",win=info.win)
-	string instance=GetControlUserData(info.ctrlName,"INSTANCE",win=info.win)
-	string action=GetControlUserData(info.ctrlName,"ACTION",win=info.win)
+	string package=Core#GetControlUserData(info.ctrlName,"PACKAGE",win=info.win)
+	string instance=Core#GetControlUserData(info.ctrlName,"INSTANCE",win=info.win)
+	string action=Core#GetControlUserData(info.ctrlName,"ACTION",win=info.win)
 
 	strswitch(action)
 		case "Save":
 			if(stringmatch(package,"*Win"))
-				SaveProfileMacro(package)
+				Core#SaveProfileMacro(package)
 			elseif(stringmatch(package,"analysisMethods"))
 				AnalysisSelector(0)
 			endif
@@ -70,7 +70,7 @@ static Function /S LoadDefaultPackageInstances(module,package[,special])
 	
 	strswitch(package)
 		case "acqModes":
-			string instances=ListPackageInstances(module,package)
+			string instances=Core#ListPackageInstances(module,package)
 			variable i
 			for(i=0;i<itemsinlist(instances);i+=1)
 				string instance=stringfromlist(i,instances)
@@ -140,8 +140,8 @@ static Function SelectPackageInstance(module,package,instance[,special])
 	endif
 	
 	string name=GetChanName(chan)
-	dfref chanDF=InstanceHome(module,package,name,quiet=1) // Location of instance e.g. ch0, not the sweeps for ch0.  
-	dfref packageDF=PackageHome(module,package)
+	dfref chanDF=Core#InstanceHome(module,package,name,quiet=1) // Location of instance e.g. ch0, not the sweeps for ch0.  
+	dfref packageDF=Core#PackageHome(module,package)
 	//String DAQ=Chan2DAQ(chan)
 	dfref daqDF=GetDaqDF(DAQ)
 	dfref instanceDF=packageDF:$instance
@@ -149,7 +149,7 @@ static Function SelectPackageInstance(module,package,instance[,special])
 	sprintf context,"_chan_:%d;",chan
 	if(DataFolderRefStatus(instanceDF)) // A normal package instance.  
 		if(!stringmatch(package,"DAQs"))
-			CopyInstance(module,package,instance,name,context=context)
+			Core#CopyInstance(module,package,instance,name,context=context)
 		endif
 	elseif(stringmatch(package,"stimuli"))
 		wave /z stimulus=packageDF:$instance
@@ -175,14 +175,14 @@ static Function SelectPackageInstance(module,package,instance[,special])
 				case "_Save_":
 					string winDAQ=GetWinDAQ()
 					do
-						string targetDAQ = DefaultInstance(module,package)
+						string targetDAQ = Core#DefaultInstance(module,package)
 						prompt targetDAQ,"Name:"
 						DoPrompt "Enter the desired name for this DAQ instance",targetDAQ
 						if(!v_flag)
 							if(strlen(targetDAQ))
 								string win
-								CopyInstance(module,package,winDAQ,targetDAQ)
-								if(!SavePackageInstance(module,package,targetDAQ))
+								Core#CopyInstance(module,package,winDAQ,targetDAQ)
+								if(!Core#SavePackageInstance(module,package,targetDAQ))
 									printf "DAQ instance %s successfully saved.\r",targetDAQ
 								endif
 							endif
@@ -201,19 +201,19 @@ static Function SelectPackageInstance(module,package,instance[,special])
 			endswitch
 			break
 		case "channelConfigs":
-			SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ) // Set the stimulus name.  
+			Core#SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ) // Set the stimulus name.  
 			string stimName=GetStimulusName(chan)
-			SelectPackageInstance(module,"stimuli",stimName,special=special)
+			Core#SelectPackageInstance(module,"stimuli",stimName,special=special)
 			break
 		case "stimuli":
-			SetStrPackageSetting(module,"channelConfigs",name,"stimulus",instance) // Set the stimulus name.  
+			Core#SetStrPackageSetting(module,"channelConfigs",name,"stimulus",instance) // Set the stimulus name.  
 			string vars="pulseSets;duration;ISI;sweepsLeft;"
 			variable i
 			for(i=0;i<itemsinlist(vars);i+=1)
 				string var=stringfromlist(i,vars)
 				nvar /z/sdfr=instanceDF val=$var
 				if(nvar_exists(val))
-					SetVarPackageSetting(module,"DAQs",DAQ,var,val)
+					Core#SetVarPackageSetting(module,"DAQs",DAQ,var,val)
 				endif
 			endfor
 			string acqMode=GetAcqMode(chan)
@@ -229,8 +229,8 @@ static Function SelectPackageInstance(module,package,instance[,special])
 			WaveValuesProc(info)
 			break
 		case "filters":
-			SetStrPackageSetting(module,"channelConfigs",name,"filters",instance) // Set the filter instance name.  
-			CopyInstance(module,"filters",instance,name)
+			Core#SetStrPackageSetting(module,"channelConfigs",name,"filters",instance) // Set the filter instance name.  
+			Core#CopyInstance(module,"filters",instance,name)
 			break
 	endswitch
 	if(WinType(DAQ+"_Selector") && !stringmatch(package,"DAQs"))
@@ -254,9 +254,9 @@ function SaveStimulus(chan[,stimName])
 	for(i=0;i<itemsinlist(vars);i+=1)
 		string varName=stringfromlist(i,vars)
 		nvar /sdfr=daqDF var=$varName
-		SetVarPackageSetting(module,"stimuli",chanName,varName,var)
+		Core#SetVarPackageSetting(module,"stimuli",chanName,varName,var)
 	endfor
-	dfref chanDF=InstanceHome(module,"channelConfigs",chanName)
+	dfref chanDF=Core#InstanceHome(module,"channelConfigs",chanName)
 	for(i=0;i<itemsinlist(strs);i+=1)
 		string strName=stringfromlist(i,strs)
 		strswitch(strName)
@@ -267,14 +267,14 @@ function SaveStimulus(chan[,stimName])
 				df=daqDF
 		endswitch
 		svar /sdfr=df str=$strName
-		SetStrPackageSetting(module,"stimuli",chanName,strName,str)
+		Core#SetStrPackageSetting(module,"stimuli",chanName,strName,str)
 	endfor
-	stimName=selectstring(!paramisdefault(stimName),StrPackageSetting(module,"channelConfigs",chanName,"Stimulus"),stimName)
+	stimName=selectstring(!paramisdefault(stimName),Core#StrPackageSetting(module,"channelConfigs",chanName,"Stimulus"),stimName)
 	stimName=selectstring(strlen(stimName),"Dummy",stimName)
-	dfref newDF=CopyInstance(module,"stimuli",chanName,stimName)
+	dfref newDF=Core#CopyInstance(module,"stimuli",chanName,stimName)
 	err-=!datafolderrefstatus(newDF)
 	if(!err)
-		err+=SavePackage(module,"stimuli",quiet=1)
+		err+=Core#SavePackage(module,"stimuli",quiet=1)
 	endif
 	if(!err)
 		printf "Stimulus '%s' on channel '%s' saved successfully.\r",stimName,Chan2Label(chan)
@@ -287,8 +287,8 @@ Function AcqModeDefaults(instance[,ignoreBaseline])
 	String instance
 	Variable ignoreBaseline
 	
-	variable noiseFreq=VarPackageSetting("Acq","random","","noiseFreq",default_=60)
-	dfref df=InstanceHome("Acq","acqModes",instance)
+	variable noiseFreq=Core#VarPackageSetting("Acq","random","","noiseFreq",default_=60)
+	dfref df=Core#InstanceHome("Acq","acqModes",instance)
 	if(!datafolderrefstatus(df))
 		return -1
 	endif
@@ -430,14 +430,14 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 		if(waveexists(labels))
 			for(i=0;i<numpnts(labels);i+=1)
 				InitChan(i,noContainer=1)
-				SetStrPackageSetting(module,"channelConfigs",GetChanName(i),"label_",labels[i])
-				SetWavPackageSetting(module,"channelConfigs",GetChanName(i),"color",row(colors,i))
+				Core#SetStrPackageSetting(module,"channelConfigs",GetChanName(i),"label_",labels[i])
+				Core#SetWavPackageSetting(module,"channelConfigs",GetChanName(i),"color",row(colors,i))
 			endfor
 		else
 			for(i=0;i<itemsinlist(usedChannels_);i+=1)
 				InitChan(i,noContainer=1)
-				SetStrPackageSetting(module,"channelConfigs",GetChanName(i),"label_",stringfromlist(i,usedChannels_))
-				SetWavPackageSetting(module,"channelConfigs",GetChanName(i),"color",GetDefaultChanColor(i))
+				Core#SetStrPackageSetting(module,"channelConfigs",GetChanName(i),"label_",stringfromlist(i,usedChannels_))
+				Core#SetWavPackageSetting(module,"channelConfigs",GetChanName(i),"color",GetDefaultChanColor(i))
 			endfor
 		endif
 	endif
@@ -446,14 +446,14 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	if(!strlen(DAQs))
 		InitDAQ(0)
 		string DAQ=GetDAQName(0)
-		wave /t DAQchannelConfigs=WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs")
+		wave /t DAQchannelConfigs=Core#WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs")
 		redimension /n=(itemsinlist(UsedChannels())) DAQchannelConfigs
 		numChannels=GetNumChannels()
 		dfref daqDF=GetDaqDF(GetDaqName(0))
 		for(j=0;j<numChannels;j+=1)
 			make /o daqDF:$("input_"+num2str(j))
 		endfor
-		SetVarPackageSetting(module,"DAQs",DAQ,"numChannels",numChannels)
+		Core#SetVarPackageSetting(module,"DAQs",DAQ,"numChannels",numChannels)
 	endif
 	for(i=0;i<ItemsInList(DAQs);i+=1)
 		DAQ=StringFromList(i,DAQs)
@@ -607,7 +607,7 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 					methods[numpnts(methods)]={method}
 				endif
 			endfor
-			SetWavTPackageSetting("Acq","channelConfigs",GetChanName(i),"analysisMethods",methods)
+			Core#SetWavTPackageSetting("Acq","channelConfigs",GetChanName(i),"analysisMethods",methods)
 		endfor
 		AnalysisMethodListBoxUpdate()
 		AnalysisWindow()

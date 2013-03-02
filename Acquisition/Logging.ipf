@@ -6,7 +6,7 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
 Function /S AvailableDrugs()
-	string instances=ListPackageInstances("Acq","drugs",editor=1)
+	string instances=Core#ListPackageInstances("Acq","drugs",editor=1)
 	variable i
 	do	
 		variable removed=0
@@ -24,7 +24,7 @@ Function /S AvailableDrugs()
 End
 
 Function /S AvailableDrugPresets()
-	string instances=ListPackageInstances("Acq","drugPresets",editor=1)
+	string instances=Core#ListPackageInstances("Acq","drugPresets",editor=1)
 	return "Washout;"+instances
 End
 
@@ -39,10 +39,10 @@ Function DrugWinPopupMenus(info) : PopupMenuControl
 				strswitch(info.popStr)
 					case "_edit_":
 						PopupMenu $("DrugName_"+num2str(num)) mode=1
-						EditModule("Acq",package="Drugs")
+						Core#EditModule("Acq",package="Drugs")
 						break
 					default:
-						SetStrPackageSetting("Acq","drugs","drug"+num2str(num),name,info.popStr)
+						Core#SetStrPackageSetting("Acq","drugs","drug"+num2str(num),name,info.popStr)
 						break
 				endswitch
 				break
@@ -54,7 +54,7 @@ Function DrugWinPopupMenus(info) : PopupMenuControl
 						if(v_flag<=0)
 							break
 						endif
-						SetVarPackageSetting("Acq","drugs","drug"+num2str(i),"active",0)
+						Core#SetVarPackageSetting("Acq","drugs","drug"+num2str(i),"active",0)
 						i+=1
 					while(1)
 	//			elseif(StringMatch(popStr,"Save*"))
@@ -76,7 +76,7 @@ Function DrugWinPopupMenus(info) : PopupMenuControl
 	//				presetStr=RemoveEnding(presetStr,",")
 	//				drugPresets=ReplaceListItem(presetStr,drugPresets,index)
 				else
-					wave /t drugPreset=WavTPackageSetting("Acq","drugPresets",info.popStr,"drugs")
+					wave /t drugPreset=Core#WavTPackageSetting("Acq","drugPresets",info.popStr,"drugs")
 					do
 						controlinfo $("Drug_"+num2str(i))
 						if(v_flag<=0)
@@ -84,9 +84,9 @@ Function DrugWinPopupMenus(info) : PopupMenuControl
 						endif
 						string drug=drugPreset[i-1]
 						if(i<=dimsize(drugPreset,0) && strlen(drug))
-							CopyInstance("Acq","drugs",drug,"drug"+num2str(i))
+							Core#CopyInstance("Acq","drugs",drug,"drug"+num2str(i))
 						else
-							SetVarPackageSetting("Acq","drugs","drug"+num2str(i),"active",0)
+							Core#SetVarPackageSetting("Acq","drugs","drug"+num2str(i),"active",0)
 						endif
 						i+=1
 					while(1)
@@ -120,7 +120,7 @@ Function DrugWinButtons(ctrlName) : ButtonControl
 				if(v_flag<=0)
 					break
 				endif
-				dfref df=InstanceHome("Acq","drugs","drug"+num2str(i))
+				dfref df=Core#InstanceHome("Acq","drugs","drug"+num2str(i))
 				nvar /sdfr=df active,conc
 				svar /sdfr=df units,name
 				if(!strlen(name))
@@ -226,7 +226,7 @@ Function MakeLogPanel() : Panel
 	NewPanel /K=2 /W=(150,100,950,323+ItemsInList(odors)*20) /N=LogPanel as "Experiment Logger"
 	NewNotebook /f=1 /K=2 /n=ExperimentLog /HOST=LogPanel /W=(440,5,785,215+ItemsInList(odors)*20)
 	Notebook LogPanel#ExperimentLog text = "", margins={0,0,300}
-	string logDefault=StrPackageSetting("Acq","random","","logDefault")
+	string logDefault=Core#StrPackageSetting("Acq","random","","logDefault")
 	Notebook LogPanel#ExperimentLog text = logDefault
 	SetActiveSubwindow LogPanel
 	
@@ -261,8 +261,8 @@ Function MakeLogPanel() : Panel
 	
 	for(i=1;i<=4;i+=1)
 		string name="drug"+num2str(i)
-		CopyDefaultInstance("Acq","drugs",name)
-		dfref df=InstanceHome("Acq","drugs",name)
+		Core#CopyDefaultInstance("Acq","drugs",name)
+		dfref df=Core#InstanceHome("Acq","drugs",name)
 		nvar /z/sdfr=df active,conc
 		svar /z/sdfr=df units
 		xx=xStart+5

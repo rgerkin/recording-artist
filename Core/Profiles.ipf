@@ -6,12 +6,16 @@
 // to a directory (Core) containing Symbols.ipf already exists in the Igor Procedures folder.  
 
 static strconstant editor="EditProfilesWin"
-static strconstant moduleInfo="root:Packages:Profiles"
+static strconstant moduleInfo_="root:Packages:Profiles"
 strconstant FLAGS_LONG="Developer;Acquisition;Neuralynx"
 constant DEV=0
 constant ACQ=1
 constant NLX=2
 constant maxprofiles=25
+
+function /s ModuleInfo()
+	return moduleInfo_
+end
 
 // Get the current profile based on the directory immediately above the desktop.  
 Function /S GetOSUser()
@@ -32,9 +36,9 @@ end
 Menu "Profiles"
 	Core#ListProfiles(init=1,brackets=1), /Q, Core#ProfileMenu()
 	"--------------"
-	"Edit Profiles", /Q, EditProfiles()
+	"Edit Profiles", /Q, Core#EditProfiles()
 	SubMenu "Edit Modules"
-		Core#ListModules(CurrProfileName()), /Q, GetLastUserMenuInfo; EditModule(s_value)
+		Core#ListProfileModules(Core#CurrProfileName()), /Q, GetLastUserMenuInfo; Core#EditModule(s_value)
 	End
 End
 
@@ -80,7 +84,7 @@ function ShowProfile(profileName,xx)
 	TitleBox $("Title_Dev"), pos={xMargin,yy-5}, title="Developer"
 	Checkbox $Hash32("isDev_"+profileName), pos={xx+5,yy}, value=IsDeveloper(profile), title=" ",proc=Core#EditProfilesCheckboxes, userData="INFO:isDev;"+userData
 	yy+=yJump
-	string modules=ListAllModules()
+	string modules=ListAvailableModules()
 	variable i
 	for(i=0;i<itemsinlist(modules);i+=1)
 		string module=stringfromlist(i,modules)
@@ -151,7 +155,7 @@ function UpdateProfile(profile[,new,quiet])
 	string profileName=selectstring(new,profile.name,"_new_")
 	controlinfo $Hash32("isDev_"+profileName)
 	profile.dev=v_value
-	string modules=ListAllModules()
+	string modules=ListAvailableModules()
 	variable i=0
 	do
 		string module=stringfromlist(i,modules)
@@ -189,7 +193,7 @@ function SetProfileModules(profile,modules)
 	string modules
 	
 	profile.modules=""
-	string allModules=ListAllModules()
+	string allModules=ListAvailableModules()
 	variable i
 	for(i=0;i<itemsinlist(allModules);i+=1)
 		string module=stringfromlist(i,allModules)
@@ -209,7 +213,7 @@ function EditProfilesCheckboxes(ctrlName,value)
 	string userData=GetUserData(editor,ctrlName,"")
 	string info=stringbykey("INFO",userData)
 	string profileName=stringbykey("NAME",userData)
-	string modules=ListAllModules()
+	string modules=ListAvailableModules()
 	
 	variable changes=0,tries=0
 	do
@@ -261,14 +265,14 @@ function EditProfilesCheckboxes(ctrlName,value)
 	while(changes>0 && tries<10)
 end
 
-function /df ModuleManifest(module)
-	string module
-	
-	dfref df=ProfilesDF()
-	string loc=getdatafolder(1,df)+module+":Manifest"
-	dfref df=$loc
-	return df
-end
+//function /df ModuleManifest(module)
+//	string module
+//	
+//	dfref df=ProfilesDF()
+//	string loc=getdatafolder(1,df)+module+":Manifest"
+//	dfref df=$loc
+//	return df
+//end
 
 Function /S ListProfiles([brackets,init]) 
 	variable brackets,init
@@ -435,7 +439,7 @@ function /s ModuleTitle(module)
 	return title
 end
 
-function /s ListModules(profileName)
+function /s ListProfileModules(profileName)
 	string profileName
 	
 	struct profileInfo profile
@@ -444,9 +448,9 @@ function /s ListModules(profileName)
 	return modules
 end
 
-function /s ListAllModules()
+function /s ListAvailableModules()
 	string result=""
-	newpath /o/q/z modulePath SpecialDirPath("Igor Pro User Files",0,0,0)+"User Procedures:Modules"
+	newpath /o/q/z modulePath ModuleManifestsDiskLocation()
 	if(!v_flag)
 		variable i=0
 		do
@@ -477,14 +481,14 @@ function HasModule(profile,module)
 	return whichlistitem(module,modules)>=0
 end
 
-function /s ListProfileModules(profileName)
-	string profileName
-	
-	struct profileInfo profile
-	GetProfileInfo(profile,name=profileName,forceLoad=1)
-	string modules=profile.modules
-	return modules
-end
+//function /s ListProfileModules(profileName)
+//	string profileName
+//	
+//	struct profileInfo profile
+//	GetProfileInfo(profile,name=profileName,forceLoad=1)
+//	string modules=profile.modules
+//	return modules
+//end
 
 function ProfileExists(name)
 	string name
@@ -594,7 +598,7 @@ Function SetProfile(profileName[,recompile])
 		defList=AddListItem("Core",defList) // Define Core for every profile. 
 	endif
 	variable i=0
-	string modules=ListAllModules()
+	string modules=ListAvailableModules()
 	do
 		string module=stringfromlist(i,modules)
 		if(HasModule(profile,module))
@@ -628,7 +632,7 @@ End
 function LoadModuleManifests([modules])
 	string modules
 	
-	modules=selectstring(!paramisdefault(modules),ListAllModules(),modules)
+	modules=selectstring(!paramisdefault(modules),ListAvailableModules(),modules)
 	variable i
 	for(i=0;i<itemsinlist(modules);i+=1)
 		string module=stringfromlist(i,modules)
@@ -636,13 +640,13 @@ function LoadModuleManifests([modules])
 	endfor
 end
 
-function LoadModuleManifest(module)
-	string module
-	
-	string cmd
-	sprintf cmd,"ProcGlobal#LoadModuleManifest(\"%s\")",module
-	Execute /Q/Z cmd // Load package definitions for the new profile. 
-end
+//function LoadModuleManifest(module)
+//	string module
+//	
+//	string cmd
+//	sprintf cmd,"ProcGlobal#LoadModuleManifest(\"%s\")",module
+//	Execute /Q/Z cmd // Load package definitions for the new profile. 
+//end
 
 // Returns a string version of the profile structure.  
 Function /s GetProfile()

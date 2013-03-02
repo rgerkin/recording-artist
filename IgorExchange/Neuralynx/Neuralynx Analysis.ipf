@@ -2161,7 +2161,7 @@ function TotalCorrelationByBinSize(df,eventsDF,phaseDF,pethInstance,binSizes[,no
 	variable period = numpnts(phaseData)*deltax(phaseData)/v_levelsfound
 	for(i=0;i<numBinSizes;i+=1)
 		Prog("Bin Size",i,numBinSizes)
-		SetVarPackageSetting("Nlx","PETH",pethInstance,"binWidth",binSizes[i])
+		Core#SetVarPackageSetting("Nlx","PETH",pethInstance,"binWidth",binSizes[i])
 		if(0)
 			NlxA#MakePETH(df,eventsDF,pethInstance,keepTrials=1)
 			variable phaseBins = max(1,round(period / binSizes[i])) // 0.5 is the approximate period of one respiration cycle in seconds.  

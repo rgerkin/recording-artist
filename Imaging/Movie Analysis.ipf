@@ -12,7 +12,7 @@ function /df MovieHome([instance,create,go])
 	variable create,go
 	
 	instance = selectstring(!paramisdefault(instance),"default",instance)
-	dfref df = InstanceHome("Acq","movie","default",create=create)
+	dfref df = Core#InstanceHome("Acq","movie","default",create=create)
 	if(go)
 		setdatafolder df
 	endif

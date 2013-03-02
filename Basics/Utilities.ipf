@@ -184,6 +184,19 @@ Function Root()
 	SetDataFolder root:
 End
 
+function /df NewFolder(folder_str[,go])
+	string folder_str
+	variable go
+	
+	return Core#NewFolder(folder_str,go=go)
+end
+
+function /s JoinPath(folders)
+	wave /t folders
+	
+	return Core#JoinPath(folders)
+end
+
 Function IMD(num)
 	Variable num
 	Execute /Q "SetIgorOption IndependentModuleDev="+num2str(num)
@@ -225,7 +238,7 @@ function FolderDiff(df1,df2)
 			if(exists(folder1+name)!=exists(folder2+name))
 				printf "No %s in %s.\r",name,folder2
 			else
-				strswitch(ObjectType(folder1+name))
+				strswitch(Core#ObjectType(folder1+name))
 					case "WAV":
 					case "WAVT":
 						wave w1=df1:$name
@@ -2274,7 +2287,7 @@ Function MoveObjects(objectList,sourceFolder,destFolder[,saveSource,createDest])
 		endif
 		SetDataFolder sourceFolder
 		if(!strlen(type))
-			type=ObjectType(itemName)
+			type=Core#ObjectType(itemName)
 		endif
 		strswitch(type)
 			case "WAV": // Numeric wave.  
@@ -2477,7 +2490,7 @@ Function MoveData(source,dest_[,match,except,quiet,copy])
 				continue
 			endif
 			string loc=joinpath({getdatafolder(1,source),object})
-			strswitch(ObjectType(loc))
+			strswitch(Core#ObjectType(loc))
 				case "WAV":
 				case "WAVT":
 					if(copy)

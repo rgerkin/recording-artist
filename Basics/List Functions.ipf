@@ -189,7 +189,7 @@ Function /S GlobalList2Values(source_list,index)
 	Variable i; String value_list=""
 	for(i=0;i<ItemsInList(source_list);i+=1)
 		String name=StringFromList(i,source_list)
-		strswitch(ObjectType(name))
+		strswitch(Core#ObjectType(name))
 			case "WAV": 
 				Wave myWave=$name
 				value_list+=num2str(myWave[index])+";"

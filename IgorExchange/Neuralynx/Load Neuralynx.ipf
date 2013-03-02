@@ -763,7 +763,7 @@ static function VarSetting(package,object,instance[,setting])
 	string package,object,instance,setting
 	
 	setting=selectstring(!paramisdefault(setting),"value",setting)
-	variable result=VarPackageSetting(module,package,instance,object,setting=setting)
+	variable result=Core#VarPackageSetting(module,package,instance,object,setting=setting)
 	return result
 end
 
@@ -775,7 +775,7 @@ static function /s StrSetting(package,object,instance[,setting,module_])
 	
 	string result=""
 	if(useSettings)
-		result=StrPackageSetting(module,package,instance,object,setting=setting)
+		result=Core#StrPackageSetting(module,package,instance,object,setting=setting)
 	endif
 	if(strlen(result)==0)
 		strswitch(package)
@@ -798,7 +798,7 @@ Function InitPanel([reload]) : Panel
 		DoWindow /F NeuralynxPanel
 		return 0
 	endif
-	LoadPackages(module)
+	Core#LoadPackages(module)
 	NewPath /O/Q/Z NlxPath, StrSetting("Sources","dataDir","")
 	DoWindow /K NeuralynxPanel
 	NewPanel /K=1 /W=(577,90,1075,199) /N=NeuralynxPanel as "Neuralynx Analysis"
@@ -846,7 +846,7 @@ static function /s ListPackageInstances(package[,editor,saver])
 	variable editor,saver
 	
 	editor=paramisdefault(editor) ? 1 : editor
-	return Settings#ListPackageInstances(module,package,editor=editor,saver=saver)
+	return Core#ListPackageInstances(module,package,editor=editor,saver=saver)
 end
 
 static Function /s EventList()
@@ -1051,7 +1051,7 @@ static Function PanelButtons(ctrlName)
 				break
 			endif
 			controlinfo PETH_settings; instance=s_value
-			variable binWidth=VarPackageSetting(module,"PETH",instance,"binWidth")
+			variable binWidth=Core#VarPackageSetting(module,"PETH",instance,"binWidth")
 			wave NlxSTH=NlxA#MakeSTH(dataDF,binWidth,tStart=tStart,tStop=tStop)
 			//ControlInfo DisplaySTH
 			//if(V_Value)
@@ -1088,7 +1088,7 @@ static Function PanelPopupMenus(info)
 	endif
 	
 	info.userData=ReplaceStringByKey("MODULE",info.userData,module)
-	if(PossiblyEditSettingsPM(info))
+	if(Core#PossiblyEditSettingsPM(info))
 		return 0
 	endif
 	strswitch(info.ctrlName)
@@ -1107,7 +1107,7 @@ static Function PanelPopupMenus(info)
 		case "Sources_settings":
 			SetVariable dirName,value=_STR:StrSetting(stringfromlist(0,info.ctrlName,"_"),"dataDir",info.popStr),win=$info.win
 			string sourcesInstance=info.popStr
-			string dataDir=strpackagesetting(module,"Sources",sourcesInstance,"dataDir")
+			string dataDir=Core#strpackagesetting(module,"Sources",sourcesInstance,"dataDir")
 			NewPath /Q/O NlxPath,dataDir
 			break
 	endswitch
@@ -1264,12 +1264,12 @@ static Function EditPackagesTabs(info)
 	struct WMTabControlAction &info
 	
 	ControlInfo /W=ProfilePackagesWin Tab; string package=s_value
-	string module=PackageModule(package)
-	string packagedescription=strvarordefault(moduleInfo+":"+module+":"+package+":desc","")
+	string module=Core#PackageModule(package)
+	string packagedescription=strvarordefault(Core#moduleInfo()+":"+module+":"+package+":desc","")
 	variable x=5,y=115,yjump=32 // Positions for controls to appear.  
 	variable titleX=2,titleY=y-60
 	TitleBox Text title=packageDescription, pos={titleX,titleY}, disable=0
-	EditPackageInstances(module,package)
+	Core#EditPackageInstances(module,package)
 	//Struct rect coords
 	//GetWinCoords(WinName(0,64),coords,forcePixels=1)
 	//Variable factor=ScreenResolution/72

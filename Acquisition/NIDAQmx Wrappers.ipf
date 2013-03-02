@@ -7,9 +7,18 @@
 #pragma ModuleName=NIDAQmx
 
 //override strconstant NIDAQmx_trigIn="PFI0" // If the ITC18 XOP is also present and we want it to control the start times of each sweep.    
-strconstant NIDAQmxTrigIn="PFI4" // If we want the NIDAQ device to control the start times of each sweep.    
 //override strconstant NIDAQmxTrigOut="CTR0"
-strconstant NIDAQmxTrigOut=""//"PFI4"
+
+static strconstant pin_prefix = "PFI"
+
+// If we want the NIDAQ device to control the start times of each sweep. 
+// Overridden in Acq/DAQs/[name]/startTrigger  
+
+static constant pin_in=4 
+
+// Device timer will send pulses out to this pin.  
+static constant pin_out=6 
+
 strconstant DAQType="NIDAQmx"
 strconstant module="Acq"
 
@@ -165,10 +174,13 @@ static Function Listen(device,gain,list,param,continuous,endHook,errorHook,other
 	else
 		deviceName="dev1"
 	endif
+	variable pin = Core#VarPackageSetting("Acq","DAQs","Generic","StartTrigger",default_=pin_in)
+	string trig_in
+	sprintf trig_in,"/%s/%s%d",deviceName,pin_prefix,pin
 	if(continuous)
-		DAQmx_Scan /DEV=deviceName /BKG=1 /ERRH=errorHook /RPTC /RPTH=endHook /STRT=1 /TRIG={"/"+deviceName+"/"+NIDAQmxTrigIn,1,1} WAVES=list
+		DAQmx_Scan /DEV=deviceName /BKG=1 /ERRH=errorHook /RPTC /RPTH=endHook /STRT=1 /TRIG={trig_in,1,1} WAVES=list
 	else
-		DAQmx_Scan /DEV=deviceName /BKG=1 /ERRH=errorHook /EOSH=endHook /STRT=1 /TRIG={"/"+deviceName+"/"+NIDAQmxTrigIn,1,1} WAVES=list
+		DAQmx_Scan /DEV=deviceName /BKG=1 /ERRH=errorHook /EOSH=endHook /STRT=1 /TRIG={trig_in,1,1} WAVES=list
 	endif
 	//fDAQmx_ScanStart("dev1",1)
 End
@@ -217,7 +229,10 @@ static Function Speak(device,list,param[,now,DAQ])
 	else
 		deviceName="dev1"
 	endif
-	DAQmx_WaveformGen /DEV=deviceName /ERRH="ErrorHook()" /NPRD=(param) /STRT=1 /TRIG={"/"+deviceName+"/"+NIDAQmxTrigIn,1,1} list
+	variable pin = Core#VarPackageSetting("Acq","DAQs","Generic","StartTrigger",default_=pin_in)
+	string trig_in
+	sprintf trig_in,"/%s/%s%d",deviceName,pin_prefix,pin
+	DAQmx_WaveformGen /DEV=deviceName /ERRH="ErrorHook()" /NPRD=(param) /STRT=1 /TRIG={trig,1,1} list
 	//DAQmx_WaveformGen /DEV="dev1" /CLK={"/dev1/ai/sampleclock",1} /ERRH="ErrorHook()" /NPRD=1 /STRT=1 /TRIG={"/dev1/"+trigChan,1,1} list
 End
 
@@ -262,7 +277,9 @@ static Function StartClock(isi[,DAQ])
 		deviceName="dev1"
 	endif
 	fDAQmx_CTR_Finished(deviceName,0)
-	DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=0 /OUT=NIDAQmxTrigOut 0
+	string trig_in
+	sprintf trig_out,"%s%d",pin_prefix,pin_out
+	DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=0 /OUT=trig_out 0
 	return fDAQmx_CTR_Start(deviceName,0)
 End
 

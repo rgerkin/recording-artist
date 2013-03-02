@@ -1828,7 +1828,7 @@ Function SaveCursors(name,[win])
 	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	dfref df=InstanceHome("Acq",win,name,create=1)
+	dfref df=Core#InstanceHome("Acq",win,name,create=1)
 	String cursors="A;B",stem="xcsr_"
 	Variable i
 	for(i=0;i<ItemsInList(cursors);i+=1)
@@ -1852,7 +1852,7 @@ Function RestoreCursors(name[,trace,win,offset])
 	Variable offset // An constant offset for the cursors with respect to the saved positions.
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	dfref df=InstanceHome("Acq",win,name,quiet=1)
+	dfref df=Core#InstanceHome("Acq",win,name,quiet=1)
 	if(!datafolderrefstatus(df))
 		//printf "Could not find data '%s' to restore cursors for window '%s'.\r",name,win
 		return -1
@@ -2039,7 +2039,7 @@ Function SaveAxes(name,[win])
 	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	string package=RemoveEnding(win,"win")
-	dfref df=InstanceHome("Acq",package,name,create=1)
+	dfref df=Core#InstanceHome("Acq",package,name,create=1)
 	
 	string axis_list=AxisList(win)
 	variable i
@@ -2063,7 +2063,7 @@ Function RestoreAxes(name,[win])
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
 	string package=RemoveEnding(win,"win")
-	dfref df=InstanceHome("Acq",package,name)
+	dfref df=Core#InstanceHome("Acq",package,name)
 	
 	variable err=0
 	if(!datafolderrefstatus(df))
@@ -2706,7 +2706,7 @@ Function /S CloneWindow([win,replace,with,freeze,name])
 	endfor
 	if(freeze)
 		Struct rect coords
-		GetWinCoords(win,coords)
+		Core#GetWinCoords(win,coords)
 		SavePICT /WIN=$win as "Clipboard"
 		String newName=UniqueName(win,6,0)
 		LoadPICT /O/Q "Clipboard",$newName

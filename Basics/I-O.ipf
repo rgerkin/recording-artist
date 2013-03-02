@@ -274,17 +274,17 @@ function /s GetDataDir([module])
 	string module
 	
 	if(paramisdefault(module))
-		string modules=ListModules()
+		string modules=Core#ListAvailableModules()
 		variable i
 		for(i=0;i<itemsinlist(modules);i+=1)
 			module=stringfromlist(i,modules)
-			string dataDir=StrPackageSetting(module,"random","","dataDir")
+			string dataDir=Core#StrPackageSetting(module,"random","","dataDir")
 			if(strlen(dataDir))
 				break
 			endif
 		endfor
 	else
-		dataDir=StrPackageSetting(module,"random","","dataDir")
+		dataDir=Core#StrPackageSetting(module,"random","","dataDir")
 	endif
 	return dataDir 
 end

@@ -563,7 +563,7 @@ Function MiniCountReview(channels)
 	endif
 	
 	Struct rect coords
-	GetWinCoords("MiniAnalysisWin",coords,forcePixels=1)
+	Core#GetWinCoords("MiniAnalysisWin",coords,forcePixels=1)
 	MoveWindow /W=MiniAnalysisWin coords.left,coords.top,coords.left+125*(max(2,ItemsInList(channels))),coords.top+350
 	DoWindow /F MiniAnalysisWin
 	Variable xStart=0,yStart=150,xx=xStart,yy=yStart,xJump=165

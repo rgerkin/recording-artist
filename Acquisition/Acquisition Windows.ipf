@@ -16,7 +16,7 @@ Function WaveSelector([coords2,DAQ,instance])
 
 	DAQ=SelectString(ParamIsDefault(DAQ),DAQ,MasterDAQ())
 	String win=DAQ+"_Selector"
-	instance=selectstring(!paramisdefault(instance) && strlen(instance),DefaultInstance(module,"DAQs"),instance)
+	instance=selectstring(!paramisdefault(instance) && strlen(instance),Core#DefaultInstance(module,"DAQs"),instance)
 	
 	String currFolder=GetDataFolder(1)
 	if(ParamIsDefault(coords2))
@@ -31,7 +31,7 @@ Function WaveSelector([coords2,DAQ,instance])
 			coords.left=200
 			coords.top=105
 		else
-			GetWinCoords(MasterDAQ()+"_Selector",coords)
+			Core#GetWinCoords(MasterDAQ()+"_Selector",coords)
 			coords.left=coords.left ? coords.left : 200
 			coords.top=coords.bottom ? coords.bottom+35 : 505
 		endif
@@ -42,7 +42,7 @@ Function WaveSelector([coords2,DAQ,instance])
 	
 	Variable i
 	variable numChannels=GetNumChannels()
-	nvar numDAQChannels=$PackageSettingLoc(module,"DAQs",DAQ,"numChannels")
+	nvar numDAQChannels=$Core#PackageSettingLoc(module,"DAQs",DAQ,"numChannels")
 	wave divisor=GetDAQDivisor(DAQ)
 	if(numpnts(divisor))
 		WaveStats /Q divisor
@@ -55,7 +55,7 @@ Function WaveSelector([coords2,DAQ,instance])
 	Variable height=35+y_offset+y_height*numDAQChannels
 	
 	DoWindow /K $win
-	string titleStr=instance+" Selector ("+VarNameToTitle(DAQ)+")"
+	string titleStr=instance+" Selector ("+Core#VarNameToTitle(DAQ)+")"
 	titleStr=replacestring("Daq",titleStr,"DAQ")
 	NewPanel /K=2 /N=$win /W=(coords.left,coords.top,coords.right,coords.top+35+y_offset+y_height*numDAQChannels) as titleStr
 	SetWindow kwTopWin userData(y_height)=num2str(y_height)
@@ -88,7 +88,7 @@ Function WaveSelector([coords2,DAQ,instance])
 		xpos=5
 		xpos+=3
 		string chanName=GetChanName(i)
-		nvar active=$PackageSettingLoc(module,"channelConfigs",chanName,"active")
+		nvar active=$Core#PackageSettingLoc(module,"channelConfigs",chanName,"active")
 		CheckBox $("AcquireOn_"+num2str(i)),pos={xpos,ypos+3},size={65,13},title=" ",proc=WaveSelectorCheckboxes,variable=active
 		TitleBox Title_On, frame=0,fSize=titleBoxSize,title="On",pos={xpos,y_offset-18}, win=$win
 		xpos+=18
@@ -97,28 +97,28 @@ Function WaveSelector([coords2,DAQ,instance])
 		PopupMenu $("Color_"+num2str(i)), pos={xpos,ypos},mode=0,size={10,10},value="*COLORPOP*",popColor=(red,green,blue),proc=WaveSelectorPopupMenus
 		xpos+=55
 		SetVariable $("Label_"+num2str(i)),pos={xpos,ypos+2},size={90,18},title=" "
-		svar label_=$PackageSettingLoc(module,"channelConfigs",chanName,"label_")
+		svar label_=$Core#PackageSettingLoc(module,"channelConfigs",chanName,"label_")
 		SetVariable $("Label_"+num2str(i)),limits={-Inf,Inf,1},value=label_,proc=WaveSelectorSetVariables, userData(oldLabel)=label_
 		TitleBox TitleLabel, frame=0,fSize=titleBoxSize,title="Label",pos={xpos+10,y_offset-18}, win=$win
 		xpos+=90
 		string channelInstances
-		sprintf channelInstances,"ListPackageInstances(\"%s\",\"%s\",saver=1)",module,"channelConfigs"
+		sprintf channelInstances,"Core#ListPackageInstances(\"%s\",\"%s\",saver=1)",module,"channelConfigs"
 		PopupMenu $("Labels_"+num2str(i)),pos={xpos,ypos-1},size={21,21},proc=WaveSelectorPopupMenus
 		PopupMenu $("Labels_"+num2str(i)),mode=0,value=#channelInstances
 		xpos+=25
-		svar ADC=$PackageSettingLoc(module,"channelConfigs",chanName,"ADC")
+		svar ADC=$Core#PackageSettingLoc(module,"channelConfigs",chanName,"ADC")
 		string ADCOptions="InputChannelList(DAQ=\""+DAQ+"\")"
 		PopupMenu $("ADC_"+num2str(i)),mode=1,popValue=Chan2ADC(i),value=#ADCOptions,Proc=WaveSelectorPopupMenus
 		TitleBox TitleADC, frame=0,fSize=titleBoxSize,title="ADC",pos={xpos+5,y_offset-18}, win=$win
 		xpos+=40
-		svar DAC=$PackageSettingLoc(module,"channelConfigs",chanName,"DAC")
+		svar DAC=$Core#PackageSettingLoc(module,"channelConfigs",chanName,"DAC")
 		string DACOptions="OutputChannelList(DAQ=\""+DAQ+"\")"
 		PopupMenu $("DAC_"+num2str(i)),mode=1,popvalue=Chan2DAC(i),pos={xpos,ypos-1},value=#DACOptions,Proc=WaveSelectorPopupMenus
 		TitleBox TitleDAC, frame=0,fSize=titleBoxSize,title="DAC",pos={xpos+5,y_offset-18}, win=$win
 		xpos+=40
 		PopupMenu $("Mode_"+num2str(i)),pos={xpos,ypos-1},Proc=WaveSelectorPopupMenus,userData(oldMode)=GetAcqMode(i)
 		string modeInstances
-		sprintf modeInstances,"ListPackageInstances(\"%s\",\"%s\",editor=1)",module,"acqModes"
+		sprintf modeInstances,"Core#ListPackageInstances(\"%s\",\"%s\",editor=1)",module,"acqModes"
 		PopupMenu $("Mode_"+num2str(i)),mode=max(1,1+WhichListItem(GetAcqMode(i),AcquisitionModes())),value=#modeInstances
 		TitleBox TitleMode, frame=0,fSize=titleBoxSize,title="Mode",pos={xpos+5,y_offset-18}, win=$win
 		xpos+=75
@@ -128,13 +128,13 @@ Function WaveSelector([coords2,DAQ,instance])
 		PopupMenu $("Assembler_"+num2str(i)),pos={xpos,ypos-1},size={21,21},proc=WaveSelectorPopupMenus		
 		PopupMenu $("Assembler_"+num2str(i)),mode=0,value=#("AssemblerList("+num2str(i)+")")
 		xpos+=21
-		svar stimulus=$PackageSettingLoc(module,"channelConfigs",chanName,"stimulus")
+		svar stimulus=$Core#PackageSettingLoc(module,"channelConfigs",chanName,"stimulus")
 		SetVariable $("Stimulus_"+num2str(i)),pos={xpos,ypos+2},size={65,18},title=" ",proc=WaveSelectorSetVariables
 		SetVariable $("Stimulus_"+num2str(i)),limits={-Inf,Inf,1},value=stimulus
 		TitleBox TitleStimulus, frame=0,fSize=titleBoxSize,title="Stimulus",pos={xpos+10,y_offset-18}, win=$win
 		xpos+=65
 		string stimulusInstances
-		sprintf stimulusInstances,"ListPackageInstances(\"%s\",\"%s\",saver=1,except=\"%s\")",module,"stimuli","ch*"
+		sprintf stimulusInstances,"Core#ListPackageInstances(\"%s\",\"%s\",saver=1,except=\"%s\")",module,"stimuli","ch*"
 		PopupMenu $("Stimuli_"+num2str(i)),pos={xpos,ypos-1},size={21,21},proc=WaveSelectorPopupMenus		
 		PopupMenu $("Stimuli_"+num2str(i)),mode=0,value=#stimulusInstances
 		xpos+=27
@@ -214,14 +214,14 @@ Function WaveSelectorCheckboxes(info)
 			PossiblyShowAnalysis()	 
 			break
 		case "TestPulse":
-			wave TestPulseOn=WavPackageSetting(module,"stimuli",name,"TestPulseOn")
+			wave TestPulseOn=Core#WavPackageSetting(module,"stimuli",name,"TestPulseOn")
 			TestPulseOn[pulseSet]=value
 			break
 		case "AddStimulus":
-			SetVarPackageSetting(module,"channelConfigs",name,"AddStimulus",value)
+			Core#SetVarPackageSetting(module,"channelConfigs",name,"AddStimulus",value)
 			break
 		case "Remainder":
-			wave Remainder=WavPackageSetting(module,"stimuli",name,"remainder")
+			wave Remainder=Core#WavPackageSetting(module,"stimuli",name,"remainder")
 			Remainder[pulseSet] = value ? (Remainder[pulseSet] | 2^remainderBit) : (Remainder[pulseSet] & ~2^remainderBit) // Bit wise remainder.  
 			break
 		case "Continuous":
@@ -241,7 +241,7 @@ Function WaveSelectorSetVariables(info) : SetVariableControl
 	string DAQ=GetUserData(info.win,"","DAQ")
 	strswitch(type)
 		case "Label":
-			string oldLabel=GetControlUserData(info.ctrlName,"oldLabel",win=info.win)
+			string oldLabel=Core#GetControlUserData(info.ctrlName,"oldLabel",win=info.win)
 			string label_=info.sval
 			//SetStrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",label_) // Can't use GetChanLabels because we need
 			if(!DataFolderExists(GetChannelFolder(label_)))
@@ -256,7 +256,7 @@ Function WaveSelectorSetVariables(info) : SetVariableControl
 			else
 				stimName=CleanupName(info.sval,0)
 			endif
-			SetStrPackageSetting(module,"channelConfigs",GetChanName(chan),"stimulus",stimName)
+			Core#SetStrPackageSetting(module,"channelConfigs",GetChanName(chan),"stimulus",stimName)
 			//SetStimulus(chan,stimName)
 			break
 		case "SweepsLeft":
@@ -287,8 +287,8 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 			strswitch(newLabel)
 				case "_Save_":
 					string toSave=cleanupname(Chan2Label(chan),0)
-					CopyInstance(module,"channelConfigs",name,toSave)
-					err=SavePackageInstance(module,"channelConfigs",toSave,special="CHAN:"+num2str(chan))
+					Core#CopyInstance(module,"channelConfigs",name,toSave)
+					err=Core#SavePackageInstance(module,"channelConfigs",toSave,special="CHAN:"+num2str(chan))
 					if(!err)
 						printf "Channel configuration %s was saved successfully.\r",toSave
 					endif
@@ -313,14 +313,14 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 								RenameDataFolder $oldFolderName, $newLabel
 							endif
 						endif
-						SetControlUserData(info.ctrlName,"oldLabel",newLabel)
-						SetStrPackageSetting(module,"channelConfigs",name,"label_",newLabel) // Update the channel label.  
+						Core#SetControlUserData(info.ctrlName,"oldLabel",newLabel)
+						Core#SetStrPackageSetting(module,"channelConfigs",name,"label_",newLabel) // Update the channel label.  
 					endif
-					SelectPackageInstance(module,"channelConfigs",newLabel,special=special)
+					Core#SelectPackageInstance(module,"channelConfigs",newLabel,special=special)
 					SetVariable $info.ctrlName userData(oldLabel)=Labels[chan]
 					string chanName=GetChanName(chan)
 					if(!stringmatch(newLabel,chanName))
-						wave /t DAQChannels=WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs")
+						wave /t DAQChannels=Core#WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs")
 						DAQChannels[chan]={newLabel}
 					endif
 					wave /z chanHistory=GetChanHistory(chan)
@@ -332,7 +332,7 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 			endswitch
 			break
 		case "Color":
-			wave colors=WavPackageSetting(module,"channelConfigs",name,"color")
+			wave colors=Core#WavPackageSetting(module,"channelConfigs",name,"color")
 			variable red,green,blue
 			sscanf info.popStr,"(%d,%d,%d)",red,green,blue
 			colors[0]={red}
@@ -351,23 +351,23 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 					break
 				default:
 					string stimName=info.popStr
-					SelectPackageInstance(module,"stimuli",stimName,special=special)
+					Core#SelectPackageInstance(module,"stimuli",stimName,special=special)
 			endswitch
 			break
 		case "SaveMode":
-			SetStrPackageSetting(module,"DAQs",DAQ,"saveMode",ClearBrackets(info.popStr))
+			Core#SetStrPackageSetting(module,"DAQs",DAQ,"saveMode",ClearBrackets(info.popStr))
 			break
 		case "ChannelSaveMode":
-			SetVarPackageSetting(module,"channelConfigs",name,"saveMode",info.popNum-1)
+			Core#SetVarPackageSetting(module,"channelConfigs",name,"saveMode",info.popNum-1)
 			break
 		case "Mode":
 			String newMode=info.popStr
 			String oldMode=GetUserData("",info.ctrlName,"oldMode")
-			string acqModes=ListPackageInstances(module,"acqModes")
+			string acqModes=Core#ListPackageInstances(module,"acqModes")
 			strswitch(newMode)
 				case "_Edit_":
 					PopupMenu $(info.ctrlName) mode=max(1,WhichListItem(oldMode,acqModes)+1)
-					EditModule(module,package="acqModes")
+					Core#EditModule(module,package="acqModes")
 					break
 				case "------":
 					PopupMenu $(info.ctrlName) mode=max(1,WhichListItem(oldMode,acqModes)+1)
@@ -379,11 +379,11 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 			endswitch
 			break
 		case "ADC":
-			SetStrPackageSetting(module,"channelConfigs",name,"ADC",info.popStr)
+			Core#SetStrPackageSetting(module,"channelConfigs",name,"ADC",info.popStr)
 			SwitchView("")
 			break
 		case "DAC":
-			SetStrPackageSetting(module,"channelConfigs",name,"DAC",info.popStr)
+			Core#SetStrPackageSetting(module,"channelConfigs",name,"DAC",info.popStr)
 			break
 	endswitch
 End
@@ -461,7 +461,7 @@ Function RedrawSelector([resize,win])
 	String DAQ=GetWinDAQ(win=win)
 	STRUCT rect coords
 	
-	GetWinCoords(win,coords,forcePixels=0)
+	Core#GetWinCoords(win,coords,forcePixels=0)
 	wave divisor=GetDAQDivisor(DAQ)
 	if(numpnts(divisor))
 		WaveStats /Q divisor
@@ -476,7 +476,7 @@ Function RedrawSelector([resize,win])
 		MovePanel(win,coords)
 	else
 		string instance=GetUserData(win,"","instance")
-		instance=selectstring(strlen(instance),DefaultInstance(module,"DAQs"),instance)
+		instance=selectstring(strlen(instance),Core#DefaultInstance(module,"DAQs"),instance)
 		DoWindow /K $win
 		WaveSelector(coords2=coords,DAQ=DAQ,instance=instance)
 	endif
@@ -502,7 +502,7 @@ Function FilterWin(hide[,win]) : Panel
 		endif
 		Variable ypos=y_offset+y_height*DAQchan // The y position of the corresponding channel.  
 		Variable xpos=xstart
-		dfref filtersDF=InstanceHome(module,"filters",GetChanName(i))
+		dfref filtersDF=Core#InstanceHome(module,"filters",GetChanName(i))
 		nvar /sdfr=filtersDF notch,notchFreq,notchHarmonics,wyldpoint,wyldpointWidth,wyldpointThresh,low,lowFreq,high,highFreq,zero,powerSpec,leakSubtract
 	
 		Checkbox $("notch_"+num2str(i)),pos={xpos,ypos+1},title=" ",disable=hide,proc=FilterWinCheckboxes,variable=notch
@@ -568,7 +568,7 @@ Function FilterWinCheckboxes(ctrlName,value) : CheckboxControl
 	String ctrlName; Variable value
 	Variable chan=str2num(StringFromList(ItemsInList(ctrlName,"_")-1,ctrlName,"_"))
 	String name=ReplaceString("_"+num2str(chan),ctrlName,"")
-	SetVarPackageSetting(module,"filters",GetChanName(chan),name,value)
+	Core#SetVarPackageSetting(module,"filters",GetChanName(chan),name,value)
 	strswitch(name)
 		case "powerSpec":
 			if(value==1)
@@ -615,7 +615,7 @@ Function PulseSetTabs(num,hide[,win])
 	endif
 		
 	String DAQ=GetUserData(win,"","DAQ")
-	Variable /G $PackageSettingLoc(module,"DAQs",DAQ,"pulseSets")=num
+	Variable /G $Core#PackageSettingLoc(module,"DAQs",DAQ,"pulseSets")=num
 	Variable i,j,k,m,size=1
 	Variable y_height=str2num(GetUserData(win, "", "y_height"))
 	Variable y_offset=str2num(GetUserData(win, "", "y_offset"))
@@ -632,15 +632,15 @@ Function PulseSetTabs(num,hide[,win])
 	for(i=0;i<numChannels;i+=1)
 		if(stringmatch(Chan2DAQ(i),DAQ))
 			string channel = GetChanName(i)
-			dfref instanceDF=InstanceHome(module,"stimuli",channel)
+			dfref instanceDF=Core#InstanceHome(module,"stimuli",channel)
 			if(!datafolderrefstatus(instanceDF)) // If this stimulus instance could not be found. 
 				// Create it from the default template.  
-				instanceDF = CopyDefaultInstance(module,"stimuli",channel)
+				instanceDF = Core#CopyDefaultInstance(module,"stimuli",channel)
 			endif
 			for(j=0;j<itemsinlist(pulseParams);j+=1)
 				string pulseParam=stringfromlist(j,pulseParams)
-				string pulseParamLoc=PackageSettingLoc(module,"stimuli",channel,pulseParam)
-				if(!stringmatch(ObjectType(pulseParamLoc),"WAV"))
+				string pulseParamLoc=Core#PackageSettingLoc(module,"stimuli",channel,pulseParam)
+				if(!stringmatch(Core#ObjectType(pulseParamLoc),"WAV"))
 					continue
 				endif
 				wave w=$pulseParamLoc
@@ -683,15 +683,15 @@ Function PulseSetTabs(num,hide[,win])
 				max_divisor = max(Divisor[i-1],max_divisor)
 				wave Remainder=GetChanRemainder(j)
 				Variable ypos=y_offset+DAQchan*y_height
-				nvar addStimulus=$PackageSettingLoc(module,"channelConfigs",GetChanName(j),"addStimulus")
+				nvar addStimulus=$Core#PackageSettingLoc(module,"channelConfigs",GetChanName(j),"addStimulus")
 				Checkbox $("AddStimulus"+"_"+num2str(j)),pos={x_offset-54,ypos+3},title=" ",variable=addStimulus,disable=(2), win=$win, proc=WaveSelectorCheckboxes
 				TitleBox TitleAddStimulus, frame=0,fSize=10,title="Add",pos={x_offset-56,y_offset-18},disable=(hide),win=$win
 				TitleBox TitleTestPulse, frame=0,fSize=10,title="TP",pos={x_offset-27,y_offset-18},disable=(hide),win=$win
 				
 				for(k=0;k<ItemsInList(pulseParams);k+=1)
 					pulseParam=StringFromList(k,pulseParams)
-					pulseParamLoc=PackageSettingLoc(module,"stimuli",GetChanName(j),pulseParam)
-					if(!stringmatch(ObjectType(pulseParamLoc),"WAV"))
+					pulseParamLoc=Core#PackageSettingLoc(module,"stimuli",GetChanName(j),pulseParam)
+					if(!stringmatch(Core#ObjectType(pulseParamLoc),"WAV"))
 						continue
 					endif
 					wave w=$pulseParamLoc
@@ -869,9 +869,9 @@ Function SetQuickPulseSets()
 	string selectorWin=getuserdata("","","selectorWin")
 	string labell=ctrlstrvalue("chan")
 	variable chan=Label2Chan(labell)
-	dfref stimulusDF=InstanceHome(module,"stimuli",GetChanName(chan))
+	dfref stimulusDF=Core#InstanceHome(module,"stimuli",GetChanName(chan))
 	string DAQ = Chan2DAQ(chan)
-	dfref daqDF = InstanceHome(module,"DAQs",DAQ)
+	dfref daqDF = Core#InstanceHome(module,"DAQs",DAQ)
 	wave /sdfr=stimulusDF width,ampl,dampl,pulses,ipi,begin,divisor,remainder,testpulseon
 	nvar /sdfr=daqDF pulseSets
 	pulseSets=ctrlnumvalue("pulseSets")
@@ -976,7 +976,7 @@ Function PreviewStimuli([sweepNum])
 		ControlBar /W=PreviewStimuliWin /T 55
 		Button SaveStimulus, proc=PreviewStimuliButtons, size={100,20}, title="Save Stimulus", win=PreviewStimuliWin
 		PopupMenu StimChan value=#"ChanLabels()", title="on",proc=PreviewStimuliPopups, win=PreviewStimuliWin
-		svar stimulus=$PackageSettingLoc(module,"channelConfigs",GetChanName(0),"stimulus")
+		svar stimulus=$Core#PackageSettingLoc(module,"channelConfigs",GetChanName(0),"stimulus")
 		SetVariable StimName value=stimulus, title="as", disable=0, pos={280,3},size={100,15}, win=PreviewStimuliWin
 		PopupMenu StimType value="Pulses;IBW", title="as type", pos={390,0}, win=PreviewStimuliWin
 	endif
@@ -1054,7 +1054,7 @@ Function PreviewStimuliPopups(info)
 			FindValue /TEXT=chanName /TXOP=4 Labels
 			Variable chan=V_Value
 			if(chan>=0)
-				svar stimulus=$PackageSettingLoc(module,"channelConfigs",GetChanName(chan),"stimulus")
+				svar stimulus=$Core#PackageSettingLoc(module,"channelConfigs",GetChanName(chan),"stimulus")
 				SetVariable StimName value=stimulus
 			endif
 			break
@@ -1125,9 +1125,9 @@ Function PreviewStimuliButtons(ctrlName)
 			else
 				string chanName=GetChanName(chan)
 				if(!stringmatch(stimName,chanName))
-					CopyInstance(module,"stimuli",chanName,stimName)
+					Core#CopyInstance(module,"stimuli",chanName,stimName)
 				endif
-				err=SavePackageInstance("Acq","stimuli",stimName,special="CHAN:"+num2str(chan))
+				err=Core#SavePackageInstance("Acq","stimuli",stimName,special="CHAN:"+num2str(chan))
 				if(!err)
 					printf "Stimulus '%s' on channel '%s' saved successfully.\r",stimName,labell
 				endif
@@ -1229,7 +1229,7 @@ Function AnalysisWindow([diskCoords]) : Graph
 	Variable diskCoords // Use the coordinates from the macro on disk.  
 	
 	DoWindow /K AnalysisWin
-	dfref df=PackageHome(module,"analysisWin",create=1)
+	dfref df=Core#PackageHome(module,"analysisWin",create=1)
 	svar /z/sdfr=df lastMethod
 	if(!svar_exists(lastMethod))
 		string /g df:lastMethod=""
@@ -1258,7 +1258,7 @@ Function AnalysisWindow([diskCoords]) : Graph
       Button Normalize, size={65,20},proc=AnalysisWinButtons,title="Normalize", win=AnalysisWin
       Button Scale, size={55,20},proc=AnalysisWinButtons,title="Scale",win=AnalysisWin
       Button Recalculate, size={110,20},proc=AnalysisWinButtons,title="Recalculate", win=AnalysisWin
-      dfref analysisWinDF=PackageHome(module,"analysisWin")
+      dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
       wave /sdfr=analysisWinDF parameter
       SetVariable Parameter, disable=1,size={80,20},value=parameter[0], win=AnalysisWin
       PopupMenu Minimum, title="Minimum", value=#"ChannelCombos(\"minimum\",\"\")", mode=0, proc=AnalysisWinPopupMenus, win=AnalysisWin
@@ -1276,15 +1276,15 @@ Function AnalysisWindow([diskCoords]) : Graph
 	
 	Variable plotNum=0,numPlots=0,axisSizeTotal=0,axisSizeSoFar=0,i,j,k
 	String axisSizeStr=""
-	dfref analysisWinDF=PackageHome(module,"analysisWin",create=1)
+	dfref analysisWinDF=Core#PackageHome(module,"analysisWin",create=1)
 	wave /sdfr=analysisWinDF SelWave
 	wave /t/sdfr=analysisWinDF ListWave
 	wave /sdfr=analysisWinDF AxisIndex; AxisIndex=NaN
 	
-	string analysisMethods=ListPackageInstances(module,"analysisMethods")
+	string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 	for(i=0;i<ItemsInList(analysisMethods);i+=1) // Over all the available analysis methods.  
 		string analysisMethod=StringFromList(i,analysisMethods)
-		variable plot=VarPackageSetting(module,"analysisMethods",analysisMethod,"show") // 1 if the "Show" checkbox is checked; 0 otherwise.  
+		variable plot=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"show") // 1 if the "Show" checkbox is checked; 0 otherwise.  
 		numPlots+=plot // Plot it.  
 	endfor
 	
@@ -1292,11 +1292,11 @@ Function AnalysisWindow([diskCoords]) : Graph
 	
 	for(k=0;k<ItemsInList(analysisMethods);k+=1)
 		analysisMethod=StringFromList(k,analysisMethods)
-		plot=VarPackageSetting(module,"analysisMethods",analysisMethod,"show") // 1 if the "Show" checkbox is checked; 0 otherwise.  
+		plot=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"show") // 1 if the "Show" checkbox is checked; 0 otherwise.  
 		if(!plot) // If this plot does not have its "Show" checkbox checked.  
 			continue // Skip it.  
 		endif
-		dfref instanceDF=InstanceHome(module,"analysisMethods",analysisMethod)
+		dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
 		nvar /sdfr=instanceDF axisSize,crossChannel,axisMin,axisMax,logScale
 		wave /z/sdfr=instanceDF marker,msize
 		string color,axisName="Axis_"+num2str(plotNum),axisTName="Time_Axis"
@@ -1450,7 +1450,7 @@ Function AnalysisWinSetVariables(info)
 			break
 		case "Parameter":
 			string analysisMethod=SelectedMethod()
-			SetWavPackageSetting(module,"analysisMethods",analysisMethod,"Parameter",{info.dval},sub="analysisWin")
+			Core#SetWavPackageSetting(module,"analysisMethods",analysisMethod,"Parameter",{info.dval},sub="analysisWin")
 			break
 	endswitch
 End
@@ -1461,7 +1461,7 @@ Function AnalysisWinPopupMenus(info)
 	if(!PopupInput(info.eventCode))
 		return 0
 	endif
-	dfref analysisWinDF=PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
 	variable i
 	strswitch(info.ctrlName)
 		case "Minimum":
@@ -1475,7 +1475,7 @@ Function AnalysisWinPopupMenus(info)
 			Variable var=info.popNum-1
 			String analysisMethod=SelectedMethod()
 			variable numChannels=GetNumChannels()
-			dfref instanceAnalysisWinDF=InstanceHome(module,"analysisMethods",analysisMethod,sub="analysisWin",create=1)
+			dfref instanceAnalysisWinDF=Core#InstanceHome(module,"analysisMethods",analysisMethod,sub="analysisWin",create=1)
 			make /o/n=(numChannels) instanceAnalysisWinDF:Minimum /WAVE=Minimum
 			duplicate /free Minimum OldMinimum
 			OldMinimum=numtype(OldMinimum) ? 0.5 : OldMinimum // Deal with NaNs.  
@@ -1527,10 +1527,10 @@ End
 
 Function AnalysisMethodListBoxUpdate()
 	String currFolder=GetDataFolder(1)
-	dfref analysisWinDF=PackageHome(module,"analysisWin",create=1)
+	dfref analysisWinDF=Core#PackageHome(module,"analysisWin",create=1)
 	variable i=0,j
 	variable numChannels=GetNumChannels()
-	String analysisMethods=ListPackageInstances(module,"analysisMethods")
+	String analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 	Variable numMethods=ItemsInList(analysisMethods)
 	
 	Make /o/T/n=(numMethods,numChannels+2) analysisWinDF:ListWave /wave=ListWave=""
@@ -1551,16 +1551,16 @@ Function AnalysisMethodListBoxUpdate()
 	i=0
 	do
 		String analysisMethod=StringFromList(i,analysisMethods)
-		dfref instanceDF=InstanceHome(module,"analysisMethods",analysisMethod)
+		dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
 		if(datafolderrefstatus(instanceDF))
-			variable active=VarPackageSetting(module,"analysisMethods",analysisMethod,"active",default_=1)
+			variable active=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"active",default_=1)
 			if(!active)
 				deletepoints i,1,ListWave,SelWave,Parameter,AxisIndex,Minimum
 			else
 				ListWave[i][numChannels]=analysisMethod
 				variable numChannelsWithMethod=0
 				for(j=0;j<numChannels;j+=1)
-					wave /t chanAnalysisMethods=WavTPackageSetting("Acq","channelConfigs",GetChanName(j),"analysisMethods")
+					wave /t chanAnalysisMethods=Core#WavTPackageSetting(module,"channelConfigs",GetChanName(j),"analysisMethods")
 					findvalue /text=analysisMethod /txop=4 chanAnalysisMethods
 					if(v_value>=0 && strlen(analysisMethod))
 						SelWave[i][j]+=16
@@ -1604,7 +1604,7 @@ Function AnalysisWinListBoxes(info)
 		variable checked=selWave[info.row][info.col] & 16
 		if(info.col<numChannels)
 			string chanName=GetChanName(info.col)
-			wave /t chanAnalysisMethods=WavTPackageSetting(module,"channelConfigs",chanName,"analysisMethods")
+			wave /t chanAnalysisMethods=Core#WavTPackageSetting(module,"channelConfigs",chanName,"analysisMethods")
 			FindValue /TEXT=analysisMethod /TXOP=4 chanAnalysisMethods
 			if(v_value>=0 && !checked && strlen(analysisMethod))
 				deletepoints v_value,1,chanAnalysisMethods
@@ -1638,7 +1638,7 @@ Function AnalysisWinListBoxes(info)
 			endfor
 			info.selWave[info.row][0,info.col-1]=32+checked
 		elseif(info.col==numChannels+1) // Show was checked or unchecked.  
-			SetVarPackageSetting(module,"analysisMethods",analysisMethod,"show",checked>0)
+			Core#SetVarPackageSetting(module,"analysisMethods",analysisMethod,"show",checked>0)
 		endif
 	endif
 End
@@ -1646,7 +1646,7 @@ End
 Function AnalysisSelector(flag)
 	Variable flag
 	
-	dfref analysisWin=PackageHome(module,"analysisWin")
+	dfref analysisWin=Core#PackageHome(module,"analysisWin")
 	variable numChannels=GetNumChannels()
 	Wave /T Labels=GetChanLabels()
 	Make /o/T/n=(numChannels+2) analysisWin:Titles /wave=Titles
@@ -1665,7 +1665,7 @@ Function AnalysisSelector(flag)
 	if(flag)
 		KillControl AnalysisSelector
 		struct rect coords
-		GetWinCoords("AnalysisWin",coords)
+		Core#GetWinCoords("AnalysisWin",coords)
 		string axisCoords=GetAxes(graph="AnalysisWin")
 		duplicate /free axisIndex oldAxisIndex
 		KillWindow AnalysisWin
@@ -1691,7 +1691,7 @@ Function AnalysisSelector(flag)
 			widthSoFar+=width
 			i+=1
 		While(i<numChannels)
-		string analysisMethods=ListPackageInstances(module,"analysisMethods")
+		string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 		width=30+WidestString(analysisMethods,"Default",fsize,0); widthSoFar+=width
 		Listbox AnalysisSelector widths+={width}, win=AnalysisWin
 		width=35; widthSoFar+=width// For "Show"
@@ -1722,7 +1722,7 @@ Function SweepsWindow()
 	Display /N=SweepsWin /W=(win.left,win.top,win.right,win.bottom) /K=2 as "Sweeps"
 	Button SetBaselineRegion,pos={575,3},size={75,15},fsize=fsize+1, proc=SweepsWinButtons,title="Set Baseline"
 	Checkbox AutoBaseline,pos={655,3},title="Auto"
-	string default_view=StrPackageSetting(module,"random","","defaultView",default_="Broad")
+	string default_view=Core#StrPackageSetting(module,"random","","defaultView",default_="Broad")
 	Checkbox SwitchView, pos={700,3},size={100,29},proc=SweepsWinCheckboxes,title="Focus",userData=default_view
 	Button ResetSweepAxes,pos={575,20},size={75,15},fsize=fsize+1,proc=SweepsWinButtons,title="Restore Axes"
 	PopupMenu SweepOverlay,pos={655,20},title="Sweep Overlay",mode=0,value=#"PopupOptions(\"SweepsWin\",\"SweepOverlay\",\"Stack;By Mode;Split\")",userData(selected)="Split",proc=SweepsWinPopupMenus
@@ -1781,10 +1781,10 @@ Function SweepsWinButtons(info) : ButtonControl
 			string win=info.win
 			strswitch(info.ctrlName)
 				case "WaveSelector":
-					string daqInstance = GetSelectedInstance(module,"DAQs",noDefault=1)
+					string daqInstance = Core#GetSelectedInstance(module,"DAQs",noDefault=1)
 					if(!strlen(daqInstance))
-						string acqInstance = GetSelectedInstance(module,"Acq")
-						wave /t daqs = WavTPackageSetting(module,"Acq",acqInstance,"DAQs")
+						string acqInstance = Core#GetSelectedInstance(module,"Acq")
+						wave /t daqs = Core#WavTPackageSetting(module,"Acq",acqInstance,"DAQs")
 						daqInstance=daqs[0]
 					endif
 					WaveSelector(instance=daqInstance)
@@ -1801,15 +1801,15 @@ Function SweepsWinButtons(info) : ButtonControl
 						// Set the baseline for this method.  
 						String analysisMethod=SelectedMethod()
 						if(strlen(analysisMethod))
-							SetVarPackageSetting(module,"analysisMethods",analysisMethod,"baselineLeft",xcsr(a),create=1)
-							SetVarPackageSetting(module,"analysisMethods",analysisMethod,"baselineRight",xcsr(b),create=1)
+							Core#SetVarPackageSetting(module,"analysisMethods",analysisMethod,"baselineLeft",xcsr(a),create=1)
+							Core#SetVarPackageSetting(module,"analysisMethods",analysisMethod,"baselineRight",xcsr(b),create=1)
 						endif
 						// Set the baseline for this mode, which will only be used in cases where a method baseline cannot be found.  
-						if(!exists(PackageSettingLoc(module,"acqModes",acqMode,"baselineLeft",quiet=1)))
+						if(!exists(Core#PackageSettingLoc(module,"acqModes",acqMode,"baselineLeft",quiet=1)))
 							AcqModeDefaults(acqMode)
 						endif
-						SetVarPackageSetting(module,"acqModes",acqMode,"baselineLeft",xcsr(a))
-						SetVarPackageSetting(module,"acqModes",acqMode,"baselineRight",xcsr(b))
+						Core#SetVarPackageSetting(module,"acqModes",acqMode,"baselineLeft",xcsr(a))
+						Core#SetVarPackageSetting(module,"acqModes",acqMode,"baselineRight",xcsr(b))
 						SwitchView("")
 					else
 						DoAlert 0,"You must place cursors on the graph to set the baseline region."
@@ -1820,12 +1820,12 @@ Function SweepsWinButtons(info) : ButtonControl
 					ResetSweepAxes("")
 					break
 				case "SaveWin":
-					SetStrPackageSetting(module,win,"","recMacro",WinRecreation(win,0))
-					SavePackage(module,win)
+					Core#SetStrPackageSetting(module,win,"","recMacro",WinRecreation(win,0))
+					Core#SavePackage(module,win)
 					break
 				case "LoadWin":
 					DoWindow /K $win
-					ExecuteProfileMacro(module,win,"",1)
+					Core#ExecuteProfileMacro(module,win,"",1)
 					break
 			endswitch
 			break
@@ -1917,11 +1917,11 @@ Function SelectedAxis()
 End
 
 function GetFontSize()
-	return VarPackageSetting(module,"random","","fsize",default_=9)
+	return Core#VarPackageSetting(module,"random","","fsize",default_=9)
 end
 
 function GetAxisLabelPos()
-	return VarPackageSetting(module,"random","","lblpos",default_=35)
+	return Core#VarPackageSetting(module,"random","","lblpos",default_=35)
 end
 
 Function ResetSweepAxes(mode)
@@ -1945,7 +1945,7 @@ Function ResetSweepAxes(mode)
 		sweepOverlay=ClearBrackets(S_Value)
 	endif
 	
-	String acqModes=ListPackageInstances(module,"acqModes")
+	String acqModes=Core#ListPackageInstances(module,"acqModes")
 	String axes=AxisList("SweepsWin")
 	Variable i,j,verticalAxes=0
 	for(i=0;i<ItemsInList(axes);i+=1)
@@ -1977,7 +1977,7 @@ Function ResetSweepAxes(mode)
 			case "time":
 				break
 			default:
-				if(InstanceExists(module,"acqModes",acqMode))
+				if(Core#InstanceExists(module,"acqModes",acqMode))
 					string units=GetModeInputUnits(acqMode)
 				else
 					units=""
@@ -2113,7 +2113,7 @@ Function SwitchView(view)
 	if(!WinType("SweepsWin"))
 		return -1
 	endif
-	dfref df=PackageHome(module,"sweepsWin",create=1)
+	dfref df=Core#PackageHome(module,"sweepsWin",create=1)
 	Variable i,j,k,sweepNum,pulse,appended=0
 
 	variable numChannels=GetNumChannels()
@@ -2136,12 +2136,12 @@ Function SwitchView(view)
 	endif
 	Checkbox SwitchView win=SweepsWin, userData=view
 	
-	String acqModes=ListPackageInstances(module,"acqModes")
+	String acqModes=Core#ListPackageInstances(module,"acqModes")
 	for(i=0;i<numChannels;i+=1)
 		if(strlen(GetAcqMode(i))==0)
 			string defaultAcqMode=stringFromList(0,acqModes)
 			// Don't call SetAcqMode, because it calls SwitchView(), which causes recursion.  
-			SetStrPackageSetting(module,"channelConfigs",GetChanName(i),"acqMode",defaultAcqMode) // Fixing blanks in this wave if if there are any.  
+			Core#SetStrPackageSetting(module,"channelConfigs",GetChanName(i),"acqMode",defaultAcqMode) // Fixing blanks in this wave if if there are any.  
 		endif
 	endfor
 	variable currSweep=GetCurrSweep()
@@ -2314,7 +2314,7 @@ Function SwitchView(view)
 	// TO DO: Determine if this section is still useful.  
 	i=0
 	Do // Clean up unused waves from the SweepsWin folder.  
-		dfref sweepsWinDF=PackageHome(module,"SweepsWin")
+		dfref sweepsWinDF=Core#PackageHome(module,"SweepsWin")
 		String wavName=GetIndexedObjNameDFR(sweepsWinDF,1,i)
 		if(strlen(wavName))
 			Wave /sdfr=sweepsWinDF PossiblyUnusedWave=$wavName
@@ -2404,7 +2404,7 @@ Function AppendAndOffsetSweep(pre,post,sweepNum,pulse,type,filtered,red,green,bl
 		case "TestPulse":
 			chan=post
 			string acqMode=SweepAcqMode(post,sweepNum)
-			variable testPulseStart=VarPackageSetting(module,"acqModes",acqMode,"testPulseStart",default_=0)
+			variable testPulseStart=Core#VarPackageSetting(module,"acqModes",acqMode,"testPulseStart",default_=0)
 			vertAxis="TestPulseMag_axis"
 			horizAxis="TestPulseTime_Axis"
 			left=(testPulseStart*1000-1)*kHz
@@ -2439,7 +2439,7 @@ Function AppendAndOffsetSweep(pre,post,sweepNum,pulse,type,filtered,red,green,bl
 		return 0
 	endif
 	if(filtered && FiltersOn(chan))
-		PackageHome(module,"SweepsWin",create=1)
+		Core#PackageHome(module,"SweepsWin",create=1)
 		String filtName=GetWavesDataFolder(SweepWave,2)+"_filt"
 		Duplicate /O SweepWave $filtName
 		Wave SweepWave=$filtName
@@ -2481,11 +2481,11 @@ Function AppendAndOffsetSweep(pre,post,sweepNum,pulse,type,filtered,red,green,bl
 	// Zero the traces if needed.  This is in addition to the ApplyFilters above because ApplyFilters is turned off when looking at a sweep range, 
 	// because it would be very slow to filter all the sweeps if e.g. low pass and high pass filters were on.  
 	Variable yOffset
-	variable zero=VarPackageSetting(module,"filters",GetChanName(chan),"zero")
+	variable zero=Core#VarPackageSetting(module,"filters",GetChanName(chan),"zero")
 	if(zero) 
 		string mode=GetAcqMode(chan)
-		variable baselineLeft=VarPackageSetting(module,"acqModes",mode,"baselineLeft")
-		variable baselineRight=VarPackageSetting(module,"acqModes",mode,"baselineRight")
+		variable baselineLeft=Core#VarPackageSetting(module,"acqModes",mode,"baselineLeft")
+		variable baselineRight=Core#VarPackageSetting(module,"acqModes",mode,"baselineRight")
 		if(baselineLeft != baselineRight)
 			WaveStats /Q/M=1/R=(baselineLeft,baselineRight) SweepWave
 		else
@@ -2577,7 +2577,7 @@ Function PossiblyShowAnalysis()
 		ControlInfo /W=AnalysisWin $columnControl
 		variable columnOn=V_flag==2 ? V_Value : 1
 		
-		variable crossChannel=VarPackageSetting(module,"analysisMethods",analysisMethod,"crossChannel")
+		variable crossChannel=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"crossChannel")
 		if(!crossChannel) // For analyses that are not cross-channel.  
 			if(pre!=0)
 				continue // Only consider traces that are in the first layer (should be the only ones on the plot).  
@@ -2599,12 +2599,12 @@ End
 Function AnalysisMethodSubSelections(axisNum)
 	variable axisNum
 	
-	dfref analysisWinDF=PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
 	wave /t/sdfr=analysisWinDF ListWave
 	wave /sdfr=analysisWinDF SelWave,AxisIndex
 	
 	MarkSelected(axisNum) // Bold the active axis.  
-	String analysisMethods=ListPackageInstances(module,"analysisMethods")
+	String analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 	
 	// Mark method corresponding to the selected axis as active.  
 	SelWave = SelWave & ~1 // Set all plots to unselected.  
@@ -2622,7 +2622,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	endif
 	string /g analysisWinDF:selected=analysisMethod
 	
-	dfref instanceDF=InstanceHome(module,"analysisMethods",analysisMethod)
+	dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
 	if(WinType("SweepsWin"))
 		String view=GetUserData("SweepsWin","SwitchView","")
 		nvar /z/sdfr=instanceDF x_left=$("x_left_"+view)
@@ -2660,7 +2660,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	if(WhichListItem(analysisMethod,availableMethodCases)>=0)
 		String methodCase=analysisMethod
 	else
-		methodCase=StrPackageSetting(module,"analysisMethods",analysisMethod,"method",default_="")
+		methodCase=Core#StrPackageSetting(module,"analysisMethods",analysisMethod,"method",default_="")
 	endif
 	strswitch(methodCase)
 		case "Peak":
@@ -2803,7 +2803,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	string modeUnits=GetModeInputUnits(acqMode)
 	string methodUnits=GetMethodUnits(analysisMethod)//,acqMode=acqMode)
 	string units=ReplaceString("#",methodUnits,modeUnits)
-	variable linefeedLabels=VarPackageSetting(module,"random","","linefeedLabels",default_=1)
+	variable linefeedLabels=Core#VarPackageSetting(module,"random","","linefeedLabels",default_=1)
 	if(!lineFeedLabels) // If the user preference is to not have "\r" in axis labels.  
 		labell=ReplaceString("\r",labell," ") // Replace "\r" with space.  
 	endif
@@ -2812,7 +2812,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	Label /Z/W=AnalysisWin $axisName, labell
 	variable lblpos=GetAxisLabelPos()
 	ModifyGraph /W=AnalysisWin /Z lblPos($axisName)=lblpos+10*(ItemsInList(labell,"\r")-1)
-	dfref analysisWinDF=InstanceHome(module,"analysisMethods",analysisMethod,sub="analysisWin",create=1)
+	dfref analysisWinDF=Core#InstanceHome(module,"analysisMethods",analysisMethod,sub="analysisWin",create=1)
 	wave /z/sdfr=analysisWinDF Parameter,Features
 	if(!waveexists(Features))
 		make /o/n=2 analysisWinDF:Features /wave=Features=1
@@ -2845,7 +2845,7 @@ Function AnalysisWinCheckboxes(ctrlName,val) : CheckboxControl
 	String ctrlName
 	Variable val
 	
-	dfref analysisWinDF=PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
 	wave /t/sdfr=analysisWinDF ListWave
 	wave /sdfr=analysisWinDF SelWave,Parameter
 	variable methodIndex=0
@@ -2880,7 +2880,7 @@ Function AnalysisWinCheckboxes(ctrlName,val) : CheckboxControl
 //				endif
 //			endfor
 //			
-			SetWavPackageSetting(module,"analysisMethods",method,"Features",{val},indices={num},sub="analysisWin")
+			Core#SetWavPackageSetting(module,"analysisMethods",method,"Features",{val},indices={num},sub="analysisWin")
 			break
 	endswitch
 End
@@ -3265,7 +3265,7 @@ Function RefreshHook(info_str)
 				case "moved":
 					Struct rect coords
 					Struct rect igorCoords
-					GetWinCoords(fullWin,coords)
+					Core#GetWinCoords(fullWin,coords)
 					IgorWinCoords(igorCoords)
 					if(coords.top+100<(igorCoords.bottom)*ScreenResolution/72) // If window was not just minimized.  
 						
@@ -3301,11 +3301,11 @@ Function RefreshHook(info_str)
 				case "cursormoved":
 					String method=SelectedMethod()
 					if(strlen(method))
-						dfref instanceDF=InstanceHome(module,"analysisMethods",method,create=1)
+						dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method,create=1)
 						ControlInfo /W=SweepsWin SwitchView; String view=S_userdata
 						Variable focused=StringMatch(view,"Focused")
 						String cursorName=StringByKey("cursor",info_str)
-						dfref instanceDF=InstanceHome(module,"analysisMethods",method)
+						dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
 						strswitch(cursorName)
 							case "A":
 								variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
@@ -3357,7 +3357,7 @@ Function RefreshHook(info_str)
 			//SetWindow SweepsWin hook=RefreshHook
 			break
 		case "AnalysisWin":
-			variable lock_cursors=VarPackageSetting(module,"random","","lockCursors")
+			variable lock_cursors=Core#VarPackageSetting(module,"random","","lockCursors")
 			strswitch(event)
 				case "cursormoved":
 					cursorName=StringByKey("CURSOR",info_str)
@@ -3439,15 +3439,15 @@ Menu "SelectorContext",contextualmenu, dynamic
 		GetDAQInfo(""),/Q,GetLastUserMenuInfo;WaveSelector(DAQ=stringfromlist(0,s_value,","))
 	End
 	SubMenu "DAQ Instance"
-		ListPackageInstances("Acq","DAQs",quiet=1)+"_Save_",/Q,GetLastUserMenuInfo;SelectPackageInstance("Acq","DAQs",s_value)
+		Core#ListPackageInstances("Acq","DAQs",quiet=1)+"_Save_",/Q,GetLastUserMenuInfo;SelectPackageInstance("Acq","DAQs",s_value)
 	End
 	SubMenu "Change DAQ Type"
-		PopupMenuOptions("Acq","DAQs",GetWinDAQ(),"type",brackets=1,quiet=1),/Q,GetLastUserMenuInfo;SetStrPackageSetting("Acq","DAQs",GetWinDAQ(),"type",ClearBrackets(s_value))
+		Core#PopupMenuOptions("Acq","DAQs",GetWinDAQ(),"type",brackets=1,quiet=1),/Q,GetLastUserMenuInfo;SetStrPackageSetting("Acq","DAQs",GetWinDAQ(),"type",ClearBrackets(s_value))
 	End
 End
 
 Menu "DAQ Instance",contextualmenu, dynamic
-	ListPackageInstances("Acq","DAQs",quiet=1),/Q,GetLastUserMenuInfo;SelectPackageInstance("Acq","DAQs",s_value); SetSelectedInstance("Acq","DAQs",s_value)
+	Core#ListPackageInstances("Acq","DAQs",quiet=1),/Q,GetLastUserMenuInfo;SelectPackageInstance("Acq","DAQs",s_value); SetSelectedInstance("Acq","DAQs",s_value)
 End
 
 Function MarkSelected(axisNum)
@@ -3519,7 +3519,7 @@ Function AnalysisWinButtons(ctrlName) : ButtonControl
 			AnalysisSelector(V_flag)
 			break
 		case "EditAnalysisMethods":
-			EditModule(module,package="AnalysisMethods")
+			Core#EditModule(module,package="AnalysisMethods")
 			break
 		case "RegressionLine":
 			RegressionLine()

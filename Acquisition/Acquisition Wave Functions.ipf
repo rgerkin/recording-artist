@@ -28,25 +28,25 @@ Function /S SaveModes(DAQ[,brackets])
 	string DAQ
 	variable brackets
 	
-	return PopupMenuOptions(module,"DAQs",DAQ,"saveMode",brackets=brackets)
+	return Core#PopupMenuOptions(module,"DAQs",DAQ,"saveMode",brackets=brackets)
 End
 
 Function /S SaveModesChannel(chan)
 	variable chan
 	
-	return PopupMenuOptions(module,"channelConfigs",GetChanName(chan),"saveMode")
+	return Core#PopupMenuOptions(module,"channelConfigs",GetChanName(chan),"saveMode")
 End
 
 function /S GetChanSaveMode(chan)
 	variable chan
 	
-	return StrPackageSetting(module,"channelConfigs",GetChanName(chan),"saveMode",default_="Raw")
+	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"saveMode",default_="Raw")
 end
 
 Function /S GetChanLabel(chan)
 	variable chan
 	
-	return StrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",default_="ch"+num2str(chan),quiet=1)
+	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",default_="ch"+num2str(chan),quiet=1)
 End
 
 function /wave GetChanLabels()
@@ -110,7 +110,7 @@ Function /S SweepAcqMode(chan,sweep[,quiet])
 				if(!strlen(mode))
 					//mode=GetDimLabel(chanHistory,0,-1)
 					//if(!strlen(mode))
-						mode=DefaultInstance(module,"acqModes")
+						mode=Core#DefaultInstance(module,"acqModes")
 					//endif
 				endif
 			endif
@@ -119,7 +119,7 @@ Function /S SweepAcqMode(chan,sweep[,quiet])
 	if(!strlen(mode))
 		mode=GetAcqMode(chan,quiet=quiet)
 		if(!strlen(mode))
-			String acqModes=ListPackageInstances(module,"acqModes")
+			String acqModes=Core#ListPackageInstances(module,"acqModes")
 			mode=StringFromList(0,acqModes)
 		endif
 	endif
@@ -129,7 +129,7 @@ End
 function IsChanActive(chan)
 	variable chan
 	
-	return VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active")
+	return Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active")
 end
 
 function IsChanAnalysisMethod(chan,method)
@@ -138,7 +138,7 @@ function IsChanAnalysisMethod(chan,method)
 	
 	variable result=0
 	string name=GetChanName(chan)
-	wave /z/t w=WavTPackageSetting(module,"channelConfigs",name,"analysisMethods")
+	wave /z/t w=Core#WavTPackageSetting(module,"channelConfigs",name,"analysisMethods")
 	if(waveexists(w) && strlen(method))
 		findvalue /text=method /txop=4 w
 		if(v_value>=0)
@@ -193,7 +193,7 @@ End
 Function GetModeGain(mode,direction)
 	string mode,direction
 	
-	return VarPackageSetting(module,"acqModes",mode,direction+"Gain")
+	return Core#VarPackageSetting(module,"acqModes",mode,direction+"Gain")
 End
 
 function /s GetModeInputType(acqMode[,fundamental])
@@ -214,9 +214,9 @@ function /s GetModeQuantity(acqMode,direction[,fundamental])
 	string acqMode,direction
 	variable fundamental
 	
-	string type=StrPackageSetting(module,"acqModes",acqMode,direction+"Type")
+	string type=Core#StrPackageSetting(module,"acqModes",acqMode,direction+"Type")
 	if(fundamental)
-		type=StrPackageSetting(module,"quantities",type,"type",default_=type) 
+		type=Core#StrPackageSetting(module,"quantities",type,"type",default_=type) 
 	endif
 	return type
 end
@@ -225,9 +225,9 @@ function /s GetMethodQuantity(analysisMethod[,fundamental])
 	string analysisMethod
 	variable fundamental
 	
-	string type=StrPackageSetting(module,"analysisMethods",analysisMethod,"units")
+	string type=Core#StrPackageSetting(module,"analysisMethods",analysisMethod,"units")
 	if(fundamental)
-		type=StrPackageSetting(module,"quantities",type,"type",default_=type) 
+		type=Core#StrPackageSetting(module,"quantities",type,"type",default_=type) 
 	endif
 	return type
 end
@@ -247,7 +247,7 @@ End
 function /s GetModeUnits(acqMode,direction)
 	string acqMode,direction
 	string type=GetModeQuantity(acqMode,direction)
-	string units=StrPackageSetting(module,"quantities",type,"units") // A unit label, e.g. "V" for volts.  
+	string units=Core#StrPackageSetting(module,"quantities",type,"units") // A unit label, e.g. "V" for volts.  
 	if(!strlen(units))
 		units=type // Input quantity, e.g. "Voltage"
 	endif
@@ -271,9 +271,9 @@ function /s GetModePrefix(acqMode,direction)
 	string acqMode,direction
 	
 	string quantity=GetModeQuantity(acqMode,direction)
-	string prefix=StrPackageSetting(module,"quantities",quantity,"prefix",quiet=1,default_="Error")
+	string prefix=Core#StrPackageSetting(module,"quantities",quantity,"prefix",quiet=1,default_="Error")
 	if(stringmatch(prefix,"Error"))
-		prefix=StrPackageSetting(module,"acqModes",acqMode,direction+"Prefix") // Unit prefix, e.g. "p" for "1e-12".
+		prefix=Core#StrPackageSetting(module,"acqModes",acqMode,direction+"Prefix") // Unit prefix, e.g. "p" for "1e-12".
 	endif
 	if(stringmatch(prefix," "))
 		prefix = ""
@@ -286,10 +286,10 @@ function /s GetMethodPrefix(analysisMethod[,acqMode])
 	
 	acqMode=selectstring(!paramisdefault(acqMode),"",acqMode)
 	string quantity=GetMethodQuantity(analysisMethod)
-	string prefix=StrPackageSetting(module,"quantities",quantity,"prefix",quiet=1,default_="Error")
+	string prefix=Core#StrPackageSetting(module,"quantities",quantity,"prefix",quiet=1,default_="Error")
 	if(stringmatch(prefix,"Error"))
 		if(strlen(acqMode))
-			prefix=StrPackageSetting(module,"acqModes",acqMode,"inputPrefix") // Unit prefix, e.g. "p" for "1e-12".
+			prefix=Core#StrPackageSetting(module,"acqModes",acqMode,"inputPrefix") // Unit prefix, e.g. "p" for "1e-12".
 		else
 			prefix=""
 		endif
@@ -304,7 +304,7 @@ function /s GetMethodUnits(analysisMethod[,acqMode])
 	string type=GetMethodQuantity(analysisMethod)
 	string units=""
 	if(!stringmatch(type,"#"))
-		units=StrPackageSetting(module,"quantities",type,"units") // A unit label, e.g. "V" for volts.  
+		units=Core#StrPackageSetting(module,"quantities",type,"units") // A unit label, e.g. "V" for volts.  
 	endif
 	if(!strlen(units))
 		units=type // Input quantity, e.g. "Voltage"
@@ -318,7 +318,7 @@ function GetStimParam(param,chan,pulseSet)
 	string param
 	variable chan,pulseSet
 	
-	wave w=WavPackageSetting(module,"stimuli",GetChanName(chan),param)
+	wave w=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param)
 	return dimsize(w,0)>pulseSet ? w[pulseSet] : 0
 end
 
@@ -326,7 +326,7 @@ function SetStimParam(param,chan,pulseSet,value)
 	string param
 	variable chan,pulseSet,value
 	
-	wave w=WavPackageSetting(module,"stimuli",GetChanName(chan),param)
+	wave w=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param)
 	w[pulseSet] = value
 end
 
@@ -429,7 +429,7 @@ Function ADC2Chan(adc)
 	variable i,numChannels=GetNumChannels()
 	make /free/t/n=(numChannels) InputMap
 	for(i=0;i<numChannels;i+=1)
-		InputMap[i]=StrPackageSetting(module,"channelConfigs",GetChanName(i),"inputMap")
+		InputMap[i]=Core#StrPackageSetting(module,"channelConfigs",GetChanName(i),"inputMap")
 	endfor
 	findvalue /text=adc /txop=4 InputMap
 	if(v_value>=0)
@@ -446,7 +446,7 @@ Function DAC2Chan(dac)
 	variable i,numChannels=GetNumChannels()
 	make /free/t/n=(numChannels) OutputMap
 	for(i=0;i<numChannels;i+=1)
-		OutputMap[i]=StrPackageSetting(module,"channelConfigs",GetChanName(i),"OutputMap")
+		OutputMap[i]=Core#StrPackageSetting(module,"channelConfigs",GetChanName(i),"OutputMap")
 	endfor
 	findvalue /text=dac /txop=4 OutputMap
 	if(v_value>=0)
@@ -460,14 +460,14 @@ End
 Function /s Chan2ADC(chan)
 	variable chan
 	
-	return StrPackageSetting(module,"channelConfigs",GetChanName(chan),"ADC")
+	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"ADC")
 End
 
 // Finds the DAC connection number (from the OutputMap) corresponding to Igor channel 'chan'.  
 Function /s Chan2DAC(chan)
 	variable chan
 	
-	return StrPackageSetting(module,"channelConfigs",GetChanName(chan),"DAC")
+	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"DAC")
 End
 
 function /wave GetChannelColor(channel,red,green,blue)
@@ -484,7 +484,7 @@ function /wave GetChanColor(chan,red,green,blue)
 	variable &red,&green,&blue
 	
 	string name=GetChanName(chan)
-	wave /z color=WavPackageSetting(module,"channelConfigs",name,"color",quiet=1)
+	wave /z color=Core#WavPackageSetting(module,"channelConfigs",name,"color",quiet=1)
 	if(!waveexists(color))
 		make /free/n=3 color
 		switch(chan)
@@ -568,7 +568,7 @@ function /s SetUniqueChanLabel(chan[,label_,quiet])
 			break
 		endif
 	while(i<10)
-	SetStrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",newLabel,quiet=quiet)
+	Core#SetStrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",newLabel,quiet=quiet)
 	return newLabel
 end
 
@@ -610,7 +610,7 @@ function /wave SetUniqueChanColor(chan[,quiet])
 		endfor
 		tries+=1
 	while(changedColor && tries<10)
-	SetWavPackageSetting(module,"channelConfigs",GetChanName(chan),"color",color)
+	Core#SetWavPackageSetting(module,"channelConfigs",GetChanName(chan),"color",color)
 	killwaves /z m_colors
 	return newLabel
 end
@@ -679,7 +679,7 @@ function ConvertModeUnits(value,acqMode,direction)
 			printf "Not a valid direction: %s; %s.\r",direction,getrtstackinfo(1)
 			return 0
 	endswitch
-	string prefix=StrPackageSetting(module,"acqModes",acqMode,direction+"prefix") // Units, e.g. "p".  
+	string prefix=Core#StrPackageSetting(module,"acqModes",acqMode,direction+"prefix") // Units, e.g. "p".  
 	string prefixes="f;p;n;u;m;;k;M;G;T;"
 	variable index=whichlistitem(prefix,prefixes)
 	if(index>=0)
@@ -713,7 +713,7 @@ Function ApplyFilters(w,chan)
 	Wave w
 	Variable chan
 	
-	dfref df=InstanceHome(module,"filters",GetChanName(chan))
+	dfref df=Core#InstanceHome(module,"filters",GetChanName(chan))
 	if(!datafolderrefstatus(df))
 		return -1
 	endif
@@ -762,7 +762,7 @@ Function ApplyFilters(w,chan)
 	// Zero (set mean to zero).  
 	if(zero) // This should be done after all filtering to make sure the final mean is zero.  
 		String acqMode=GetAcqMode(chan)
-		dfref acqModeDF=InstanceHome(module,"acqModes",acqMode)
+		dfref acqModeDF=Core#InstanceHome(module,"acqModes",acqMode)
 		nvar /z/sdfr=acqModeDF baselineLeft,baselineRight
 		if(nvar_exists(baselineLeft) && nvar_exists(baselineRight))
 			WaveStats /Q/M=1/R=(baselineLeft,baselineRight) w
@@ -799,7 +799,7 @@ Function ApplyFilters(w,chan)
 		wave power=chanDF:$name
 		variable currSweep=GetCurrSweep()
 		make /o/n=(currSweep) chanDF:PowerHistory /wave=PowerHistory
-		variable noiseFreq=VarPackageSetting(module,"random","","noiseFreq",default_=60)
+		variable noiseFreq=Core#VarPackageSetting(module,"random","","noiseFreq",default_=60)
 		PowerHistory[currSweep-1]=log(Power(noiseFreq))
 		killwaves /z Power
 	endif
@@ -950,46 +950,46 @@ End
 function /s GetAssembler(chan)
 	variable chan
 	
-	string assembler=StrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",default_="Default_stim")
+	string assembler=Core#StrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",default_="Default_stim")
 	return removeending(assembler,"_stim")
 end
 
 Function /S AcquisitionModes()
-	string acqModes=ListPackageInstances(module,"acqModes",editor=1)
+	string acqModes=Core#ListPackageInstances(module,"acqModes",editor=1)
 	return RemoveEnding(acqModes,";")+";------;Edit"
 End
 
 Function /S GetAcqMode(chan[,quiet])
 	variable chan,quiet
 	
-	return StrPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",quiet=quiet)
+	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",quiet=quiet)
 End
 
 Function /S GetAcqModeOutputType(modeName)
 	string modeName
 	
-	return StrPackageSetting(module,"acqModes",modeName,"outputType")
+	return Core#StrPackageSetting(module,"acqModes",modeName,"outputType")
 End
 
 Function /S GetAcqModeInputType(modeName)
 	string modeName
 	
-	return StrPackageSetting(module,"acqModes",modeName,"inputType")
+	return Core#StrPackageSetting(module,"acqModes",modeName,"inputType")
 End
 
 function /s GetOutputUnits(chan)
 	variable chan
 	
 	string type=GetOutputType(chan)
-	return StrPackageSetting(module,"quantities",type,"units")
+	return Core#StrPackageSetting(module,"quantities",type,"units")
 end
 
 function /s GetInputUnits(chan)
 	variable chan
 	
 	string type=GetInputType(chan)
-	string units = StrPackageSetting(module,"quantities",type,"units")
-	string prefix = StrPackageSetting(module,"quantities",type,"prefix")
+	string units = Core#StrPackageSetting(module,"quantities",type,"units")
+	string prefix = Core#StrPackageSetting(module,"quantities",type,"prefix")
 	return prefix+units
 end
 
@@ -1027,7 +1027,7 @@ End
 
 Function /S SelectedMethod()
 	string result=""
-	dfref analysisWinDF=PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
 	if(datafolderrefstatus(analysisWinDF))
 		wave /z/sdfr=analysisWinDF selWave
 		wave /z/t/sdfr=analysisWinDF listWave
@@ -1049,7 +1049,7 @@ Function SetAcqMode(mode,chan)
 	Variable chan 
 	
 	if(StringMatch(mode,"Edit"))
-		EditModule(module,package="AcqModes")
+		Core#EditModule(module,package="AcqModes")
 		return 1
 	endif
 	
@@ -1077,7 +1077,7 @@ Function SetAcqMode(mode,chan)
 				SetVariable kHz disable=2,userData(oldFreq)=num2str(GetAcqFreq()),win=$win
 				SetAcqFreq(50)
 			endif
-			dfref dc=InstanceHome(module,"acqModes",mode)
+			dfref dc=Core#InstanceHome(module,"acqModes",mode)
 			variable vE=numvarordefault(getdatafolder(1,dc)+":vE",0)
 			variable vI=numvarordefault(getdatafolder(1,dc)+":vI",-80)
 			prompt vE,"Excitatory (mV)"; prompt vI,"Inhibitory (mv)"; doPrompt "Set the values of the reversal potentials for dynamic clamp.",vE,vI 
@@ -1092,7 +1092,7 @@ Function SetAcqMode(mode,chan)
 	endif
 	
 	if(WhichListItem(mode,modes)>=0) // Existing mode.  
-		SetPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",mode)
+		Core#SetPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",mode)
 		SwitchView("")
 	else
 		AcqModeDefaults(mode) // Set values for input resistance measurement, access resistance measurements, etc.  
@@ -1141,15 +1141,15 @@ End
 Function IsDynamicClamp(mode)
 	string mode
 	
-	return VarPackageSetting(module,"acqModes",mode,"dynamic",default_=0)
+	return Core#VarPackageSetting(module,"acqModes",mode,"dynamic",default_=0)
 End
 
 Function /S ListAcqModes()
-	 return ListPackageInstances("Acq","acqModes")
+	 return Core#ListPackageInstances("Acq","acqModes")
 End
 
 Function /S ListAcqMethods()
-	 return ListPackageInstances("Acq","analysisMethods")
+	 return Core#ListPackageInstances("Acq","analysisMethods")
 End
 
 Function NumDistinctAcqModes(modeList[,withInput,withOutput])
@@ -1177,10 +1177,10 @@ Function SerialOrIBW(stimName)
 	string stimName
 	
 	variable result
-	if(InstanceExists(module,"stimuli",stimName))
+	if(Core#InstanceExists(module,"stimuli",stimName))
 		result=0
 	else
-		dfref df=PackageHome(module,"stimuli")
+		dfref df=Core#PackageHome(module,"stimuli")
 		wave /z/sdfr=df w=$stimName
 		if(waveexists(w))
 			result=1
@@ -1197,7 +1197,7 @@ function SetAssembler(chan,assembler)
 	
 	string daq=Chan2DAQ(chan)
 	string win=DAQ+"_Selector"
-	SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
+	Core#SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
 	strswitch(assembler)
 		case "Noisy":
 			string title="StDev"
@@ -1205,7 +1205,7 @@ function SetAssembler(chan,assembler)
 		case "Frozen":
 		case "FrozenPlusNegative":
 			title="Multiplier"
-			dfref df=InstanceHome(module,"stimuli",GetChanName(chan))
+			dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
 			wave /z/sdfr=df Frozen
 			if(!waveexists(Frozen))
 				printf "Could not find a frozen wave in %s.\r",joinpath({getdatafolder(1,df),"Frozen"})
@@ -1255,7 +1255,7 @@ Function WaveUpdate([DAQ])
 		if(!StringMatch(Chan2DAQ(i),DAQ))
 			continue
 		endif
-		variable active=VarPackageSetting(module,"channelConfigs",GetChanName(i),"active")
+		variable active=Core#VarPackageSetting(module,"channelConfigs",GetChanName(i),"active")
 		if(!active)
 			continue
 		endif
@@ -1288,7 +1288,7 @@ Function WaveUpdate([DAQ])
 		//	AddStimulus[i]=0
 		//endif
 		if(WinType(DAQ+"_Selector"))
-			nvar addStimulus=$PackageSettingLoc(module,"channelConfigs",GetChanName(i),"addStimulus")
+			nvar addStimulus=$Core#PackageSettingLoc(module,"channelConfigs",GetChanName(i),"addStimulus")
 			Checkbox $("AddStimulus_"+num2str(i)) variable=addStimulus,win=$(DAQ+"_Selector")
 		endif
 		SetScale x,0,duration,input
@@ -1386,7 +1386,7 @@ function GetNumChannels([DAQ,quiet])
 	variable i,numChannels=0
 	for(i=0;i<itemsinlist(DAQs);i+=1)
 		DAQ=stringfromlist(i,DAQs)
-		wave /z/t DAQchannelConfigs=WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs",quiet=quiet)
+		wave /z/t DAQchannelConfigs=Core#WavTPackageSetting(module,"DAQs",DAQ,"channelConfigs",quiet=quiet)
 		if(waveexists(DAQchannelConfigs))
 			numChannels+=numpnts(DAQchannelConfigs)
 		endif
@@ -1413,14 +1413,14 @@ function SetAcqSetting(package,instance,object,value[,indices])
 	if(paramisdefault(indices))
 		make /free/n=0 indices
 	endif
-	SetPackageSetting(module,package,instance,object,value,indices=indices)
+	Core#SetPackageSetting(module,package,instance,object,value,indices=indices)
 end
 
 function /s GetStimulusName(chan)
 	variable chan
 	
 	string channel = GetChanName(chan)
-	return StrPackageSetting(module,"channelConfigs",channel,"stimulus")
+	return Core#StrPackageSetting(module,"channelConfigs",channel,"stimulus")
 end
 
 function /wave GetDAQDivisor(daq)
@@ -1443,7 +1443,7 @@ function /wave GetChanDivisor(chan[,sweepNum])
 	
 	string channel = GetChanName(chan)
 	if(paramisdefault(sweepNum))
-		wave /z divisor = WavPackageSetting(module,"stimuli",channel,"divisor")
+		wave /z divisor = Core#WavPackageSetting(module,"stimuli",channel,"divisor")
 		if(!waveexists(divisor))
 			string daq = Chan2DAQ(chan)
 			variable numPulseSets=GetNumPulseSets(daq)
@@ -1461,7 +1461,7 @@ function /wave GetChanRemainder(chan[,sweepNum])
 	
 	string channel = GetChanName(chan)
 	if(paramisdefault(sweepNum))
-		wave /z remainder = WavPackageSetting(module,"stimuli",channel,"remainder")
+		wave /z remainder = Core#WavPackageSetting(module,"stimuli",channel,"remainder")
 		if(!waveexists(remainder))
 			string daq = Chan2DAQ(chan)
 			variable numPulseSets=GetNumPulseSets(daq)
@@ -1478,7 +1478,7 @@ function /wave GetNumPulses(chan[,sweepNum])
 	variable chan,sweepNum
 	
 	if(paramisdefault(sweepNum))
-		wave numPulses=WavPackageSetting(module,"stimuli",GetChanName(chan),"pulses")
+		wave numPulses=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"pulses")
 	else
 		wave chanHistory=GetChanHistory(chan)
 		make /free/n=(dimsize(chanHistory,2)) numPulses=chanHistory[sweepNum][%$"pulses"][p]
@@ -1490,7 +1490,7 @@ function /wave GetAmpl(chan[,sweepNum])
 	variable chan,sweepNum
 	
 	if(paramisdefault(sweepNum))
-		wave ampl=WavPackageSetting(module,"stimuli",GetChanName(chan),"ampl")
+		wave ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"ampl")
 	else
 		wave chanHistory=GetChanHistory(chan)
 		make /free/n=(dimsize(chanHistory,2)) ampl=chanHistory[sweepNum][%$"ampl"][p]
@@ -1502,7 +1502,7 @@ function /wave GetdAmpl(chan[,sweepNum])
 	variable chan,sweepNum
 	
 	if(paramisdefault(sweepNum))
-		wave dAmpl=WavPackageSetting(module,"stimuli",GetChanName(chan),"dAmpl")
+		wave dAmpl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"dAmpl")
 	else
 		wave chanHistory=GetChanHistory(chan)
 		make /free/n=(dimsize(chanHistory,2)) dAmpl=chanHistory[sweepNum][%$"dAmpl"][p]
@@ -1559,7 +1559,7 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	variable triparity // Even (0) or odd (1).  
 	
 	string stimulusName=GetStimulusName(chan)
-	string Assembler=StrPackageSetting(module,"stimuli",GetChanName(chan),"Assembler")
+	string Assembler=Core#StrPackageSetting(module,"stimuli",GetChanName(chan),"Assembler")
 	funcref Default_stim stimFunc=$(assembler+"_stim")
 	if(!strlen(stringbykey("NAME",funcrefinfo(stimFunc))) || stringmatch(Assembler,"Normal") || stringmatch(Assembler,"Default")) // Invalid or plain stimulus Assembler function.  
 		funcref Default_stim stimFunc=Default_stim // Use the normal stimulus Assembler function.  
@@ -1575,16 +1575,16 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	//string mode=AcqMode[channel]
 	variable duration=GetDuration(DAQ)
 	variable kHz=GetKhZ(DAQ)
-	wave LCM_=WavPackageSetting(module,"DAQs",DAQ,"LCM_")
+	wave LCM_=Core#WavPackageSetting(module,"DAQs",DAQ,"LCM_")
 	variable pulseSets=GetNumPulseSets(DAQ)
-	dfref df=InstanceHome(module,"stimuli",GetChanName(chan))
+	dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
 	wave /sdfr=df divisor,remainder,pulses,begin,IPI,width,testPulseOn
 	Redimension /n=(duration*kHz*1000,LCM_[chan]) Stimulus
 	SetScale /P x,0,1/(1000*kHz),Stimulus
 	Stimulus=0
 	
 	variable i,j,k,testPulseFound=0,testPulseApplied=0
-	dfref df=InstanceHome(module,"acqModes",GetAcqMode(chan))
+	dfref df=Core#InstanceHome(module,"acqModes",GetAcqMode(chan))
 	if(DataFolderRefStatus(df)==1)
 		testPulseFound=1
 		nvar /sdfr=df testPulsestart,testPulselength,testPulseampl
@@ -1705,7 +1705,7 @@ Function MaxStimParam(param,pre[,sweep])
 		variable i
 		for(i=0;i<numChannels;i+=1) // TO DO: Fix to reflect the fact that there may be fewer channels at this points than earlier in the experiment.  
 			if((pre==-1 || pre==i) && IsChanActive(i))
-				wave ParamWave=WavPackageSetting(module,"stimuli",GetChanName(i),param)
+				wave ParamWave=Core#WavPackageSetting(module,"stimuli",GetChanName(i),param)
 				concatenate {ParamWave},Temp
 			endif
 		endfor
@@ -1754,7 +1754,7 @@ Function EarliestStim(sweep[,chan,channel_label,ignoreRemainder])
 	
 	variable currSweep=GetCurrSweep()
 	variable numChannels=GetNumChannels()
-	dfref df=InstanceHome(module,"stimuli",GetChanName(chan))
+	dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
 	if(sweep>=currSweep) // Next sweep.  
 		sweep=currSweep
 		wave /sdfr=df Begin,Ampl,dAmpl,Width,Pulses,Divisor,Remainder
@@ -1825,7 +1825,7 @@ End
 Function /S Chan2Label(chan[,quiet])
 	variable chan,quiet
 	
-	return StrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",default_="Chan_"+num2str(chan),quiet=quiet)
+	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",default_="Chan_"+num2str(chan),quiet=quiet)
 End
 
 // Returns a positive value if any filters are on.  
@@ -1833,7 +1833,7 @@ Function FiltersOn(chan)
 	Variable chan
 	
 	string filters="notch;wyldpoint;low;high;zero;leakSubtract"
-	dfref df=InstanceHome(module,"filters",GetChanName(chan))
+	dfref df=Core#InstanceHome(module,"filters",GetChanName(chan))
 	variable i,val=0
 	if(datafolderrefstatus(df))
 		for(i=0;i<itemsinlist(filters);i+=1)
@@ -1853,7 +1853,7 @@ Function WaveSave(chan[,path,as])
 	variable chan
 	 string path,as
 	if(ParamIsDefault(path))
-		path=ProfilePath(package="Stimuli")
+		path=Core#ProfilePath(package="Stimuli")
 	endif
 	newpath /o/q waveSavePath path
 	string name
@@ -1877,7 +1877,7 @@ Function WaveSave(chan[,path,as])
 		endif
 	endfor
 	if(waveexists(toSave))
-		dfref df=PackageHome("Acq","stimuli")
+		dfref df=Core#PackageHome("Acq","stimuli")
 		string tempLoc="root:Temp"+num2str(abs(enoise(100000))) // Create a temporary folder for the renamed wave.  
 		dfref temp=newfolder(tempLoc)
 		duplicate /o toSave temp:$as /wave=tempSave
@@ -1896,12 +1896,12 @@ Function WaveLoad(name[,path])
 		return 0
 	endif
 	if(ParamIsDefault(path))
-		path=ProfilePath(package="Stimuli")
+		path=Core#ProfilePath(package="Stimuli")
 		NewPath /O/Q/Z WaveLoadPath path
 		path="WaveLoadPath"
 	endif
 	dfref currDF= GetDataFolderDFR()		// save
-	dfref df=PackageHome("Acq","stimuli")
+	dfref df=Core#PackageHome("Acq","stimuli")
 	setdatafolder df
 	LoadWave /H/O/Q/P=$path name+".ibw"
 	SetDataFolder currDF					// and restore
@@ -2101,7 +2101,7 @@ function Frozen_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,swee
 	SetStimParam("dAmpl",chan,pulseSet,0) // Set dAmpl to be 0 because we are not using this parameter as intended in Default_stim.  
 	Default_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
 	SetStimParam("dAmpl",chan,pulseSet,multiplier) // Set it back to its original value.  
-	wave /z frozen=WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
+	wave /z frozen=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
 	if(waveexists(frozen))
 		lastSample = min(lastSample,firstSample+numpnts(frozen)-1) // Only extend to the end of the pulse or the end of the frozen wave, whichever comes first.  
 		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample]
@@ -2120,7 +2120,7 @@ function FrozenPlusNegative_stim(Stimulus,chan,firstSample,lastSample,pulseNum,p
 	variable IPI=GetStimParam("IPI",chan,pulseSet)
 	variable numPulses=GetStimParam("pulses",chan,pulseSet)
 	variable kHz=GetKHz(daq)
-	wave /z frozen=WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
+	wave /z frozen=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
 	if(waveexists(frozen))
 		lastSample = min(lastSample,firstSample+numpnts(frozen)-1) // Only extend to the end of the pulse or the end of the frozen wave, whichever comes first.  
 		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample]
@@ -2329,7 +2329,7 @@ Function MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
 		return 0
 	endif
 	Variable points=kHz*duration*1000
-	dfref df=PackageHome(module,"stimuli")
+	dfref df=Core#PackageHome(module,"stimuli")
 	Make /o/n=(points) df:PSCNoise /WAVE=Noise=0
 	SetScale x,0,duration,Noise
 	Variable start=x2pnt(Noise,stepBegin)
@@ -2354,7 +2354,7 @@ Function MakeAlphaNoise(duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz)
 	Variable duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz
 	
 	Variable points=kHz*duration*1000
-	dfref df=PackageHome(module,"stimuli")
+	dfref df=Core#PackageHome(module,"stimuli")
 	Make /o/n=(points) df:AlphaNoise /WAVE=Noise=0
 	SetScale x,0,duration,Noise
 	Variable start=x2pnt(Noise,stepBegin)

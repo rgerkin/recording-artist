@@ -1,5 +1,6 @@
 #pragma rtGlobals=1		// Use modern global access method.
-#pragma moduleName=Settings
+//#pragma moduleName=Settings
+#pragma IndependentModule=Core
 
 //#ifdef Dev
 strconstant moduleEditor="EditModuleWin"
@@ -343,7 +344,7 @@ function ShowPackageInstanceObject(module,package,instance,object,info,x,y,yJump
 		CopyDefaultInstanceObject(module,package,instance,object)
 	endif
 	string options
-	sprintf options,"StrPackageSetting(\"%s\",\"%s\",\"%s\",\"%s\",setting=\"%s\")",module,package,instance,object,"options"
+	sprintf options,"Core#StrPackageSetting(\"%s\",\"%s\",\"%s\",\"%s\",setting=\"%s\")",module,package,instance,object,"options"
 	variable expandable=VarPackageSetting(module,package,instance,object,setting="expandable",default_=0)
 	string controlName=Core#Hash32(info)
 	string type=ObjectType(joinpath({objectLoc,"value"}))
@@ -1601,9 +1602,11 @@ Function LoadDefaultPackages(module[,packages,quiet])
 	variable quiet
 	
 	packages=selectstring(!paramisdefault(packages),ListPackages(modules=module,quiet=quiet),packages)
+	packages = PackageLoadOrder(module,packages)
 	variable i
 	for(i=0;i<itemsinlist(packages);i+=1)
 		string package=StringFromList(i,packages)
+		PackageHome(module,package,create=1)
 		LoadDefaultPackageInstances(module,package,quiet=quiet)
 	endfor
 End
@@ -1615,11 +1618,24 @@ function /s LoadDefaultPackageInstances(module,package[,quiet])
 	return LoadPackageInstance(module,package,"_default_",quiet=quiet)
 end
 
+function /s PackageLoadOrder(module,packages)
+	string module,packages
+	
+	string manifest_home = getdatafolder(1,ModuleManifestHome(module))
+	string load_first = strvarordefault(joinpath({manifest_home,"load_first"}),"")
+	string load_last = strvarordefault(joinpath({manifest_home,"load_last"}),"")
+	string load_ends = joinlists({load_first,load_last})
+	string load_middle = RemoveFromList(load_ends,packages,";",0)
+	string ordered_packages = joinlists({load_first,load_middle,load_last})
+	return ordered_packages
+end
+
 Function /S LoadPackages(module[,packages,quiet])
 	string module,packages
 	variable quiet
 	
 	packages=selectstring(!paramisdefault(packages),ListPackages(modules=module,quiet=quiet),packages)
+	packages = PackageLoadOrder(module,packages)
 	string packageInstancesLoaded=""
 	variable i
 	for(i=0;i<ItemsInList(packages);i+=1)
@@ -1782,23 +1798,39 @@ Function /S ListDefaultPackageInstances(module,package)
 	return instances
 End
 
-Function LoadModuleManifests([modules])
-	string modules
+//Function LoadModuleManifests([modules])
+//	string modules
+//	
+//	modules=selectstring(!paramisdefault(modules),ListModules(),modules)
+//	variable i
+//	for(i=0;i<itemsinlist(modules);i+=1)
+//		string module=stringfromlist(i,modules)
+//		LoadModuleManifest(module)
+//	endfor
+//End
+
+function /df ModuleManifestHome(module[,create,go])
+	string module
+	variable create,go
 	
-	modules=selectstring(!paramisdefault(modules),ListModules(),modules)
-	variable i
-	for(i=0;i<itemsinlist(modules);i+=1)
-		string module=stringfromlist(i,modules)
-		LoadModuleManifest(module)
-	endfor
-End
+	string path = joinpath({moduleinfo,module,"Manifest"})
+	if(create)
+		NewFolder(path,go=go)
+	endif
+	dfref df = $path
+	if(go)
+		cd df
+	endif
+	return df
+end
 
 Function /df LoadModuleManifest(module[,quiet])
 	string module
 	variable quiet
 	
 	dfref currDF=GetDataFolderDFR()
-	NewFolder(joinpath({moduleInfo,module}),go=1)
+	ModuleManifestHome(module,create=1,go=1)
+	cd ::
 	string path=ModuleDiskLocation("",default_=1,quiet=quiet)
 	newpath /o/c/q currPath,path
 	path=joinpath({path,module})
@@ -1818,15 +1850,15 @@ Function /df LoadModuleManifest(module[,quiet])
 	return df
 End
 
-function /s ListModules()
-	string modules=Core#ListAllModules()
-	return modules
-end
+//function /s ListModules()
+//	string modules=Core#ListAllModules()
+//	return modules
+//end
 
 Function SaveModuleManifests([modules])
 	string modules
 	
-	modules=selectstring(!paramisdefault(modules),ListModules(),modules)
+	modules=selectstring(!paramisdefault(modules),ListAvailableModules(),modules)
 	variable i
 	for(i=0;i<itemsinlist(modules);i+=1)
 		string module=stringfromlist(i,modules)
@@ -2080,7 +2112,9 @@ Function /S LoadPackage(module,package[,instances,noOverwrite,loadLive,quiet])
 	if(!generic)
 		if(!strlen(instances) && !default_)
 			if(!quiet)
-				printf "No instances found for package '%s'. Loading from defaults...\r",package
+#ifdef Dev
+				printf "No instances found on disk for package '%s'. Loading from defaults...\r",package
+#endif
 			endif
 			loaded=LoadPackageInstance(module,package,"_default_",quiet=quiet)
 		else
@@ -2170,16 +2204,20 @@ Function /s LoadPackageInstance(module,package,instance[,quiet,special])
 		endif
 	elseif(!loadedFromManifest)
 		if(!quiet)
+#ifdef Dev
 			if(generic)
 				printf "Package '%s' was not found on disk. ",package
 			else
 				printf "Instance '%s' of package '%s' was not found on disk. ",selectstring(strlen(instance),"(Blank)",instance),package
 			endif
+#endif
 		endif
 		if(!default_) // If it was not generic, there would be no reason to load a default instance.  
+#ifdef Dev
 			if(!quiet)
 				printf "Loading from defaults...\r"
 			endif
+#endif
 			string loaded=LoadDefaultPackageInstances(module,package,quiet=quiet)
 		else
 			if(!quiet)
@@ -2221,7 +2259,7 @@ function /s DefaultInstance(module,package[,forceManifest,quiet])
 end
 
 function MigrateModules()
-	string modules=ListModules()
+	string modules=ListAvailableModules()
 	variable i
 	string loc=ProfileDiskLocation()
 	NewPath /O/Q profilePath loc
@@ -2241,6 +2279,16 @@ function MigrateModules()
 	endfor
 end
 
+function /s RecordingArtistDiskLocation()
+	string path=joinpath({specialdirpath("Igor Pro User Files",0,0,0),"User Procedures","Recording Artist"})
+	return path
+end
+
+function /s ModuleManifestsDiskLocation()
+	string path = joinpath({RecordingArtistDiskLocation(),"Modules"})
+	return path
+end
+
 // Return the full path of a module's location on disk.
 function /s ProfileDiskLocation([profileName,default_,create,quiet])
 	string profileName
@@ -2248,7 +2296,7 @@ function /s ProfileDiskLocation([profileName,default_,create,quiet])
 	variable create,quiet
 	
 	if(default_)
-		string path=joinpath({specialdirpath("Igor Pro User Files",0,0,0),"User Procedures","Modules"})
+		string path=ModuleManifestsDiskLocation()
 	else
 		profileName=selectstring(!paramisdefault(profileName),Core#CurrProfileName(),profileName)
 		path=joinpath({SpecialDirPath("Packages",0,0,0),"Profiles",profileName})
@@ -2805,7 +2853,7 @@ Function SavePackageInstance(module,package,instance[,special])
 	endif
 	
 	string path
-	sprintf path,"%sprofiles:%s:%s",SpecialDirPath("Packages",0,0,0),Core#CurrProfileName(),module
+	sprintf path,"%sprofiles:%s:%s",SpecialDirPath("Packages",0,0,0),CurrProfileName(),module
 	variable generic=IsGenericPackage(module,package)
 	dfref instanceDF=InstanceHome(module,package,instance)
 	if(!generic)
@@ -2908,6 +2956,21 @@ function /s JoinPath(folders)
 	endfor
 	path=removeending(path,":")
 	return path
+end
+
+function /s JoinLists(lists)
+	wave /t lists
+	
+	string joined=""
+	variable i
+	for(i=0;i<numpnts(lists);i+=1)
+		string list=lists[i]
+		list = removeending(list,";")
+		if(strlen(list))
+			joined += removeending(list,";")+";"
+		endif
+	endfor
+	return joined
 end
 
 // Returns the data type found at the path passed in 'data_loc'.  Returns an empty string if no data object is found there.  

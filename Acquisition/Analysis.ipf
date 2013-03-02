@@ -249,7 +249,7 @@ Function /S StimulusRegionList(channel,sweepNum[,includeGaps,left,right1,right2]
 			right=right2
 			chan=Label2Chan(channel)
 			string mode=SweepAcqMode(chan,sweepNum)
-			dfref df=InstanceHome(module,"acqModes",mode)
+			dfref df=Core#InstanceHome(module,"acqModes",mode)
 			if(!datafolderrefstatus(df))
 				printf "Could not find stimulus regions for mode %s.\r",mode
 			else
@@ -335,9 +335,9 @@ Function RemoveStimulusArtifacts(channel,sweep[,w,left,right,channels])
 	if(SweepParams[sweep][%TestPulseOn]>0)
 		variable chan=Label2Chan(channel)
 		string mode=SweepAcqMode(chan,sweep)
-		variable testPulseLength=VarPackageSetting(module,"acqModes",mode,"testPulseLength")
-		variable testPulseAmpl=VarPackageSetting(module,"acqModes",mode,"testPulseAmpl")
-		variable testPulseStart=VarPackageSetting(module,"acqModes",mode,"testPulseStart")
+		variable testPulseLength=Core#VarPackageSetting(module,"acqModes",mode,"testPulseLength")
+		variable testPulseAmpl=Core#VarPackageSetting(module,"acqModes",mode,"testPulseAmpl")
+		variable testPulseStart=Core#VarPackageSetting(module,"acqModes",mode,"testPulseStart")
 		if(testPulseAmpl)
 			starts[count]={testPulseStart-left}
 			finishes[count]={testPulseStart+testPulseLength+right}
@@ -401,7 +401,7 @@ Function /S MethodList(method)
 	string matchingMethods=""
 	for(i=0;i<ItemsInList(methods);i+=1)
 		string oneMethod=StringFromList(i,methods)
-		string sourceMethod=StrPackageSetting(module,"analysisMethods",oneMethod,"method")
+		string sourceMethod=Core#StrPackageSetting(module,"analysisMethods",oneMethod,"method")
 		if(stringMatch(oneMethod,method) || strlen(oneMethod))
 			matchingMethods+=oneMethod+";"
 		endif
@@ -555,7 +555,7 @@ Function SplitChannelsByPathway()
 		endfor
 		
 		// Split (or copy) analyses.  
-		string analysisMethods=ListPackageInstances(module,"analysisMethods")
+		string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 		for(j=0;j<itemsinlist(analysisMethods);j+=1)
 			string analysisMethod=stringfromlist(j,analysisMethods)
 			wave /z measurement=$analysisMethod
@@ -641,7 +641,7 @@ Function /S ChannelCombos(object,instance)
 	String combos=""
 	
 	string analysisMethod=SelectString(strlen(instance),SelectedMethod(),instance)
-	dfref instanceDF=InstanceHome(module,"analysisMethods",analysisMethod,quiet=1)
+	dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod,quiet=1)
 	strswitch(object)
 		case "minimum":
 			dfref analysisWinDF=instanceDF:analysisWin
@@ -685,7 +685,7 @@ Function /wave GetAnalysisParameter(analysisMethod,chan)
 	string analysisMethod
 	variable chan
 	
-	return WavPackageSetting(module,"analysisMethods",analysisMethod,"parameter",sub="analysisWin")
+	return Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"parameter",sub="analysisWin")
 End
 
 // Recalculates the data points in the Analysis window
@@ -706,7 +706,7 @@ Function Recalculate()
   variable numChannels=GetNumChannels()
   wave /T Labels=GetChanLabels()
   string method=SelectedMethod()
-  variable crossChannel=VarPackageSetting(module,"analysisMethods",method,"crossChannel",default_=0)
+  variable crossChannel=Core#VarPackageSetting(module,"analysisMethods",method,"crossChannel",default_=0)
   for(i=0;i<numChannels;i+=1)
 	  if(!crossChannel)
 	    ControlInfo /W=SweepsWin $("Show_"+num2str(i))
@@ -728,13 +728,13 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 	Variable pre,post
 	String sweeps,analysisMethod
 	
-	string analysisMethods=ListPackageInstances(module,"analysisMethods")
-	variable noise_freq=VarPackageSetting(module,"random","","noiseFreq",default_=60)
+	string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
+	variable noise_freq=Core#VarPackageSetting(module,"random","","noiseFreq",default_=60)
 	if(!ParamIsDefault(analysisMethod)) // Singular here, the optional argument.  
 		analysisMethods=SelectedMethod() // Plural here, the local variable to loop through.  Will have only one element because analysis is restricted to the argument.  
 	endif
 	wave /T Labels=GetChanLabels()
-	dfref df=PackageHome(module,"analysisWin")
+	dfref df=Core#PackageHome(module,"analysisWin")
 	wave /t/sdfr=df ListWave
 	wave /sdfr=df SelWave
 	string measurementCompleted=""
@@ -748,7 +748,7 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 		if(!strlen(analysisMethod))
 			continue
 		endif
-		wave /t chanAnalysisMethods=WavPackageSetting(module,"channelConfigs",GetChanName(post),"analysisMethods")
+		wave /t chanAnalysisMethods=Core#WavPackageSetting(module,"channelConfigs",GetChanName(post),"analysisMethods")
 		if(!InWavT(chanAnalysisMethods,analysisMethod)) // If this measurement does not have its box checked in the listbox of possible measurements.  
 			continue
 		endif
@@ -758,7 +758,7 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			endif
 		endif
 		
-		dfref df=InstanceHome(module,"analysisMethods",analysisMethod)
+		dfref df=Core#InstanceHome(module,"analysisMethods",analysisMethod)
 		dfref analysisWinDF=df:analysisWIn
 		wave /sdfr=analysisWinDF Minimum
 		nvar /sdfr=df crossChannel
@@ -895,7 +895,7 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
  				nvar /z/sdfr=df baselineLeft,baselineRight
  				if(!nvar_exists(baselineLeft)) // If there is no baseline set for this analysis method.  
  					// Use the baseline for this acquisition mode.  
- 					dfref modeDF=InstanceHome("Acq","acqModes",acqMode)
+ 					dfref modeDF=Core#InstanceHome("Acq","acqModes",acqMode)
  					nvar /z/sdfr=modeDF baselineLeft,baselineRight
  				endif
  				baselineLeft_=!nvar_exists(baselineLeft) ? 0 : baselineLeft
@@ -1131,7 +1131,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			result[sweepNum][1][layer]=NaN
 			break
 		case "Access_Resistance":
-			dfref df=InstanceHome(module,"acqModes",mode)
+			dfref df=Core#InstanceHome(module,"acqModes",mode)
 			nvar /sdfr=df accessLeft,accessRight,rBaselineLeft,rBaselineRight,testPulseStart,testPulseampl,testPulselength
 			if(!nvar_exists(accessLeft))
 				AcqModeDefaults(mode)
@@ -1179,7 +1179,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			endif
 			break
 		case "Input_Resistance":
-			dfref df=InstanceHome(module,"acqModes",mode)
+			dfref df=Core#InstanceHome(module,"acqModes",mode)
 			nvar /sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
 			if(!nvar_exists(inputLeft))
 				AcqModeDefaults(mode)
