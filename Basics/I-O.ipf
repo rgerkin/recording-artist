@@ -835,9 +835,14 @@ function ExportWins([types,match,except])
 end
 
 
-function ExportHDF5(path_name,file_name)
+function ExportHDF5([path_name,file_name])
 	string path_name,file_name
+	
 #if exists("HDF5CreateFile")	
+	if(paramisdefault(path_name) || !strlen(path_name))
+		path_name = "hdf_path"
+	endif
+	file_name = selectstring(!paramisdefault(file_name),igorinfo(1),file_name)
 	pathinfo $path_name
 	if(!v_flag)
 		string full_path = strvarordefault("root:Packages:HDF:path","")
@@ -851,9 +856,7 @@ function ExportHDF5(path_name,file_name)
 		path_name = "hdf_path"
 	endif
 	variable fileID
-	print file_name
 	pathinfo $path_name
-	print v_flag,s_path
 	HDF5CreateFile /O/P=$path_name fileID as file_name+".h5"
 	//variable groupID
 	//HDF5CreateGroup fileID, "/root", groupID
