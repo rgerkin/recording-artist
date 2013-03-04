@@ -863,6 +863,6 @@ function ExportHDF5([path_name,file_name])
 	HDF5SaveGroup /O /R /T root:, fileID, "."
 	HDF5CloseFile /Z fileID  
 #else
-	print "HDF5 XOP not loaded.  
+	print "HDF5 XOP not loaded."  
 #endif
 end

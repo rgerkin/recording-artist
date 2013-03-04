@@ -100,7 +100,7 @@ End
 static Function DefaultKHz(DAQ)
 	String DAQ
 	
-	dfref df=ObjectManifest(module,"DAQs","kHz")
+	dfref df=Core#ObjectManifest(module,"DAQs","kHz")
 	nvar /sdfr=df value
 	return value
 End
@@ -587,7 +587,7 @@ static Function SetupDynamicClamp(DAQ)
 	endif
 	
 	string mode=GetAcqMode(chan_)
-	dfref df=InstanceHome(module,"acqModes",mode)
+	dfref df=Core#InstanceHome(module,"acqModes",mode)
 	variable duration=GetAcqDuration()
 	variable kHz=GetAcqFreq()
 	variable /g df:points=round(duration*kHz*1000) 
@@ -651,7 +651,7 @@ static Function ExecuteDynamicClamp(DAQ)
 	string listenHook=GetListenHook(DAQ)
 	variable chan=ADC2Chan("0")
 	string mode=GetAcqMode(chan)
-	dfref df=InstanceHome(module,"acqModes",mode)
+	dfref df=Core#InstanceHome(module,"acqModes",mode)
 	nvar /sdfr=df vE,vI,forcingGain,eGain,iGain
 	variable inputGain=GetInputGain(chan,inf)
 	variable outputGain=GetOutputGain(chan,inf)
@@ -707,13 +707,13 @@ Function DemultiplexDynamicClamp(DAQ)
 	
 	variable chan=ADC2Chan("0")
 	string mode=GetAcqMode(chan)
-	dfref df=InstanceHome(module,"acqModes",mode)
+	dfref df=Core#InstanceHome(module,"acqModes",mode)
 	make /free/n=4 chans=ADC2Chan(num2str(p))
 	dfref daqDF=GetDaqDF(DAQ)
 	wave /sdfr=daqDF InputMultiplex
 	variable boardGain=GetBoardGain()
 	variable duration=GetAcqDuration()
-	nvar /sdfr=df points
+	nvar /sdfr=df pointsS
 	variable i
 	for(i=0;i<4;i+=1)
 		chan=chans[i]
