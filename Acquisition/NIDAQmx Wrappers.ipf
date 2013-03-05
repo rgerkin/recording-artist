@@ -3,6 +3,8 @@
 // $Rev: 559 $
 // $Date: 2011-06-20 11:54:49 -0400 (Mon, 20 Jun 2011) $
 
+// Test...
+
 #pragma rtGlobals=1		// Use modern global access method.
 #pragma ModuleName=NIDAQmx
 
