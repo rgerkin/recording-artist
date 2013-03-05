@@ -321,7 +321,9 @@ Function SealTestWindow([DAQ])
 			ValDisplay $valName pos={85,8+count*yJump}, format="%.1f", fsize=18, disable=2
 			ValDisplay $valName bodywidth=70, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
 			Button $("Baseline_"+channel) title="Baseline", pos={195,10+count*yJump}, proc=SealTestWinButtons
-			SetVariable $("Threshold_"+channel) title="Thresh %", pos={252,12+count*yJump}, size={85,20}, value=_NUM:0, proc=SealTestWinSetVariables
+			SetVariable $("Range_"+channel) title="Range", pos={252,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
+			valName="seriesRes_"+channel
+			//SetVariable $("Threshold_"+channel) title="Thresh %", pos={252,12+count*yJump}, size={85,20}, value=_NUM:0, proc=SealTestWinSetVariables
 			valName="seriesRes_"+channel
 			ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
 			ValDisplay $valName bodywidth=100, size={100,30}, title=resistanceTitle,value=#JoinPath({getdatafolder(1,chanDF),"seriesRes"})
@@ -611,6 +613,20 @@ Function SealTestWinSetVariables(info)
 		case "Threshold":
 			SealTestTracker(chan,0)
 			break
+		case "Range":
+			dfref chanDF=SealTestChanDF(i)
+			wave /sdfr=chanDF Sweep
+			variable center=statsmedian(Sweep)
+			variable range = info.dval
+			variable high = center + range/2
+			variable low = center - range/2
+			string axes=AxisList("SealTestWin")
+			string sweepaxes=listmatch(axes,"chan*")
+			for(i=0;i<itemsinlist(sweepAxes);i+=1)
+				string sweepAxis=stringfromlist(i,sweepAxes)
+				SetAxis $sweepAxis,low,high
+			endfor
+			break
 	endswitch
 End
 
@@ -624,18 +640,18 @@ Function SealTestTracker(chan,updateBaseline)
 	wave /z/sdfr=chanDF Baseline
 	if(updateBaseline || !waveexists(Baseline))
 		Duplicate /o chanDF:InputHistory chanDF:Baseline /WAVE=Baseline
-		WaveStats /Q/R=[0,10] chanDF:InputHistory
+		Wavestats /Q/R=[0,10] chanDF:InputHistory
 		Baseline=V_avg
 		
 		// Rescale response axis.  
 		wave /z/sdfr=chanDF Sweep
-		WaveStats /Q Sweep
+		StatsQuantiles /Q Sweep
 		string axes=AxisList("SealTestWin")
 		string sweepaxes=listmatch(axes,"chan*")
 		variable i
 		for(i=0;i<itemsinlist(sweepAxes);i+=1)
 			string sweepAxis=stringfromlist(i,sweepAxes)
-			SetAxis $sweepAxis,V_avg-(V_avg-V_min)*1.5,V_avg+(V_max-V_avg)*1.5
+			SetAxis $sweepAxis,V_median-(V_median-V_min)*1.5,V_avg+(V_max-V_median)*1.5
 		endfor
 	endif
 	Duplicate /o chanDF:InputHistory, chanDF:Threshold /WAVE=Threshold 
