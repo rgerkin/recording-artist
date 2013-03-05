@@ -713,7 +713,7 @@ Function DemultiplexDynamicClamp(DAQ)
 	wave /sdfr=daqDF InputMultiplex
 	variable boardGain=GetBoardGain()
 	variable duration=GetAcqDuration()
-	nvar /sdfr=df points
+	nvar /sdfr=df pointsS
 	variable i
 	for(i=0;i<4;i+=1)
 		chan=chans[i]

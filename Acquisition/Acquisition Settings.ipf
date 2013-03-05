@@ -125,7 +125,7 @@ function /wave GetDefaultChanColor(chan)
 end
 
 // Applies a loaded package instance to the given channel.  Deals with some of the hierarchical application of package instances, e.g. selecting a channel configuration often implies selecting a stimulus.  
-static Function SelectPackageInstance(module,package,instance[,special])
+Function SelectPackageInstance(module,package,instance[,special])
 	string package,instance,module,special
 	
 	special=selectstring(!paramisdefault(special),"",special)
@@ -203,7 +203,7 @@ static Function SelectPackageInstance(module,package,instance[,special])
 		case "channelConfigs":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ) // Set the stimulus name.  
 			string stimName=GetStimulusName(chan)
-			Core#SelectPackageInstance(module,"stimuli",stimName,special=special)
+			SelectPackageInstance(module,"stimuli",stimName,special=special)
 			break
 		case "stimuli":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"stimulus",instance) // Set the stimulus name.  

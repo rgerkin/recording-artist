@@ -316,7 +316,7 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 						Core#SetControlUserData(info.ctrlName,"oldLabel",newLabel)
 						Core#SetStrPackageSetting(module,"channelConfigs",name,"label_",newLabel) // Update the channel label.  
 					endif
-					Core#SelectPackageInstance(module,"channelConfigs",newLabel,special=special)
+					SelectPackageInstance(module,"channelConfigs",newLabel,special=special)
 					SetVariable $info.ctrlName userData(oldLabel)=Labels[chan]
 					string chanName=GetChanName(chan)
 					if(!stringmatch(newLabel,chanName))
@@ -351,7 +351,7 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 					break
 				default:
 					string stimName=info.popStr
-					Core#SelectPackageInstance(module,"stimuli",stimName,special=special)
+					SelectPackageInstance(module,"stimuli",stimName,special=special)
 			endswitch
 			break
 		case "SaveMode":

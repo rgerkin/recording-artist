@@ -125,7 +125,7 @@ End
 static Function DefaultKHz(DAQ)
 	String DAQ
 	
-	dfref df=ObjectManifest(module,"DAQs","kHz")
+	dfref df=Core#ObjectManifest(module,"DAQs","kHz")
 	nvar /sdfr=df value
 	return value
 End
@@ -232,7 +232,7 @@ static Function Speak(device,list,param[,now,DAQ])
 	variable pin = Core#VarPackageSetting("Acq","DAQs","Generic","StartTrigger",default_=pin_in)
 	string trig_in
 	sprintf trig_in,"/%s/%s%d",deviceName,pin_prefix,pin
-	DAQmx_WaveformGen /DEV=deviceName /ERRH="ErrorHook()" /NPRD=(param) /STRT=1 /TRIG={trig,1,1} list
+	DAQmx_WaveformGen /DEV=deviceName /ERRH="ErrorHook()" /NPRD=(param) /STRT=1 /TRIG={trig_in,1,1} list
 	//DAQmx_WaveformGen /DEV="dev1" /CLK={"/dev1/ai/sampleclock",1} /ERRH="ErrorHook()" /NPRD=1 /STRT=1 /TRIG={"/dev1/"+trigChan,1,1} list
 End
 
@@ -277,7 +277,7 @@ static Function StartClock(isi[,DAQ])
 		deviceName="dev1"
 	endif
 	fDAQmx_CTR_Finished(deviceName,0)
-	string trig_in
+	string trig_out
 	sprintf trig_out,"%s%d",pin_prefix,pin_out
 	DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=0 /OUT=trig_out 0
 	return fDAQmx_CTR_Start(deviceName,0)
