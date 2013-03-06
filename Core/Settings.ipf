@@ -861,7 +861,7 @@ function /s StrPackageSetting(module,package,instance,object[,setting,default_,s
 				//str=replacestring("Default_",str,"Default")
 			elseif(stringmatch(str,"Return:*"))
 				string func=str[7,strlen(str)-1]
-				string cmd="string /g temp="+func
+				string cmd="string /g temp=ProcGlobal#"+func
 				Execute /Q/Z cmd
 				svar /z temp
 				if(svar_exists(temp))
