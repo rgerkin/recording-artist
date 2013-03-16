@@ -1,7 +1,7 @@
 
 // $Author: rick $
-// $Rev: 626 $
-// $Date: 2013-02-07 09:36:23 -0700 (Thu, 07 Feb 2013) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 
@@ -1241,6 +1241,9 @@ Function DisplayMeanTrace([win,error,name,type,keyTrace,x1,x2])
 			GetTraceColor(trace,red,green,blue,win=win)
 			if(red==keyRed && green==keyGreen && blue==keyBlue) // Trace of the same color as the key trace.  
 				Wave TraceWave=TraceNameToWaveRef(win,trace)
+				if(!waveexists(TraceWave)) // Not sure how this could happen, but Gilberto had this problem when one channel was not active.  
+					continue
+				endif
 				Wave /z TraceXWave=XWaveRefFromTrace(win,trace)
 				Variable xOffset_=XOffset(trace,win=win)
 				Variable xMulOffset_=XmulOffset(trace,win=win)

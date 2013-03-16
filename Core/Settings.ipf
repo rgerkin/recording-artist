@@ -2103,9 +2103,13 @@ Function /S LoadPackage(module,package[,instances,noOverwrite,loadLive,quiet])
 	if(!generic && !strlen(instances)) // Non-generic package; all instances requested.  
 		string name=Core#CurrProfileName()
 		string path=PackageDiskLocation(module,package,quiet=quiet)
-		NewPath /C/O/Q currPath,path
-		instances=IndexedFile(currPath, -1, ".pxp")
-		instances=replacestring(".pxp;",instances,";")
+		if(strlen(path))
+			NewPath /C/O/Q currPath,path
+			instances=IndexedFile(currPath, -1, ".pxp")
+			instances=replacestring(".pxp;",instances,";")
+		else
+			instances = ""
+		endif
 	endif
 	string loaded=""
 	dfref packageDF=PackageHome(module,package,create=1,quiet=quiet)
@@ -2313,7 +2317,7 @@ function /s ModuleDiskLocation(module[,default_,create,quiet])
 	variable default_ // The location of the default, with the manifest.   
 	variable create,quiet
 	
-	string path=ProfileDiskLocation(default_=default_,quiet=quiet)
+	string path=ProfileDiskLocation(default_=default_,quiet=quiet,create=create)
 	path=joinpath({path,module})
 	if(create)
 		CreatePathLocation(path)	
@@ -2349,12 +2353,14 @@ function /s PackageDiskLocation(module,package[,default_,create,quiet])
 			newpath /o/q/z currPath path
 			if(v_flag && !quiet)
 				printf err,package,path
+				path = ""
 			endif
 		endif
 	else
 		getfilefolderinfo /q/z path
 		if(v_flag && !quiet)
 			printf err,package,path
+			path = ""
 		endif
 	endif
 	return path

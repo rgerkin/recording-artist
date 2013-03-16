@@ -1,7 +1,7 @@
-// $URL: svn://churro.cnbc.cmu.edu/igorcode/Recording%20Artist/Other/Batch%20Plotting.ipf $
+// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Other/Batch%20Plotting.ipf $
 // $Author: rick $
-// $Rev: 566 $
-// $Date: 2011-07-14 09:16:22 -0400 (Thu, 14 Jul 2011) $
+// $Rev: 628 $
+// $Date: 2013-02-11 12:57:08 -0700 (Mon, 11 Feb 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 //#include "Batch Wave Functions"
@@ -23,8 +23,13 @@ Function DoToGraphs([match_str])
 	endfor
 End
 
-Function KillTables()
-	KillAll("tables")
+Function KillTables([match])
+	string match
+	if(ParamIsDefault(match))
+		match="*"
+	endif
+	
+	KillAll("tables",match=match)
 End
 
 Function KillGraphs([match])

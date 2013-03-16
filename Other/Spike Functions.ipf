@@ -1,7 +1,7 @@
-// $URL: svn://churro.cnbc.cmu.edu/igorcode/Recording%20Artist/Other/Spike%20Functions.ipf $
+// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Other/Spike%20Functions.ipf $
 // $Author: rick $
-// $Rev: 622 $
-// $Date: 2013-01-29 14:04:50 -0700 (Tue, 29 Jan 2013) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 #include "Stats Plot"
@@ -615,6 +615,9 @@ function CellSpikes(cell)
     for(i=0;i<CountObjectsDFR(df,1);i+=1)
         string name=GetIndexedObjNameDFR(df,1,i)
         if(grepstring(name,"sweep[0-9]+"))
+        	if(stringmatch(name,"*_filt"))
+			continue
+		endif
             wave w=df:$name
             string folder=getdatafolder(1,df)+"Spikes_"+name
             Spikes(w=w,folder=folder)
@@ -686,7 +689,7 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
 	finish=ParamIsDefault(finish) ? (cursors ? xcsr(B) : dimoffset(w,0)+dimdelta(w,0)*dimsize(w,0)) : finish // Defaults: the location of the square cursor (cursor B) or the right edge of the wave. 
 	cross_val=ParamIsDefault(cross_val) ? -10 : cross_val // -10 mV.  
 	refract=ParamIsDefault(refract) ? 0.01 : refract // 0.01 s.  
-	thresh_fraction=ParamIsDefault(thresh_fraction) ? 0.02 : thresh_fraction // 1/50 of the maximum value of dV/dt during each spike.  
+	thresh_fraction=ParamIsDefault(thresh_fraction) ? 0.2 : thresh_fraction // 1/50 of the maximum value of dV/dt during each spike.  
 	minHeight=paramisdefault(minHeight) ? 2 : minHeight
 	Variable offset=keepOffset ? dimoffset(w,0) : 0
 	
@@ -803,6 +806,7 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
 	Variable /G spikes_finish=finish+offset
 	String /G spikes_wave=GetWavesDataFolder(w,2) // Store the location of the wave that was analyzed.  
 	
+	//edit /k=1 Peak,Peak_locs,Threshold
 	SetDataFolder $curr_folder // Go back to the original folder.  
 	String /G root:last_spikes_folder=folder // Mark the folder of the last analysis (for debugging purposes).  
 	return num_spikes // Return the number of spikes found.  

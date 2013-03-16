@@ -1,7 +1,7 @@
-// $URL: svn://churro.cnbc.cmu.edu/igorcode/IgorExchange/Neuralynx%20Analysis.ipf $
+// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/IgorExchange/Neuralynx/Neuralynx%20Analysis.ipf $
 // $Author: rick $
-// $Rev: 615 $
-// $Date: 2012-09-05 13:14:03 -0700 (Wed, 05 Sep 2012) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 #pragma moduleName=NlxB

@@ -1,6 +1,6 @@
 // $Author: rick $
-// $Rev: 626 $
-// $Date: 2013-02-07 09:36:23 -0700 (Thu, 07 Feb 2013) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 #pragma ModuleName=Acq
@@ -174,6 +174,7 @@ Function SelectPackageInstance(module,package,instance[,special])
 			strswitch(instance)
 				case "_Save_":
 					string winDAQ=GetWinDAQ()
+					wave labels = GetChanLabels()
 					do
 						string targetDAQ = Core#DefaultInstance(module,package)
 						prompt targetDAQ,"Name:"
@@ -182,6 +183,7 @@ Function SelectPackageInstance(module,package,instance[,special])
 							if(strlen(targetDAQ))
 								string win
 								Core#CopyInstance(module,package,winDAQ,targetDAQ)
+								Core#SetWavTPackageSetting(module,"DAQs",targetDAQ,"channelConfigs",labels)
 								if(!Core#SavePackageInstance(module,package,targetDAQ))
 									printf "DAQ instance %s successfully saved.\r",targetDAQ
 								endif

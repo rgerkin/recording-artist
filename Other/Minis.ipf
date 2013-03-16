@@ -1,7 +1,7 @@
-// $URL: svn://churro.cnbc.cmu.edu/igorcode/Recording%20Artist/Other/Minis.ipf $
+// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Other/Minis.ipf $
 // $Author: rick $
-// $Rev: 605 $
-// $Date: 2012-04-18 12:37:23 -0400 (Wed, 18 Apr 2012) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma moduleName=Minis
 #pragma rtGlobals=1		// Use modern global access method.
@@ -1528,6 +1528,28 @@ Function MoreMiniStats(channel[,proxy])
 	endfor
 	
 	// Compute intervals.  
+if(0)
+	TempIndex=x
+	Sort Event_Time,Event_Time,TempIndex
+	Interval=Event_Time[p]-Event_Time[p-1]
+	Sort TempIndex,Event_Time,Interval
+	for(i=0;i<numpnts(MiniNames);i+=1)
+		name=MiniNames[i]
+		sscanf name,"Sweep%d_Mini%d",sweepNum,miniNum
+		Wave Index=root:Minis:$(channel):$("Sweep"+num2str(sweepNum)):Index
+		FindValue /V=(miniNum) Index
+		j=V_Value
+		if(j==0) // First mini of the sweep.  
+			Wave Sweep=root:$(channel):$("Sweep"+num2str(sweepNum))
+			variable lastSweepDuration=rightx(Sweep)
+			variable unrecordedDuration=60*(sweepT[sweepNum]-sweepT[sweepNum-1])-lastSweepDuration
+			Interval[i]+=unrecordedDuration
+		endif
+	endfor	
+	
+	KillWaves /Z TempIndex
+	//SetDataFolder $curr_folder
+else
 	duplicate /o Event_Time,Interval
 	//make /free/n=(numpnts(Interval)) TempInterval,TempIndex=p
 	extract /free/indx Interval,TempIndex,Use[p]==1
@@ -1538,6 +1560,7 @@ Function MoreMiniStats(channel[,proxy])
 	for(i=0;i<numpnts(TempIndex);i+=1)
 		Interval[TempIndex[i]]=TempInterval[i]
 	endfor
+endif
 End
 
 function /s GetMinisChannel()

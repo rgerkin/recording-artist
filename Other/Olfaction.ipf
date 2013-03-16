@@ -1,7 +1,7 @@
-// $URL: svn://churro.cnbc.cmu.edu/igorcode/Recording%20Artist/Other/Olfaction.ipf $
+// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Other/Olfaction.ipf $
 // $Author: rick $
-// $Rev: 624 $
-// $Date: 2013-01-30 17:08:26 -0700 (Wed, 30 Jan 2013) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 #pragma ModuleName=Olfaction

@@ -1,7 +1,7 @@
-// $URL: svn://churro.cnbc.cmu.edu/igorcode/Recording%20Artist/Acquisition/Logging.ipf $
+// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Acquisition/Logging.ipf $
 // $Author: rick $
-// $Rev: 599 $
-// $Date: 2011-12-16 09:25:15 -0500 (Fri, 16 Dec 2011) $
+// $Rev: 632 $
+// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 
