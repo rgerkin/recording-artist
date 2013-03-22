@@ -35,16 +35,15 @@ Function SuperClamp()
 				Slider $("Offset_"+num2str(i)),size={100,25},limits={low,high,0.25},fsize=7,vert=0,title="Offset",userTicks={f:TickValues,f:TickLabels},win=SuperClampWin
 			endif
 			
-			
 			// Update control positions, units, and titles.  
 			Variable red,green,blue
 			GetChanColor(i,red,green,blue)
 			String titleStr
 			sprintf titleStr,"\K(%d,%d,%d)%s",red,green,blue,Chan2Label(i)
 			Checkbox $("Hold_"+num2str(i)) pos={5,row*25+5},title=titleStr, win=SuperClampWin
-			SetVariable $("CommandMV_"+num2str(i)) pos={55,row*25+5},title="mV", win=SuperClampWin
-			SetVariable $("CommandPA_"+num2str(i)) pos={130,row*25+5},title="pA", win=SuperClampWin
-			Slider $("Offset_"+num2str(i)) pos={210,row*25+2},win=SuperClampWin
+			SetVariable $("CommandMV_"+num2str(i)) pos={65,row*25+5},title="mV", win=SuperClampWin
+			SetVariable $("CommandPA_"+num2str(i)) pos={140,row*25+5},title="pA", win=SuperClampWin
+			Slider $("Offset_"+num2str(i)) pos={220,row*25+2},win=SuperClampWin
 			validChannels+=num2str(i)+";"
 		else
 			// Kill old controls for channels that no longer have the right acquisition mode.  

@@ -317,7 +317,7 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 						Core#SetControlUserData(info.ctrlName,"oldLabel",newLabel)
 						Core#SetStrPackageSetting(module,"channelConfigs",name,"label_",newLabel) // Update the channel label.  
 					endif
-					SelectPackageInstance(module,"channelConfigs",newLabel,special=special)
+					SelectPackageInstance("channelConfigs",newLabel,special=special)
 					SetVariable $info.ctrlName userData(oldLabel)=Labels[chan]
 					string chanName=GetChanName(chan)
 					if(!stringmatch(newLabel,chanName))
@@ -352,7 +352,7 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 					break
 				default:
 					string stimName=info.popStr
-					SelectPackageInstance(module,"stimuli",stimName,special=special)
+					SelectPackageInstance("stimuli",stimName,special=special)
 			endswitch
 			break
 		case "SaveMode":
@@ -1768,8 +1768,10 @@ Function SweepsWindow()
 	SwitchView(default_view) // Set broad or focused (check user data for SwitchView button)	
 	ResetSweepAxes(default_view)
 	SweepsWinControlsUpdate()
-	SetWindow SweepsWin hook=RefreshHook, hookEvents=5
-	RefreshHook("WINDOW:SweepsWin;EVENT:resize")
+	SetWindow SweepsWin hook(mainHook)=SweepsWinHook
+	struct wmwinhookstruct info
+	info.eventName="resize"
+	SweepsWinHook(info)
 	//KillVariables /Z red,green,blue
 End
 
@@ -2110,6 +2112,10 @@ Function SweepsWinVertAxisOffsets(axis)
 	endfor
 End
 
+function /s GetCurrSweepsView()
+	return GetUserData("SweepsWin","SwitchView","")
+end
+
 // A window that show whole sweeps.  By default it shows the last sweep from each channel, and other
 // sweeps can be shown, too.  
 Function SwitchView(view)
@@ -2125,7 +2131,7 @@ Function SwitchView(view)
 	wave /T Labels=GetChanLabels()
 	
 	// Determine requested view and save current view.  
-	String curr_view=GetUserData("SweepsWin","SwitchView","")
+	string curr_view=GetCurrSweepsView()
 	SaveCursors(curr_view,win="SweepsWin")
 	SaveAxes(curr_view,win="SweepsWin")
 	if(StringMatch(view,"SwitchView"))
@@ -3256,6 +3262,78 @@ Function /s AppendedWave(w[,dim0,dim1,dim2,axis,win])
 End
 
 // Handles all hooks for windows
+
+function SweepsWinHook(info)
+	struct WMWinHookStruct &info
+	if(info.eventCode==4)
+		return 0
+	endif
+	strswitch(info.eventName)
+		case "cursormoved":
+			string method=SelectedMethod()
+			if(strlen(method))
+				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method,create=1)
+				ControlInfo /W=SweepsWin SwitchView; String view=S_userdata
+				Variable focused=StringMatch(view,"Focused")
+				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
+				strswitch(info.cursorName)
+					case "A":
+						variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
+						break
+					case "B":
+						variable /G instanceDF:$("x_right_"+view)=focused ? xcsr2("B",win="SweepsWin") : xcsr(B,"SweepsWin")
+						break
+					endswitch
+				endif
+			break
+		case "resize":
+			if(!WinType("SweepsWin"))
+				return -1
+			endif
+			GetWindow SweepsWin,wsizeDC
+			Variable narrow=(V_right-V_left<1200)
+			ControlBar /W=SweepsWin /L 105*narrow
+			variable numChannels=GetNumChannels()
+			String sweepsWinButtons="WaveSelector;Logger"
+			variable i
+			for(i=0;i<ItemsInList(sweepsWinButtons);i+=1)
+				String buttonName=StringFromList(i,sweepsWinButtons)
+				Variable ypos=max(3,numChannels)*18+5
+				Button $buttonName pos={narrow ? 2 : V_right-(2-i)*201,narrow ? ypos+i*35 : 5}, fsize=GetFontSize()+2, win=SweepsWin
+			endfor
+			break
+		case "modified":
+			ControlInfo /W=SweepsWin sweepOverlay
+			if(v_flag<=0 || !StringMatch(ClearBrackets(s_value),"Split"))
+				break
+			endif
+			String axes=AxisList("SweepsWin")
+			for(i=0;i<ItemsInList(axes);i+=1)
+				String axis=StringFromList(i,axes)
+				String axis_info=AxisInfo("SweepsWin",axis)
+				String axisType=StringByKey("AXTYPE",axis_info)
+				if((StringMatch(axisType,"left") || StringMatch(axisType,"right")) && !StringMatch(axis,"Stim*") && !StringMatch(axis,"TestPulse*"))
+					SweepsWinVertAxisOffsets(axis)
+				endif
+			endfor
+		case "mousedown":
+			string str
+			structput /s info.mouseLoc str
+			SetWindow SweepsWin userData(mouseDown)=str
+			if(info.mouseLoc.v<30)
+				PopupContextualMenu Core#ListPackageInstances(module,"sweepsWin")+"_Save_"
+				if(v_flag>=0)
+					SelectPackageInstance("sweepsWin",s_selection)
+				endif
+			endif
+			break
+		case "mouseup":
+			structput /s info.mouseLoc str
+			SetWindow SweepsWin userData(mouseUp)=str
+			break
+	endswitch
+end
+
 Function RefreshHook(info_str)
 	string info_str
 	
@@ -3367,6 +3445,16 @@ Function RefreshHook(info_str)
 					string str
 					structput /s mouseDown str
 					SetWindow SweepsWin userData(mouseDown)=str
+					if(mouseDown.v<30)
+						PopupContextualMenu Core#ListPackageInstances(module,"sweepsWin")+"_Save_"
+					endif
+					break
+				case "mouseup":
+					struct point mouseUp
+					mouseUp.h=NumberByKey("MouseX",info_str)
+					mouseUp.v=NumberByKey("MouseY",info_str)
+					structput /s mouseUp str
+					SetWindow SweepsWin userData(mouseUp)=str
 					break
 			endswitch
 			//SetWindow SweepsWin hook=RefreshHook

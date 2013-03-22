@@ -237,7 +237,7 @@ function ShowPackageInstance(module,package,instance,x,y[,generic,sub,hideVars,f
 		dfref objectDF=ObjectManifest(module,package,object,sub=sub)
 		string objectLoc=getdatafolder(1,objectDF)
 		string valueLoc=joinpath({getdatafolder(1,instanceDF),object}) // Location of the object containing the actual data value(s).  
-		string info=module+"_"+package+"_"+object+"_"+instance
+		string info=module+"_"+package+"_"+selectstring(strlen(sub),"",replacestring(":",sub,"_")+"_")+object+"_"+instance
 		string control=strvarordefault(joinpath({objectLoc,"control"}),"")
 		string type=ObjectType(joinpath({objectLoc,"value"}))
 		string controlsToModify=""
@@ -292,6 +292,7 @@ function ShowPackageInstance(module,package,instance,x,y[,generic,sub,hideVars,f
 				ShowPackageInstanceObject(module,package,instance,object,info+"_0",x,y,yJump,generic=generic,sub=sub,hideVars=hideVars,firstInstance=firstInstance)
 				break
 			case "FLDR": // Subpackage.  
+				ShowPackageInstanceObject(module,package,instance,object,info+"_0",x,y,yJump,generic=generic,sub=sub,hideVars=hideVars,firstInstance=firstInstance)
 				ShowPackageInstance(module,package,instance,x,y,generic=generic,sub=joinpath({sub,object}),hideVars=hideVars,firstInstance=firstInstance)
 				//isSubPackage_=1
 				continue
@@ -336,12 +337,13 @@ function ShowPackageInstanceObject(module,package,instance,object,info,x,y,yJump
 	string module,package,instance,object,info,sub
 	variable generic,hideVars,&x,&y,yJump,row,firstInstance
 	
+	sub = selectstring(!paramisdefault(sub),"",sub)
 	dfref instanceDF=InstanceHome(module,package,instance,sub=sub,create=1)
 	dfref manifestDF=ObjectManifest(module,package,object,sub=sub)
 	string objectLoc=getdatafolder(1,manifestDF) // Location of the folder containing the manifest data for this object.  
 	string valueLoc=joinpath({getdatafolder(1,instanceDF),object}) // Location of the object containing the actual data value(s).  
 	if(!exists(valueLoc))
-		CopyDefaultInstanceObject(module,package,instance,object)
+		CopyDefaultInstanceObject(module,package,instance,object,sub=sub)
 	endif
 	string options
 	sprintf options,"Core#StrPackageSetting(\"%s\",\"%s\",\"%s\",\"%s\",setting=\"%s\")",module,package,instance,object,"options"
@@ -371,10 +373,14 @@ function ShowPackageInstanceObject(module,package,instance,object,info,x,y,yJump
 				top=y
 			endif
 		endif
-		TitleBox /z $(object+"_title") pos={5+itemsinlist(sub,":")*5,top},title=title,disable=0
+		string titlebox_name = selectstring(strlen(sub),"",replacestring(":",sub,"_")+"_")+object+"_title"
+		variable indent = (1+itemsinlist(sub,":"))*5 // Indent by 5 pixels for each level of subpackage depth.  
+		TitleBox /z $titlebox_name pos={indent,top},title=title,disable=0
 	endif
 	string controlsToModify=controlName+";"
 	strswitch(type)
+		case "FLDR": // Subpackage.  
+			break
 		case "WAV":
 			wave WAV=$valueLoc
 			strswitch(control)
@@ -779,6 +785,26 @@ function /s ListPackageInstances(module,package[,editor,saver,match,except,all,q
 		instances+="_Save_"
 	endif
 	return instances
+end
+
+function /s ListSubPackages(module,package[,sub,recurse])
+	string module,package,sub
+	variable recurse
+	
+	sub=selectstring(!paramisdefault(sub),"",sub)
+	dfref df = PackageManifest(module,package,sub=sub)
+	variable i
+	string list = ""
+	for(i=0;i<CountObjectsDFR(df,4);i+=1)
+		string object = GetIndexedObjNameDFR(df,4,i)
+		if(IsSubPackage(module,package,object,sub=sub))
+			list+=object+";"
+			if(recurse)
+				list += ListSubPackages(module,package,sub=joinpath({sub,object}))
+			endif
+		endif
+	endfor
+	return list
 end
 
 function /s PackageObjectHelp(module,package,object[,sub])
@@ -2573,6 +2599,8 @@ function CopyDefaultInstanceObject(module,package,destInstance,object[,context,s
 			svar str=$loc
 			string /g df:$object=str
 			break
+		case "FLDR": // Subpackage
+			break
 		default:
 			printf "Could not find any object in the manifest at %s.\r",loc
 			err=-1
@@ -2864,14 +2892,14 @@ end
 Function SavePackageInstance(module,package,instance[,special])
 	string module,package,instance,special
 	
+	special=selectstring(!paramisdefault(special),"",special)
 	variable err=0
 	dfref currDF=getdatafolderdfr()
 	// Module specific functions.  
-	funcref SavePackageInstance f=$(module+"SavePackageInstance")
-	if(strlen(stringbykey("NAME",funcrefinfo(f))))
-		f(module,package,instance)
-	endif
-	
+	string cmd
+	sprintf cmd,"ProcGlobal#%s#SavePackageInstance(%s,%s,special=%s)",module,package,instance,special
+	Execute /Q/Z cmd
+
 	string path
 	sprintf path,"%sprofiles:%s:%s",SpecialDirPath("Packages",0,0,0),CurrProfileName(),module
 	variable generic=IsGenericPackage(module,package)
@@ -2902,6 +2930,17 @@ Function SavePackageInstance(module,package,instance[,special])
 		setdatafolder currDF
 	endif
 	return err
+End
+
+// Applies a loaded package instance to the given channel.  
+Function SelectPackageInstance(module,package,instance[,special])
+	String package,instance,special,module
+	Variable chan
+	
+	special=selectstring(!paramisdefault(special),"",special)
+	string cmd
+	sprintf cmd,"ProcGlobal#%s#SelectPackageInstance(%s,%s,special=%s)",module,package,instance,special
+	Execute /Q/Z cmd
 End
 
 function /s PackageObjectList(module,package[,sub])
@@ -2944,18 +2983,6 @@ function /s SaveDataJOrderList(list)
 	endfor
 	return newList1+newList2
 end
-
-// Applies a loaded package instance to the given channel.  
-Function SelectPackageInstance(module,package,instance[,special])
-	String package,instance,special,module
-	Variable chan
-	
-	special=selectstring(!paramisdefault(special),"",special)
-	funcref SelectPackageInstance f=$(module+"#SelectPackageInstance")
-	if(strlen(stringbykey("NAME",funcrefinfo(f))))
-		f(module,package,instance,special=special)
-	endif
-End
 
 // ------------------------ Utility Functions -------------------------- //
 

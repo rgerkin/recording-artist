@@ -125,8 +125,8 @@ function /wave GetDefaultChanColor(chan)
 end
 
 // Applies a loaded package instance to the given channel.  Deals with some of the hierarchical application of package instances, e.g. selecting a channel configuration often implies selecting a stimulus.  
-Function SelectPackageInstance(module,package,instance[,special])
-	string package,instance,module,special
+Function SelectPackageInstance(package,instance[,special])
+	string package,instance,special
 	
 	special=selectstring(!paramisdefault(special),"",special)
 	variable chan=NumberByKey("CHAN",special)
@@ -170,6 +170,55 @@ Function SelectPackageInstance(module,package,instance[,special])
 	endif
 	
 	strswitch(package)
+		case "sweepsWin":
+			string liveInstance = "win0"
+			strswitch(instance)
+				case "_Save_":
+					do
+						string targetInstance = Core#DefaultInstance(module,package)
+						prompt targetInstance,"Name:"
+						DoPrompt "Enter the desired name for this "+package+" instance",targetInstance
+						if(!v_flag)
+							// Save cursors and axes for current view.  
+							string curr_view=GetCurrSweepsView()
+							SaveAxes(curr_view,win=package) // Assumes package and window have the same name.  
+							
+							struct rect coords
+							Core#CopyInstance(module,package,liveInstance,targetInstance)
+							Core#GetWinCoords(package,coords) // Assumes package and window have the same name.  
+							Core#SetVarPackageSetting(module,package,targetInstance,"left",coords.left,sub="position")
+							Core#SetVarPackageSetting(module,package,targetInstance,"top",coords.top,sub="position")
+							Core#SetVarPackageSetting(module,package,targetInstance,"right",coords.right,sub="position")
+							Core#SetVarPackageSetting(module,package,targetInstance,"bottom",coords.bottom,sub="position")
+							
+							// Copy one of the vertical axes to the generic "Ampl_Axis".   
+							dfref df = Core#InstanceHome(module,package,targetInstance,sub=curr_view)
+							string acqModes = ListAcqModes()
+							variable i
+							for(i=0;i<itemsinlist(acqModes);i+=1)
+								string acqMode = stringfromlist(i,acqModes)
+								dfref sourceDF = df:$(acqMode+"_axis")
+								if(datafolderrefstatus(sourceDF))
+									break
+								endif
+							endfor
+							if(datafolderrefstatus(sourceDF))
+								string targetFolder = joinpath({getdatafolder(1,df),"Ampl_Axis"})
+								Core#CopyData(sourceDF,targetFolder)
+							endif
+							
+							if(!Core#SavePackageInstance(module,package,targetInstance))
+								printf "%s instance %s successfully saved.\r",package,targetInstance
+							endif
+						else
+							break
+						endif
+					while(!strlen(targetInstance)) // User must supply an instance name of some length.  
+					break	
+				default:
+					Core#CopyInstance(module,package,instance,liveInstance)
+				endswitch
+			break
 		case "DAQs":
 			strswitch(instance)
 				case "_Save_":
@@ -184,12 +233,11 @@ Function SelectPackageInstance(module,package,instance[,special])
 								Core#CopyInstance(module,package,winDAQ,targetDAQ)
 								Core#SetWavTPackageSetting(module,"DAQs",targetDAQ,"channelConfigs",labels)
 								string win = GetDAQWin(DAQ = winDAQ)
-								struct rect coords
 								Core#GetWinCoords(win,coords)
 								Core#SetVarPackageSetting(module,package,targetDAQ,"left",coords.left,sub="position")
 								Core#SetVarPackageSetting(module,package,targetDAQ,"top",coords.top,sub="position")
 								if(!Core#SavePackageInstance(module,package,targetDAQ))
-									printf "DAQ instance %s successfully saved.\r",targetDAQ
+									printf "%s instance %s successfully saved.\r",package,targetDAQ
 								endif
 							endif
 						else
@@ -213,12 +261,11 @@ Function SelectPackageInstance(module,package,instance[,special])
 		case "channelConfigs":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ) // Set the stimulus name.  
 			string stimName=GetStimulusName(chan)
-			SelectPackageInstance(module,"stimuli",stimName,special=special)
+			SelectPackageInstance("stimuli",stimName,special=special)
 			break
 		case "stimuli":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"stimulus",instance) // Set the stimulus name.  
 			string vars="pulseSets;duration;ISI;sweepsLeft;"
-			variable i
 			for(i=0;i<itemsinlist(vars);i+=1)
 				string var=stringfromlist(i,vars)
 				nvar /z/sdfr=instanceDF val=$var
@@ -226,9 +273,9 @@ Function SelectPackageInstance(module,package,instance[,special])
 					Core#SetVarPackageSetting(module,"DAQs",DAQ,var,val)
 				endif
 			endfor
-			string acqMode=Core#StrPackageSetting(module,package,instance,"acqMode")
+			acqMode=Core#StrPackageSetting(module,package,instance,"acqMode")
 			if(strlen(acqMode) && !stringmatch(acqMode," "))
-				string acqModes=ListAcqModes()
+				acqModes=ListAcqModes()
 				if(WhichListItem(acqMode,acqModes)<0)
 					string default_acqMode = StringFromList(0,acqModes)
 					string alert

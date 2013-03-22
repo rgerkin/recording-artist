@@ -1831,7 +1831,7 @@ Function SaveCursors(name,[win])
 	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	dfref df=Core#InstanceHome("Acq",win,name,create=1)
+	dfref df=Core#InstanceHome("Acq",win,"win0",create=1,sub=name)
 	String cursors="A;B",stem="xcsr_"
 	Variable i
 	for(i=0;i<ItemsInList(cursors);i+=1)
@@ -1855,7 +1855,7 @@ Function RestoreCursors(name[,trace,win,offset])
 	Variable offset // An constant offset for the cursors with respect to the saved positions.
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	dfref df=Core#InstanceHome("Acq",win,name,quiet=1)
+	dfref df=Core#InstanceHome("Acq",win,"win0",sub=name,quiet=1)
 	if(!datafolderrefstatus(df))
 		//printf "Could not find data '%s' to restore cursors for window '%s'.\r",name,win
 		return -1
@@ -2041,8 +2041,8 @@ Function SaveAxes(name,[win])
 	String name,win
 	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
-	string package=RemoveEnding(win,"win")
-	dfref df=Core#InstanceHome("Acq",package,name,create=1)
+	string package=win//RemoveEnding(win,"win")
+	dfref df=Core#InstanceHome("Acq",package,"win0:"+name,create=1)
 	
 	string axis_list=AxisList(win)
 	variable i
@@ -2065,8 +2065,8 @@ Function RestoreAxes(name,[win])
 	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	string package=RemoveEnding(win,"win")
-	dfref df=Core#InstanceHome("Acq",package,name)
+	string package=win//RemoveEnding(win,"win")
+	dfref df=Core#InstanceHome("Acq",package,"win0:"+name)
 	
 	variable err=0
 	if(!datafolderrefstatus(df))

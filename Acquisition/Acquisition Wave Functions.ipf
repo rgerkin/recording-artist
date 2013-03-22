@@ -969,13 +969,13 @@ Function /S GetAcqMode(chan[,quiet])
 	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",quiet=quiet)
 End
 
-Function /S GetAcqModeOutputType(modeName)
+Function /S GetAcqModeOutputQuantity(modeName)
 	string modeName
 	
 	return Core#StrPackageSetting(module,"acqModes",modeName,"outputType")
 End
 
-Function /S GetAcqModeInputType(modeName)
+Function /S GetAcqModeInputQuantity(modeName)
 	string modeName
 	
 	return Core#StrPackageSetting(module,"acqModes",modeName,"inputType")
@@ -984,20 +984,22 @@ End
 function /s GetOutputUnits(chan)
 	variable chan
 	
-	string type=GetOutputType(chan)
-	return Core#StrPackageSetting(module,"quantities",type,"units")
+	string quantity=GetOutputQuantity(chan)
+	string units = Core#StrPackageSetting(module,"quantities",quantity,"units")
+	string prefix = Core#StrPackageSetting(module,"quantities",quantity,"prefix")
+	return prefix+units
 end
 
 function /s GetInputUnits(chan)
 	variable chan
 	
-	string type=GetInputType(chan)
-	string units = Core#StrPackageSetting(module,"quantities",type,"units")
-	string prefix = Core#StrPackageSetting(module,"quantities",type,"prefix")
+	string quantity=GetInputQuantity(chan)
+	string units = Core#StrPackageSetting(module,"quantities",quantity,"units")
+	string prefix = Core#StrPackageSetting(module,"quantities",quantity,"prefix")
 	return prefix+units
 end
 
-Function /S GetOutputType(chan)
+Function /S GetOutputQuantity(chan)
 	Variable chan
 	
 	string type=""
@@ -1008,12 +1010,12 @@ Function /S GetOutputType(chan)
 			break
 		default:
 			string modeName=GetAcqMode(chan)
-			type=GetAcqModeOutputType(modeName)
+			type=GetAcqModeOutputQuantity(modeName)
 	endswitch
 	return type
 End
 
-Function /S GetInputType(chan)
+Function /S GetInputQuantity(chan)
 	Variable chan
 	
 	string type=""
@@ -1024,10 +1026,26 @@ Function /S GetInputType(chan)
 			break
 		default:
 			string modeName=GetAcqMode(chan)
-			type=GetAcqModeInputtype(modeName)
+			type=GetAcqModeInputQuantity(modeName)
 	endswitch
 	return type
 End
+
+function /S GetInputType(chan)
+	variable chan
+	
+	string quantity = GetInputQuantity(chan)
+	string type = Core#StrPackageSetting(module,"quantities",quantity,"type")
+	return type
+end
+
+function /S GetOutputType(chan)
+	variable chan
+	
+	string quantity = GetOutputQuantity(chan)
+	string type = Core#StrPackageSetting(module,"quantities",quantity,"type")
+	return type
+end
 
 Function /S SelectedMethod()
 	string result=""
