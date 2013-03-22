@@ -1898,7 +1898,7 @@ Function /S ListFolders(inFolder[,match,except])
 	
 	match=selectstring(paramisdefault(match),match,"*")
 	except=selectstring(paramisdefault(except),except,"")
-	return Dir2("folders",folder=inFolder,match=match,except=except)
+	return Core#Dir2("folders",folder=inFolder,match=match,except=except)
 End
 
 Function /s DirDFR(df,type[,match,except])
@@ -1907,58 +1907,7 @@ Function /s DirDFR(df,type[,match,except])
 	
 	match=selectstring(paramisdefault(match),match,"*")
 	except=selectstring(paramisdefault(except),except,"")
-	return Dir2(type,df=df,match=match,except=except)
-End
-
-Function /s Dir2(type[,df,folder,match,except])
-	dfref df
-	string folder,type,match,except
-	
-	if(paramisdefault(df))
-		if(paramisdefault(folder))
-			df=getdatafolderdfr()
-		else
-			df=$folder
-		endif
-	endif	
-	
-	match=selectstring(paramisdefault(match),match,"*")
-	except=selectstring(paramisdefault(except),except,"")
-	
-	strswitch(type)
-		case "":
-			string types="1;2;3;4"
-			break
-		case "waves":
-			types="1"
-			break
-		case "variables":
-			types="2"
-			break
-		case "strings":
-			types="3"
-			break	
-		case "folders":
-			types="4"
-			break
-		default:
-			types=""
-			break
-	endswitch
-	
-	variable i,j
-	string items=""
-	for(j=0;j<itemsinlist(types);j+=1)
-		variable type_=str2num(stringfromlist(j,types))	
-		for(i=0;i<CountObjectsDFR(df,type_);i+=1)
-			string item=getindexedobjnamedfr(df,type_,i)
-			if(strlen(listmatch2(item,match)) && !strlen(listmatch2(item,except)))
-				items+=item+";"
-			endif
-		endfor
-	endfor
-	
-	return items
+	return Core#Dir2(type,df=df,match=match,except=except)
 End
 
 // Given a number, returns the smallest power of 2 greater than that number.  Useful for padding waves.
@@ -2450,82 +2399,6 @@ Function DuplicateFolderContents(source,dest[,except])
 		endfor
 	endfor
 	SetDataFolder $curr_folder
-End
-
-Function CopyData(source,dest_[,match,except,quiet])
-	dfref source
-	string dest_,match,except
-	variable quiet
-	
-	match=selectstring(!paramisdefault(match),"*",match)
-	except=selectstring(!paramisdefault(except),"",except)
-	MoveData(source,dest_,match=match,except=except,quiet=quiet,copy=1)
-End
-
-// Moves all folders, variables, strings, and waves from the source_folder to the dest_folder
-Function MoveData(source,dest_[,match,except,quiet,copy])
-	dfref source
-	string dest_,match,except
-	variable quiet,copy
-	
-	match=selectstring(!paramisdefault(match),"*",match)
-	except=selectstring(!paramisdefault(except),"",except)
-	variable i,err=0
-	dfref dest=NewFolder(dest_)
-	if(!datafolderrefstatus(source))
-		if(!quiet)
-			printf "Source data folder does not exist.\r"
-		endif
-		err=-1
-	elseif(!datafolderrefstatus(dest))
-		if(!quiet)
-			printf "Could not create data folder %s.\r",dest_
-		endif
-		err=-2	
-	else
-		string objects=dir2("",df=source)
-		for(i=0;i<ItemsInList(objects);i+=1)
-			string object=stringfromlist(i,objects)
-			if(!stringmatch2(object,match) || stringmatch2(object,except))
-				continue
-			endif
-			string loc=joinpath({getdatafolder(1,source),object})
-			strswitch(Core#ObjectType(loc))
-				case "WAV":
-				case "WAVT":
-					if(copy)
-						duplicate /o source:$object dest:$object
-					else
-						MoveWave source:$object dest
-					endif
-					break
-				case "VAR":
-					if(copy)
-						nvar var=source:$object
-						variable /g dest:$object=var
-					else
-						MoveVariable source:$object dest
-					endif
-					break
-				case "STR":
-					if(copy)
-						svar str=source:$object
-						string /g dest:$object=str
-					else
-						MoveString source:$object dest
-					endif
-					break
-				case "FLDR":
-					dfref subDF=source:$object
-					err+=MoveData(subDF,joinpath({dest_,object}),match="*",except="",quiet=quiet,copy=copy)
-					if(!err && !copy)
-						killdatafolder /z subDF
-					endif
-					break
-			endswitch
-		endfor
-	endif
-	return err
 End
 
 Function /S StrDefault(condition,true,false)

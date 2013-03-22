@@ -48,7 +48,7 @@ Function /wave Sweeps2Matrix2(df)
 	
 	variable i
 	make /o/n=0 df:sweeps /wave=sweeps,df:sweepNums /wave=sweepNums
-	string list=Dir2("waves",df=df,match="sweep*")
+	string list=Core#Dir2("waves",df=df,match="sweep*")
 	list=sortlist(list,";",16)
 	list=RemoveFromList("sweeps",list)
 	list=RemoveFromList("sweepNums",list)
@@ -1160,9 +1160,12 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			redimension /n=(-1,max(dimsize(result,1),numPulses_),-1) result
  			variable v_fitoptions=4
  			for(i=0;i<numPulses_;i+=1)
+ 				waveStats /Q/M=1 /R=(baselineLeft+i*IPI,baselineRight+i*IPI) Sweep // Baseline mean before the pulse.  
+ 				baseline = v_avg
  				duplicate /free/r=(x_left+i*IPI,x_right+i*IPI) Sweep, piece
  				setscale /p x,0,dimdelta(Sweep,0),piece
- 				CurveFit/NTHR=0/Q exp piece
+ 				K0 = baseline
+ 				CurveFit/H="100"/NTHR=0/Q exp piece // Fit holding the y offset to be the mean of the baseline region.  
 				result[sweepNum][i][layer] = 1000/K2 // Time constant in ms.  
  			endfor
  			break

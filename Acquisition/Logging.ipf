@@ -42,7 +42,18 @@ Function DrugWinPopupMenus(info) : PopupMenuControl
 						Core#EditModule("Acq",package="Drugs")
 						break
 					default:
-						Core#SetStrPackageSetting("Acq","drugs","drug"+num2str(num),name,info.popStr)
+						string sourceInstance = info.popStr
+						string targetInstance = "drug"+num2str(num)
+						Core#CopyInstance("Acq","drugs",sourceInstance,targetInstance)
+						string units = Core#StrPackageSetting("Acq","drugs",sourceInstance,"units")						
+						string unitsOptions = Core#PopupMenuOptions("Acq","drugs","","units",brackets=0)
+						string unitsControl = "DrugUnits_"+num2str(num)
+						PopupMenu $unitsControl mode = 1+whichlistitem(units,unitsOptions)
+						PopupMenu $info.ctrlName mode = 1+whichlistitem(info.popStr,AvailableDrugs()) // In case function was called by selecting a preset.  
+						// Shouldn't have to do this next part because the control should have been updated from copying, but it
+						// doesn't update until it is clicked on.   
+						variable conc = Core#VarPackageSetting("Acq","drugs",sourceInstance,"conc")
+						Core#SetVarPackageSetting("Acq","drugs",targetInstance,"conc",conc)
 						break
 				endswitch
 				break
@@ -78,15 +89,20 @@ Function DrugWinPopupMenus(info) : PopupMenuControl
 				else
 					wave /t drugPreset=Core#WavTPackageSetting("Acq","drugPresets",info.popStr,"drugs")
 					do
-						controlinfo $("Drug_"+num2str(i))
+						string control = "DrugName_"+num2str(i)
+						targetInstance = "drug"+num2str(i)
+						controlinfo $control
 						if(v_flag<=0)
 							break
 						endif
-						string drug=drugPreset[i-1]
-						if(i<=dimsize(drugPreset,0) && strlen(drug))
-							Core#CopyInstance("Acq","drugs",drug,"drug"+num2str(i))
+						sourceInstance=drugPreset[i-1]
+						if(i<=dimsize(drugPreset,0) && strlen(sourceInstance))
+							info.ctrlName = control
+							info.popStr = sourceInstance
+							DrugWinPopupMenus(info)	
+							//Core#CopyInstance("Acq","drugs",sourceInstance,targetInstance)
 						else
-							Core#SetVarPackageSetting("Acq","drugs","drug"+num2str(i),"active",0)
+							Core#SetVarPackageSetting("Acq","drugs",targetInstance,"active",0)
 						endif
 						i+=1
 					while(1)
@@ -270,7 +286,7 @@ Function MakeLogPanel() : Panel
 		xx+=70
 		SetVariable $("DrugConc_"+num2str(i)),pos={xx,yy-2},size={50,18},limits={0,1000,1},variable=conc, title=" "
 		xx+=70
-		PopupMenu $("DrugUnits_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"PopupMenuOptions(\"Acq\",\"drugs\",\"\",\"units\")"
+		PopupMenu $("DrugUnits_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"Acq\",\"drugs\",\"\",\"units\",brackets=0)"
 		xx+=70
 		PopupMenu $("DrugName_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"AvailableDrugs()",proc=DrugWinPopupMenus
 		yy+=25

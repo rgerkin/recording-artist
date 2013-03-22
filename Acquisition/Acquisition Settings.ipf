@@ -181,9 +181,13 @@ Function SelectPackageInstance(module,package,instance[,special])
 						DoPrompt "Enter the desired name for this DAQ instance",targetDAQ
 						if(!v_flag)
 							if(strlen(targetDAQ))
-								string win
 								Core#CopyInstance(module,package,winDAQ,targetDAQ)
 								Core#SetWavTPackageSetting(module,"DAQs",targetDAQ,"channelConfigs",labels)
+								string win = GetDAQWin(DAQ = winDAQ)
+								struct rect coords
+								Core#GetWinCoords(win,coords)
+								Core#SetVarPackageSetting(module,package,targetDAQ,"left",coords.left,sub="position")
+								Core#SetVarPackageSetting(module,package,targetDAQ,"top",coords.top,sub="position")
 								if(!Core#SavePackageInstance(module,package,targetDAQ))
 									printf "DAQ instance %s successfully saved.\r",targetDAQ
 								endif
@@ -195,6 +199,10 @@ Function SelectPackageInstance(module,package,instance[,special])
 					break	
 				default:
 					variable daqNum=GetWinDAQNum()
+					if(numtype(daqNum) || daqNum<0)
+						string daqName = Core#StrPackageSetting(module,package,instance,"device")
+						daqNum = GetDAQNum(daqName)
+					endif
 					InitDAQ(daqNum,instance=instance)
 					SweepsWindow()
 					DAQ=GetDAQName(daqNum)
@@ -218,13 +226,17 @@ Function SelectPackageInstance(module,package,instance[,special])
 					Core#SetVarPackageSetting(module,"DAQs",DAQ,var,val)
 				endif
 			endfor
-			string acqMode=GetAcqMode(chan)
-			string acqModes=ListAcqModes()
-			if(WhichListItem(acqMode,acqModes)<0)
-				string alert
-				sprintf alert,"This stimulus calls for acquisition mode '%s', but no such mode exists.  Acquisition mode set to '%s'.",acqMode,StringFromList(0,acqModes)
-				DoAlert 0,alert
-				SetAcqMode(StringFromList(0,acqModes),chan)
+			string acqMode=Core#StrPackageSetting(module,package,instance,"acqMode")
+			if(strlen(acqMode) && !stringmatch(acqMode," "))
+				string acqModes=ListAcqModes()
+				if(WhichListItem(acqMode,acqModes)<0)
+					string default_acqMode = StringFromList(0,acqModes)
+					string alert
+					sprintf alert,"This stimulus calls for acquisition mode '%s', but no such mode exists.  Acquisition mode set to '%s'.",acqMode,default_acqMode
+					DoAlert 0,alert
+					acqMode = default_acqMode
+				endif				
+				SetAcqMode(acqMode,chan)
 			endif
 			Struct WMSetVariableAction info
 			info.ctrlName="Divisor"; info.win=DAQ+"_Selector"
@@ -232,7 +244,7 @@ Function SelectPackageInstance(module,package,instance[,special])
 			break
 		case "filters":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"filters",instance) // Set the filter instance name.  
-			Core#CopyInstance(module,"filters",instance,name)
+			Core#CopyInstance(module,package,instance,name)
 			break
 	endswitch
 	if(WinType(DAQ+"_Selector") && !stringmatch(package,"DAQs"))
@@ -375,17 +387,17 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	if(!paramisdefault(dontMove))
 		except=removeending(dontMove,";")+";"+except
 	endif
-	MoveData(root:,"root:"+oldName,except=except,quiet=quiet)
+	Core#MoveData(root:,"root:"+oldName,except=except,quiet=quiet)
 	InitializeVariables(quiet=quiet,noContainers=1)
 	
 	// Parameters.  
 	//dfref oldParamsDF=oldRoot:parameters
 	//joinpath({getdatafolder(1,oldRoot),removefromlist("root",getdatafolder(1,daqDF),":")})
 	if(datafolderrefstatus(oldRoot:parameters))
-		CopyData(oldRoot:parameters,"root:parameters",quiet=quiet)
+		Core#CopyData(oldRoot:parameters,"root:parameters",quiet=quiet)
 	endif
 	// For very old experiments.  
-	MoveData(oldRoot:variables,"root:parameters",quiet=quiet)
+	Core#MoveData(oldRoot:variables,"root:parameters",quiet=quiet)
 	dfref oldParameters=oldRoot:parameters
 	
 	// Status variables.  

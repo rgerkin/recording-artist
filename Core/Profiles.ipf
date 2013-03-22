@@ -173,7 +173,7 @@ function UpdateProfile(profile[,new,quiet])
 	SetProfileModules(profile,modules)
 	// Another kludge.    
 	if(profile.dev==0)
-		LoadPackageDefinitionsOld()
+		//LoadPackageDefinitionsOld()
 	endif
 	// End Kludge.  
 		
@@ -590,7 +590,7 @@ Function SetProfile(profileName[,recompile])
 		Execute /Q/Z "SetIgorOption IndependentModuleDev=1"
 		defList=AddListItem("Dev",defList)
 	else
-		LoadPackageDefinitionsOld() // Load package definitions for the new profile.  
+		//LoadPackageDefinitionsOld() // Load package definitions for the new profile.  
 		Execute /Q/Z "SetIgorOption IndependentModuleDev=0"
 		undefList=AddListItem("Dev",undefList)
 	endif

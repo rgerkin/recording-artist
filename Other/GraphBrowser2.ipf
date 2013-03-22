@@ -1,7 +1,7 @@
 #pragma rtGlobals=2		// Use modern global access method.
 #pragma IgorVersion=6.0	// Independent modules require Igor 6
 #pragma version=6.0
-#pragma IndependentModule= WM_GrfBrowser
+#pragma IndependentModule= RCG_GrfBrowser
 
 // GraphBrowser.ipf
 // Version 6.0, LH051121
@@ -452,7 +452,7 @@ Function list0Proc(lba) : ListBoxControl
 End
 
 menu "GraphBrowserMenu", contextualMenu, dynamic
-	"\""+WM_GrfBrowser#GraphBrowserWinTitle()+"\"",/Q,GraphBrowserMenuHook("Retitle")
+	"\""+RCG_GrfBrowser#GraphBrowserWinTitle()+"\"",/Q,GraphBrowserMenuHook("Retitle")
 	submenu "Importance"
 		GraphBrowserWinImportance(3),/Q,GraphBrowserMenuHook("Importance",options="Importance:3")
 		GraphBrowserWinImportance(2),/Q,GraphBrowserMenuHook("Importance",options="Importance:2")
@@ -637,7 +637,7 @@ function NetworkGraph()
 	newdatafolder /o pf:graph
 	dfref df=pf:graph
 	
-	//tic(); similarity=WM_GrfBrowser#WinSimilarity(GetDimLabel(similarity,0,p),GetDimLabel(similarity,1,q)); toc()
+	//tic(); similarity=RCG_GrfBrowser#WinSimilarity(GetDimLabel(similarity,0,p),GetDimLabel(similarity,1,q)); toc()
 	duplicate /o similarity,df:distance /wave=distance
 	distance=1/(similarity[p][q]+0.2)
 	string distancePath=getdatafolder(1,df)+"distance"

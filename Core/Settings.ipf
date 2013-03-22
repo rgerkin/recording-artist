@@ -860,14 +860,24 @@ function /s StrPackageSetting(module,package,instance,object[,setting,default_,s
 				str=extraOptions+ListPackageInstances(optionsModule,optionsPackage,quiet=quiet)
 				//str=replacestring("Default_",str,"Default")
 			elseif(stringmatch(str,"Return:*"))
-				string func=str[7,strlen(str)-1]
-				string cmd="string /g temp=ProcGlobal#"+func
-				Execute /Q/Z cmd
-				svar /z temp
-				if(svar_exists(temp))
-					str=temp
-					killstrings /z temp
-				endif
+				string funcs=str[7,strlen(str)-1]
+				str = ""
+				variable i
+				for(i=0;i<itemsinlist(funcs,"+");i+=1)
+					string func = stringfromlist(i,funcs,"+")
+					string cmd="string /g temp=ProcGlobal#"+func
+					Execute /Q/Z cmd
+					if(v_flag)
+						func = replacestring("\"",func,"")
+						str += removeending(func,";")+";"
+					else
+						svar /z temp
+						if(svar_exists(temp) && strlen(temp))
+							str += removeending(temp,";")+";"
+							killstrings /z temp
+						endif
+					endif
+				endfor
 			endif
 		elseif(stringmatch(str,"_default_"))
 			string child=ChildPackage(module,package,object,sub=sub)
@@ -937,12 +947,13 @@ function SetPackageSetting(module,package,instance,object,value[,sub,indices,set
 	SetObject(loc,value,indices=indices,quiet=quiet)
 end
 
-function SetVarPackageSetting(module,package,instance,object,value[,setting,quiet,create])
-	string module,package,instance,object,setting
+function SetVarPackageSetting(module,package,instance,object,value[,setting,sub,quiet,create])
+	string module,package,instance,object,setting,sub
 	variable value,quiet,create
 	
 	setting=selectstring(!paramisdefault(setting),"value",setting)
-	string loc=PackageSettingLoc(module,package,instance,object,setting=setting,quiet=quiet)
+	sub=selectstring(!paramisdefault(sub),"",sub)
+	string loc=PackageSettingLoc(module,package,instance,object,setting=setting,sub=sub,quiet=quiet)
 	nvar /z var=$loc
 	if(!nvar_exists(var))
 		if(create)
@@ -1214,13 +1225,14 @@ Function EditPackagesButtons(info) : ButtonControl
 				DoAlert 0, "Try giving it a more creative name than 'New'"
 				return -2  
 			elseif(CheckName(instance,4) || whichlistitem(instance,existingInstances)>=0)
-				string str="The name '"+instance+"' will be changed to the legal name "
-				string suffix=""
+				string str = "The name '"+instance+"' will be changed to the legal name "
+				string suffix = ""
 				do
 					instance=CleanupName(instance+suffix,0)
-					suffix+="_"
+					suffix += "_"
 				while(whichlistitem(instance,existingInstances)>=0)
-				str+="'"+instance+"'"
+				str += "'"+instance+"'.\r"
+				str += "If this is OK, please click 'Add' again."
 				DoAlert 0,str
 				SetVariable NewInstance_Name value=_STR:instance
 				return -3
@@ -2604,16 +2616,18 @@ function /df CopyInstance(module,package,instance,newInstance[,sub,useGenerators
 	endif
 		
 	dfref packageDF=PackageHome(module,package,quiet=quiet)
-	dfref newInstanceDF=packageDF:$newInstance
-	if(datafolderrefstatus(newInstanceDF))
-		killdatafolder /z newInstanceDF
-		if(v_flag)
-			printf "Could not kill '%s'.\r",getdatafolder(1,newInstanceDF)
-		endif
-	endif
-	if(!datafolderrefstatus(newInstanceDF))
+	//dfref newInstanceDF=packageDF:$newInstance
+	//if(datafolderrefstatus(newInstanceDF))
+	//	killdatafolder /z newInstanceDF
+	//	if(v_flag)
+	//		printf "Could not kill '%s'.\r",getdatafolder(1,newInstanceDF)
+	//	endif
+	//endif
+	//if(!datafolderrefstatus(newInstanceDF))
 		if(datafolderrefstatus(instanceDF) && datafolderrefstatus(packageDF))
-			duplicatedatafolder instanceDF packageDF:$newInstance
+			//duplicatedatafolder instanceDF packageDF:$newInstance
+			string destFolder = joinpath({getdatafolder(1,packageDF),newInstance})
+			CopyData(instanceDF,destFolder)
 			if(useGenerators)
 				RunInstanceGenerators(module,package,newInstance,context=context,quiet=quiet)
 			endif
@@ -2621,7 +2635,7 @@ function /df CopyInstance(module,package,instance,newInstance[,sub,useGenerators
 			printf "Either package '%s' or instance '%s' could not be found.\r",package,instance
 		endif
 		instanceDF=packageDF:$newInstance
-	endif
+	//endif
 	return instanceDF
 end
 
@@ -3118,3 +3132,137 @@ Function GetWinCoords(win,coords[,forcePixels])
 	endif
 End
 //#endif
+
+Function CopyData(source,dest_[,match,except,quiet])
+	dfref source
+	string dest_,match,except
+	variable quiet
+	
+	match=selectstring(!paramisdefault(match),"*",match)
+	except=selectstring(!paramisdefault(except),"",except)
+	MoveData(source,dest_,match=match,except=except,quiet=quiet,copy=1)
+End
+
+// Moves all folders, variables, strings, and waves from the source_folder to the dest_folder
+Function MoveData(source,dest_[,match,except,quiet,copy])
+	dfref source
+	string dest_,match,except
+	variable quiet,copy
+	
+	match=selectstring(!paramisdefault(match),"*",match)
+	except=selectstring(!paramisdefault(except),"",except)
+	variable i,err=0
+	dfref dest=NewFolder(dest_)
+	if(!datafolderrefstatus(source))
+		if(!quiet)
+			printf "Source data folder does not exist.\r"
+		endif
+		err=-1
+	elseif(!datafolderrefstatus(dest))
+		if(!quiet)
+			printf "Could not create data folder %s.\r",dest_
+		endif
+		err=-2	
+	else
+		string objects=dir2("",df=source,match=match,except=except)
+		for(i=0;i<ItemsInList(objects);i+=1)
+			string object=stringfromlist(i,objects)
+			string loc=joinpath({getdatafolder(1,source),object})
+			strswitch(ObjectType(loc))
+				case "WAV":
+				case "WAVT":
+					if(copy)
+						duplicate /o source:$object dest:$object
+					else
+						MoveWave source:$object dest
+					endif
+					break
+				case "VAR":
+					if(copy)
+						nvar var=source:$object
+						variable /g dest:$object=var
+					else
+						MoveVariable source:$object dest
+					endif
+					break
+				case "STR":
+					if(copy)
+						svar str=source:$object
+						string /g dest:$object=str
+					else
+						MoveString source:$object dest
+					endif
+					break
+				case "FLDR":
+					dfref subDF=source:$object
+					err+=MoveData(subDF,joinpath({dest_,object}),match="*",except="",quiet=quiet,copy=copy)
+					if(!err && !copy)
+						killdatafolder /z subDF
+					endif
+					break
+			endswitch
+		endfor
+	endif
+	return err
+End
+
+Function /s Dir2(type[,df,folder,match,except])
+	dfref df
+	string folder,type,match,except
+	
+	if(paramisdefault(df))
+		if(paramisdefault(folder))
+			df=getdatafolderdfr()
+		else
+			df=$folder
+		endif
+	endif	
+	
+	match=selectstring(paramisdefault(match),match,"*")
+	except=selectstring(paramisdefault(except),except,"")
+	
+	strswitch(type)
+		case "":
+			string types="1;2;3;4"
+			break
+		case "waves":
+			types="1"
+			break
+		case "variables":
+			types="2"
+			break
+		case "strings":
+			types="3"
+			break	
+		case "folders":
+			types="4"
+			break
+		default:
+			types=""
+			break
+	endswitch
+	
+	variable i,j,k,m
+	string items=""
+	for(j=0;j<itemsinlist(types);j+=1)
+		variable type_=str2num(stringfromlist(j,types))	
+		for(i=0;i<CountObjectsDFR(df,type_);i+=1)
+			string item=getindexedobjnamedfr(df,type_,i)
+			for(k=0;k<itemsinlist(match);k+=1)
+				if(stringmatch(item,stringfromlist(k,match)))
+					variable hit = 1
+					for(m=0;m<itemsinlist(except);m+=1)
+						if(stringmatch(item,stringfromlist(m,except)))
+							hit = 0 
+						endif
+					endfor
+					if(hit)
+						items+=item+";"
+					endif
+				endif
+			endfor
+		endfor
+	endfor
+	
+	return items
+End

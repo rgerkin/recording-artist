@@ -4,7 +4,7 @@
 // $Date: 2013-02-11 12:57:08 -0700 (Mon, 11 Feb 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
-//#include "Batch Wave Functions"
+#include "Batch Wave Functions"
 
 // Does stuff to all graphs
 Function DoToGraphs([match_str])

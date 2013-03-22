@@ -21,12 +21,13 @@ Function WaveSelector([coords2,DAQ,instance])
 	String currFolder=GetDataFolder(1)
 	if(ParamIsDefault(coords2))
 		STRUCT rect coords
-		NVar /Z left,top,right,bottom
-		if(NVar_Exists(left))
+		dfref df = Core#InstanceHome(module,"DAQs",instance,sub="position")
+		nvar /z/sdfr=df left,top,right,bottom
+		if(NVar_Exists(left) && (left+top)>0)
 			coords.left=left
 			coords.top=top
-			coords.right=right
-			coords.bottom=bottom
+			//coords.right=right
+			//coords.bottom=bottom
 		elseif(StringMatch(DAQ,MasterDAQ()))
 			coords.left=200
 			coords.top=105
@@ -425,7 +426,10 @@ Function SweepsWinControlsUpdate()
 			sprintf titleStr,"\K(%d,%d,%d)ch %d\K(0,0,0) -> \K(%d,%d,%d)ch %d",redPre,greenPre,bluePre,j,redPost,greenPost,bluePost,i
 			Checkbox $("Synapse_"+num2str(j)+"_"+num2str(i)), pos={95+75*i,1+18*j}, title=titleStr, disable=!focused, proc=SweepsWinCheckboxes, win=SweepsWin
 		endfor
-	endfor							
+	endfor		
+	
+	// Fix TitleBar
+	ControlBar /T max(3,numChannels)*18					
 End
 
 function SweepIndexWindow()
@@ -523,7 +527,7 @@ Function FilterWin(hide[,win]) : Panel
 		Checkbox $("powerSpec_"+num2str(i)),pos={xpos+451,ypos+1},title=" ",disable=hide,proc=FilterWinCheckboxes,variable=powerSpec
 		Checkbox $("leakSubtract_"+num2str(i)),pos={xpos+485,ypos+1},title=" ",disable=hide,proc=FilterWinCheckboxes,variable=leakSubtract
 		string options
-		sprintf options,"PopupMenuOptions(\"%s\",\"%s\",\"%s\",\"%s\")",module,"channelConfigs",GetChanName(i),"saveMode"
+		sprintf options,"Core#PopupMenuOptions(\"%s\",\"%s\",\"%s\",\"%s\")",module,"channelConfigs",GetChanName(i),"saveMode"
 		PopupMenu $("channelSaveMode_"+num2str(i)),pos={xpos+522,ypos-3},title="",mode=0, disable=hide,proc=WaveSelectorPopupMenus,value=#options
 	
 		DAQChan+=1
@@ -1757,7 +1761,8 @@ Function SweepsWindow()
 			numBoxes+=1
 		endfor
 	endfor
-	Textbox/A=LT/N=TimeStamp/F=0/V=1/X=25/Y=1 "\\Z08\\{root:status:waveformSweeps} (\\{root:status:currSweep}) -- \\{secs2time(60*root:SweepT[root:status:currSweep],3)} -- \\{time()}"
+	Textbox/A=LT/N=TimeStamp/F=0/V=1/X=25/Y=1
+	SweepsWinTextBoxUpdate()
 	//WaveSelector();DoWindow /B Selector
 	WaveUpdate()
 	SwitchView(default_view) // Set broad or focused (check user data for SwitchView button)	
@@ -2274,24 +2279,26 @@ Function SwitchView(view)
 				endif
 				
 				// Existing sweeps
-				wave SweepParams=GetChanHistory(i)
-				ControlInfo /W=SweepsWin Range; range=V_Value
-				if(range) // Append all the sweeps in the range between the cursors.  
-					ControlInfo /W=SweepsWin Inc; inc=V_Value
-					if(!numtype(first) && !numtype(last))
-						for(k=min(first,last);k<=max(first,last);k+=inc)
-							appended+=AppendAndOffsetSweep(-1,i,k,0,"Sweep",0,red,green,blue)
+				wave /z SweepParams = GetChanHistory(i)
+				if(waveexists(SweepParams))
+					ControlInfo /W=SweepsWin Range; range=V_Value
+					if(range) // Append all the sweeps in the range between the cursors.  
+						ControlInfo /W=SweepsWin Inc; inc=V_Value
+						if(!numtype(first) && !numtype(last))
+							for(k=min(first,last);k<=max(first,last);k+=inc)
+								appended+=AppendAndOffsetSweep(-1,i,k,0,"Sweep",0,red,green,blue)
+							endfor
+						endif
+					else // Append only the sweeps indicated by the cursors.  
+						for(j=0;j<2;j+=1)
+							curs=StringFromList(j,"A;B")
+							ControlInfo /W=SweepsWin $("SweepShow_"+curs); cursShow=V_Value
+							cursorSweepNum=GetCursorSweepNum(curs)
+							if(cursShow)
+								appended+=AppendAndOffsetSweep(-1,i,cursorSweepNum,0,"Sweep",1,red,green,blue)
+							endif
 						endfor
 					endif
-				else // Append only the sweeps indicated by the cursors.  
-					for(j=0;j<2;j+=1)
-						curs=StringFromList(j,"A;B")
-						ControlInfo /W=SweepsWin $("SweepShow_"+curs); cursShow=V_Value
-						cursorSweepNum=GetCursorSweepNum(curs)
-						if(cursShow)
-							appended+=AppendAndOffsetSweep(-1,i,cursorSweepNum,0,"Sweep",1,red,green,blue)
-						endif
-					endfor
 				endif
 			endfor
 			ModifyGraph /Z/W=SweepsWin prescaleExp(Time_Axis)=0
@@ -2325,25 +2332,33 @@ Function SwitchView(view)
 		endif
 	While(1)
 	
+	SweepsWinTextBoxUpdate()
+End
+
+function SweepsWinTextBoxUpdate()
 	String timeStamp="\\Z08"
 	ControlInfo /W=SweepsWin LastSweep; Variable lastOn=V_Value
-	if(V_Value)
-		timeStamp+="\\{root:status:waveformSweeps} (\\{root:status:currSweep}) -- \\{secs2time(60*root:SweepT[root:status:currSweep],3)} -- \\{time()}"
+	if(lastOn)
+		timeStamp += "\\{root:status:waveformSweeps} (\\{root:status:currSweep}) -- "
+		timeStamp += "\\{secs2time(60*GetSweepTime(GetCurrSweep()),3)} -- \\{time()}"
 	endif
-	String cursors="A;B"; Variable cursorOn=0
+	string cursors="A;B"
+	variable j,cursorOn=0
 	for(j=0;j<ItemsInList(cursors);j+=1)
-		curs=StringFromList(j,cursors)
+		string curs=StringFromList(j,cursors)
 		ControlInfo /W=SweepsWin $("SweepShow_"+curs)
 		if(V_Value)
 			cursorOn=1
-			timeStamp+="\r"+curs+": \\{root:status:cursorSweepNum_"+curs+"} -- \\{secs2time(60*root:SweepT[root:status:cursorSweepNum_"+curs+"],3)} -- \\{secs2time(root:status:expStartT+60*root:SweepT[root:status:cursorSweepNum_"+curs+"],1)}"
+			timeStamp += "\r"+curs+": \\{root:status:cursorSweepNum_"+curs+"} -- "
+			timeStamp += "\\{secs2time(60*GetSweepTime(GetCursorSweepNum(\""+curs+"\")),3)} -- "
+			timeStamp += "\\{secs2time(root:status:expStartT+60*GetSweepTime(GetCursorSweepNum(\""+curs+"\")),1)}"
 		endif
 	endfor
 	if(lastOn && cursorOn)
 		timeStamp="\\Z08Last: "+timeStamp
 	endif
-	Textbox /C/W=SweepsWin /N=TimeStamp timeStamp
-End
+	Textbox /C/W=SweepsWin /N=TimeStamp timeStamp	
+end
 
 Function AppendAndOffsetSweep(pre,post,sweepNum,pulse,type,filtered,red,green,blue[,rightAxis])
 	Variable pre // Presynaptic channel number.  -1 if there is nothing "presynaptic" because we are in "Broad" view.  
@@ -2822,7 +2837,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	endif
 	
 	string columnControls = ControlNameList("AnalysisWin",";","Column_*")
-	ModifyControlList columnControls disable=1
+	ModifyControlList /Z columnControls disable=1
 	variable i
 	if(itemsinlist(titles)>=2) // Analysis methods, i=0 is primary, i>=1 are auxiliary.  
 		for(i=0;i<itemsinlist(titles);i+=1)

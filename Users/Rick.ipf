@@ -3,7 +3,7 @@
 // $Rev: 632 $
 // $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
-#pragma rtGlobals=1		// Use modern global access method.
+#pragma rtGlobals=3		// Use modern global access method.
 
 #ifdef Rick
 

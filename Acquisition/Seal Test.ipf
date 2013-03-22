@@ -914,7 +914,7 @@ Function SealTestEnd([noStore,DAQ])
 		while(datafolderrefstatus(history))
 		NewDataFolder /O df:$("Seal_"+num2str(i-1))
 		dfref history=df:$("Seal_"+num2str(i-1))
-		String waves=Dir2("WAV",df=df,match="*History*")
+		String waves=Core#Dir2("WAV",df=df,match="*History*")
 		
 		for(i=0;i<ItemsInList(channels);i+=1)
 			string channel=StringFromList(i,channels)

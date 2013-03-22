@@ -968,7 +968,7 @@ Function PlotSpikes([align,left,right,order,min_colorval,max_colorval,cell]) // 
 End
 
 Function FIData()
-	NVar total_sweeps=root:currSweep
+	variable total_sweeps = GetCurrSweep()
 	Variable i,j,pulse_start,pulse_length,pulse_amplitude; String channel
 	Edit /K=1 /N=FI_Table
 	String curr_folder=GetDataFolder(1)

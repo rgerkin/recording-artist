@@ -85,6 +85,11 @@ Function Initialization([profileName,acqInstance])
 	Core#SetSelectedInstance(module,"Acq",acqInstance)
 	
 	variable defaults=stringmatch(acqInstance,"_default_")
+	if(defaults)
+		printf "Initializing experiment using default acquisition settings.\r"
+	else
+		printf "Initializing experiment from Acquisition instance %s.\r",acqInstance
+	endif
 
 	variable fsize=GetFontSize()
 	DefaultGuiFont all= {"Arial",fsize,0}
@@ -94,6 +99,7 @@ Function Initialization([profileName,acqInstance])
 	if(defaults || Core#ExecuteProfileMacro(module,"SweepsWin","",1)<0)
 		SweepsWindow()
 	endif
+	SweepsWinControlsUpdate()
 	if(defaults || Core#ExecuteProfileMacro(module,"AnalysisWin","",1)<0 || AnalysisMethodListBoxUpdate())
 		AnalysisWindow()
 	endif
@@ -176,6 +182,10 @@ Function /s InitializeVariables([acqInstance,noContainers,quiet])
 			string chanName=GetChanName(chan)
 			InitChan(chan,DAQ=DAQ,instance=selectstring(default_,channelConfigInstance,"_default_"),noContainer=noContainers,quiet=quiet)
 			chan+=1
+		endfor
+		for(j=chan-1;j>=0;j-=1)
+			SetUniqueChanLabel(j,quiet=quiet)
+			SetUniqueChanColor(j,quiet=quiet)
 		endfor
 	endfor
 	
@@ -294,8 +304,8 @@ Function InitChan(chan[,DAQ,instance,noContainer,label_,quiet])
 	Core#InheritInstancesOrDefault(module,"channelConfigs","stimuli",{name},parentInstance=name,context=context,quiet=quiet)
 	Core#InheritInstancesOrDefault(module,"channelConfigs","filters",{name},parentInstance=name,context=context,quiet=quiet)
 	//SetAcqSetting("channelConfigs",name,"DAQ",DAQ)
-	SetUniqueChanLabel(chan,label_=label_,quiet=quiet)
-	SetUniqueChanColor(chan,quiet=quiet)
+	//SetUniqueChanLabel(chan,label_=label_,quiet=quiet)
+	//SetUniqueChanColor(chan,quiet=quiet)
 	wave /z chanHistory=GetChanHistory(chan,quiet=quiet)
 	if(!waveexists(chanHistory) && !noContainer)
 		InitChanContainer(chan,quiet=quiet)

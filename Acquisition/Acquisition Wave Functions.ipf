@@ -931,7 +931,11 @@ Function /S AssemblerList(chan)
 	
 	string funcs=functionlist("*_stim",";","")
 	string goodFuncs=""//"Normal;"
-	string assembler=GetAssembler(chan)
+	if(chan>=0)
+		string assembler=GetAssembler(chan)
+	else
+		assembler = ""
+	endif
 	variable i
 	for(i=0;i<itemsinlist(funcs);i+=1)
 		string func=stringfromlist(i,funcs)
@@ -1303,6 +1307,16 @@ function /wave GetSweepT()
 		make /free/n=0 w 
 	endif
 	return w
+end
+
+function GetSweepTime(sweep)
+	variable sweep
+	
+	wave SweepT = GetSweepT()
+	sweep = limit(sweep,0,numpnts(SweepT)-1)
+	variable result = SweepT[sweep]
+	result = numtype(result)==2 ? 0 : result
+	return result
 end
 
 function /s GetDAQName(daqNum)
@@ -1965,7 +1979,7 @@ Function Concat(wave_list,df[,prefix,split,to_append,downscale])
 	Variable downscale // A factor to downscale the concatenated trace by, in order to make display faster and to save memory.  
 	
 	if(IsEmptyString(wave_list))
-		NVar last_sweep=root:status:currSweep
+		variable last_sweep=GetCurrSweep()
 		wave_list="1,"+num2str(last_sweep)
 	endif
 	split=ParamIsDefault(split) ? 0 : split
@@ -2019,7 +2033,7 @@ Function Concat(wave_list,df[,prefix,split,to_append,downscale])
 	else
 		String append_list="",offset_list="",sweep_name
 		Variable offset
-		Wave SweepT=root:SweepT
+		Wave SweepT=GetSweepT()
 		old_name=folderName+"TempConcat"
 		start_sweep_num=NumFromList(0,wave_list)
 		for(i=0;i<ItemsInList(wave_list);i+=1)
