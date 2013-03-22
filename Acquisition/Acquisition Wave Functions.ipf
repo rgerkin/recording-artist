@@ -1,6 +1,6 @@
 // $Author: rick $
-// $Rev: 632 $
-// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
+// $Rev: 626 $
+// $Date: 2013-02-07 09:36:23 -0700 (Thu, 07 Feb 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 static strconstant module="Acq"
@@ -2142,6 +2142,36 @@ function PoissonAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 		Convolve AlphaSynapso(1,3,0,50),Stimulus
 	endif
 end
+
+//sin function added by AG 3-21-13
+function Sine_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable begin=GetStimParam("Begin",chan,pulseSet)		//Begin time
+	variable width=GetStimParam("Width",chan,pulseSet)		//Set frequency (Hz)
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)		//Set amplitude
+	
+	make/o/n=10000 SineWave
+	setscale x,0,1,SineWave  
+	SineWave = Ampl * sin(2*pi*x*width)
+	
+	save SineWave
+	
+	display SineWave
+	
+//From duplicated code- probably don't need
+//	variable ampl=GetStimParam("Ampl",chan,pulseSet)
+
+//	variable width=lastSample-firstSample
+//	variable start=abs(enoise(dimsize(Stimulus,0)))
+//	Stimulus[start,start+width][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+//	variable pulses=GetStimParam("Pulses",chan,pulseSet)
+//	if(pulseNum==pulses-1)
+//		Convolve AlphaSynapso(1,3,0,50),Stimulus
+//	endif
+end
+
 
 function Optimus1_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
 	wave Stimulus

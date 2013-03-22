@@ -1,6 +1,11 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
-function StimulusTable()
+//
+//#ifdef Acq
+//#include "Spike Functions"
+//#endif
+
+//function StimulusTable()
 	dowindow /k StimTable
 	edit /k=1/n=StimTable.ld as "Stimulus Table"
 	variable num_channels = GetNumChannels() // Number of channels.  

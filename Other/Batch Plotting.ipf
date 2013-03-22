@@ -1,7 +1,7 @@
-// $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Other/Batch%20Plotting.ipf $
+// $URL: svn://churro.cnbc.cmu.edu/igorcode/Recording%20Artist/Other/Batch%20Plotting.ipf $
 // $Author: rick $
-// $Rev: 628 $
-// $Date: 2013-02-11 12:57:08 -0700 (Mon, 11 Feb 2013) $
+// $Rev: 566 $
+// $Date: 2011-07-14 09:16:22 -0400 (Thu, 14 Jul 2011) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 //#include "Batch Wave Functions"
@@ -23,13 +23,8 @@ Function DoToGraphs([match_str])
 	endfor
 End
 
-Function KillTables([match])
-	string match
-	if(ParamIsDefault(match))
-		match="*"
-	endif
-	
-	KillAll("tables",match=match)
+Function KillTables()
+	KillAll("tables")
 End
 
 Function KillGraphs([match])
@@ -408,7 +403,7 @@ Function FitsforAllPlots([mask]) // Get fits of a certain type for each plot in 
 End
 
 //// Plot all combinations of list1 against list2 (data pairs with lines connecting them)
-Function PlotPairsWithLinesMany(list1,list2,bad_list)//,suffix)
+//Function PlotPairsWithLinesMany(list1,list2,bad_list)//,suffix)
 	String list1,list2//,suffix
 	String bad_list // Makes sure nothing on the bad list (e.g. current too small) is on the returned list
 	String prefix="time_constants_"
@@ -507,7 +502,7 @@ Function ColorCode([names,colors])
 	endfor
 End
 
-Function KillAllFits() // Removes Fits from every graph there is and then deletes them
+//Function KillAllFits() // Removes Fits from every graph there is and then deletes them
 	String list=WinList("*",";","")
 	Variable i,j
 	String window_name
@@ -643,7 +638,7 @@ Function PlotFolder()
 End
 
 // A window that can show the waves of a folder, and in which those waves can be browsed.  
-Function BrowseFolder(df[,prefix])
+//Function BrowseFolder(df[,prefix])
 	dfref df // Data folder reference. 
 	String prefix // e.g. "Sweep".   
 	if(ParamIsDefault(prefix))

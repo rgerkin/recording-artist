@@ -1,7 +1,7 @@
 
 // $Author: rick $
-// $Rev: 632 $
-// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
+// $Rev: 626 $
+// $Date: 2013-02-07 09:36:23 -0700 (Thu, 07 Feb 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 
@@ -649,10 +649,13 @@ Function SealTestTracker(chan,updateBaseline)
 		string axes=AxisList("SealTestWin")
 		string sweepaxes=listmatch(axes,"chan*")
 		variable i
-		for(i=0;i<itemsinlist(sweepAxes);i+=1)
-			string sweepAxis=stringfromlist(i,sweepAxes)
-			SetAxis $sweepAxis,V_median-(V_median-V_min)*1.5,V_avg+(V_max-V_median)*1.5
-		endfor
+		string sweepAxis = "chan"+num2str(chan)+"_axis"
+		variable center = v_median
+		ControlInfo $("Range_"+num2str(chan))
+		variable range = v_value
+		variable low = center - range/2
+		variable high = center + range/2
+		SetAxis $sweepAxis,low,high
 	endif
 	Duplicate /o chanDF:InputHistory, chanDF:Threshold /WAVE=Threshold 
 	ControlInfo $("Threshold_"+channel); Variable thresh=V_Value
