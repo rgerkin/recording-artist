@@ -4,110 +4,324 @@
 // $Date: 2010-05-08 15:05:43 -0400 (Sat, 08 May 2010) $
 
 #pragma rtGlobals=1		// Use modern global access method.
+#pragma ModuleName=NoDAQ
 
-Function NoDaq_InDemultiplex(input_waves)
-	String input_waves
+static strconstant module="Acq"
+static strconstant daqType="NoDAQ"
+static strconstant noDAQ_path="root:Packages:NoDAQ"
+static strconstant input_path="root:Packages:NoDAQ:input"
+static strconstant output_path="root:Packages:NoDAQ:output"
+static constant num_inputs=2
+static constant num_outputs=2
+static constant Hz = 10000
+static constant max_buffer_size = 1e6
+
+static function /s InputChannelList([DAQ])
+	string DAQ
+	
+	string list = ""
+	variable i
+	for(i=0;i<num_inputs;i+=1)
+		list+=num2str(i)+";"
+	endfor
+	//list += "D;N;"
+	return list
+end
+
+static function /s OutputChannelList([DAQ])
+	string DAQ
+	
+	string list = ""
+	variable i
+	for(i=0;i<num_outputs;i+=1)
+		list+=num2str(i)+";"
+	endfor
+	//list += "D;N;"
+	return list
+end
+
+static function /s GetDAQDevices([types])
+	string types
+	
+	return "dev1"
+end
+
+static function /s DAQType(DAQ)
+	string DAQ
+	
+	return "NoDAQ"
+end
+
+static function /s DAQ2Device(DAQ) // TO DO: Make DAQ map onto a device number.  
+	string DAQ
+	
+	string devices=GetDAQDevices()
+	return stringfromlist(0,devices)
+end
+
+static Function BoardGain(DAQ)
+	String DAQ
+	
+	return 1
 End
 
-// Obsolete for NIDAQmx
-Function NoDaq_SelectSignal(device,param1,param2,direction)
-	Variable device,param1,param2,direction
+static Function SpeakReset([DAQ])
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	CtrlNamedBackground NoDAQSpeak, stop
 End
 
-// Obsolete for NIDAQmx
-Function NoDaq_SetupTriggers(pin)
-	Variable pin // Hardcoded to pin 6
+static Function ListenReset([DAQ])
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	CtrlNamedBackground NoDAQListen, stop
 End
 
-Function NoDaq_SpeakReset(device)
-	Variable device
-	//return fDAQmx_WaveformStop("dev"+num2str(device))
+static Function SetupTriggers(pin[,DAQ])
+	Variable pin
+	String DAQ
 End
 
-Function NoDaq_ZeroAll()
-//	fDAQmx_WaveformStop("dev1")
-//	fDAQmx_ScanStop("dev1")
-//	fDAQmx_WriteChan("dev1",0,0,-10,10)
-//	fDAQmx_WriteChan("dev1",1,0,-10,10)
+static Function ZeroAll([DAQ])
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQtype),DAQ)
+	SpeakReset(DAQ=DAQ)
+	ListenReset(DAQ=DAQ)
+	variable i
+	for(i=0;i<num_outputs;i+=1)
+		//Write(i,0,DAQ=DAQ)
+	endfor
 End
 
-Function NoDaq_BoardReset(Device)
-	Variable device
-	//return fDAQmx_ResetDevice("dev"+num2str(device))
+static Function BoardReset(device[,DAQ])
+	variable device
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQtype),DAQ)
+	CtrlNamedBackground NoDAQSpeak, kill=1
+	CtrlNamedBackground NoDAQListen, kill=1
 End
 
-Function NoDaq_BoardInit()
-	NoDAQ_BoardReset(1)
-	NoDAQ_ZeroAll()
+static Function BoardInit([DAQ])
+	string DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQtype),DAQ)
+	NewDataFolder /o root:Packages
+	NewDataFolder /o root:Packages:NoDAQ
+	dfref df = root:Packages:NoDAQ
+	newdatafolder /o df:input
+	newdatafolder /o df:output
+	dfref input = df:input
+	dfref output = df:output
+	variable i
+	for(i=0;i<num_inputs;i+=1)	
+		PurgeInput(i)
+	endfor
+	for(i=0;i<num_outputs;i+=1)	
+		PurgeOutput(i)
+	endfor
+	variable /g df:t_init = StopMsTimer(-2) // When the buffer was initialized.  	
+	variable /g df:t_update = 0 // Last time the buffer was updated by Waiting().  
+	BoardReset(1,DAQ=DAQ)
+	ZeroAll(DAQ=DAQ)
 End
 
-Function /S NoDaq_NIDAQError()
-	//return fDAQmx_ErrorString()
+static Function /S DAQError([DAQ])
+	String DAQ
+	
+	return "No error checking for the No DAQ testing interface."
 End
 
-Function NoDaq_Listen(device,gain,list,param,continuous,endHook,errorHook,other[,now])
+// Default sampling frequency in kHz.  
+static Function DefaultKHz(DAQ)
+	String DAQ
+	
+	dfref df=Core#ObjectManifest(module,"DAQs","kHz")
+	nvar /sdfr=df value
+	return value
+End
+
+static Function Listen(device,gain,list,param,continuous,endHook,errorHook,other[,now,DAQ])
 	Variable device,gain
 	String list
-	Variable param,continuous
-	String endHook,errorHook,other
-	Variable now
+	Variable param,continuous,now // 'now' is non-functional
+	String endHook,errorHook,other,DAQ
 	
-	// Figure out what the difference is between /BKG=0 and /BKG=1 (right now /BKG=0 doesn't work)
-	// Alternatively, set /BKG=0 and /STRT=0 and uncomment the line below it.  
-	// Consider using /RPT, which is still sensitive to triggers, for continuous collection
-	if(continuous)
-		//DAQmx_Scan /DEV="dev1" /BKG=1 /ERRH=errorHook /EOSH=endHook /RPTC /RPTH=endHook /STRT=1 /TRIG={"/dev1/PFI6",1,1} WAVES=list
-	else
-		//DAQmx_Scan /DEV="dev1" /BKG=1 /ERRH=errorHook /EOSH=endHook /STRT=1 /TRIG={"/dev1/PFI6",1,1} WAVES=list
-	endif
-	//fDAQmx_ScanStart("dev1",1)
+	CtrlNamedBackground NoDAQListen, start, proc=NoDAQ#Listening
 End
 
-Function NoDaq_Speak(device,list,param[,now])
+static Function Speak(device,list,param[,now,DAQ])
 	Variable device
 	String list
 	Variable param // 0 is continuous, 32 is only one time
-	Variable now
+	Variable now // 'now' is non-functional
+	String DAQ
 	
-	if(param!=0)
-		param=1
-	endif
-	//DAQmx_WaveformGen /DEV="dev1" /ERRH="ErrorHook()" /NPRD=(param) /STRT=1 /TRIG={"/dev1/PFI6",1,1} list
-	//DAQmx_WaveformGen /DEV="dev1" /CLK={"/dev1/ai/sampleclock",1} /ERRH="ErrorHook()" /NPRD=1 /STRT=1 /TRIG={"/dev1/PFI6",1,1} list
+	variable continuous = Core#VarPackageSetting(module,"DAQs",MasterDAQ(),"continuous")
+	dfref df = $output_path
+	string output_waves = Core#StrPackageSetting(module,"DAQs",MasterDAQ(),"outputWaves")
+	variable i
+	for(i=0;i<min(num_outputs,itemsinlist(output_waves));i+=1)
+		string output_wave = stringfromlist(i,output_waves)
+		string name = stringfromlist(0,output_wave,",")
+		variable chan = str2num(stringfromlist(1,output_wave,","))
+		wave w = $name
+		wave /sdfr=df buffer = $("ch"+num2str(chan))
+		variable start = numpnts(buffer)
+		redimension /n=(start+dimsize(w,0)) buffer
+		buffer[start,] = w[p-start]
+		printf "Speaking wrote to the buffer...\r"
+		if(numpnts(buffer)>max_buffer_size)
+			PurgeOutput(i)
+			buffer = w[0]
+		endif
+	endfor
 End
 
-Function NoDaq_Read(channel)
+static Function Read(channel[,DAQ])
 	Variable channel
-	//return fDAQmx_ReadChan("dev1",channel,-10,10,-1)
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	dfref df = $input_path
+	wave /sdfr=df w = $("ch"+num2str(channel))
+	return w[numpnts(w)-1]
 End
 
-Function NoDaq_Write(channel,value)
+static Function Write(channel,value[,DAQ])
 	Variable channel,value
-	//return fDAQmx_WriteChan("dev1",channel,value,-10,10)
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	dfref df = $output_path
+	wave /sdfr=df w = $("ch"+num2str(channel))
+	w[numpnts(w)] = {value}
 End
 
-Function NoDaq_Start_clock(isi)
-	Variable isi 
-	//DAQmx_CTR_OutputPulse /DEV="dev1" /DELY=0  /FREQ={1/isi,1/(1000*isi)} /NPLS=0 /STRT=0 0
-	//return fDAQmx_CTR_Start("dev1",0)
+static Function StartClock(isi[,DAQ])
+	Variable isi
+	String DAQ
+	 
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	StopClock()
+	CtrlNamedBackground NoDAQClock, start, period=isi*60, proc=NoDAQ#Waiting
+	return 0
 End
 
-Function NoDaq_Stop_clock ()
-	//return fDAQmx_CTR_Finished("dev1",0)
+static Function StopClock([DAQ])
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	CtrlNamedBackground NoDAQClock, stop
 End
 
-Function NoDaq_ErrorHook() // This function is called when a scanning or waveform generation error is encountered
-	NVar acquiring = root:acquiring
-	Print "ErrorSweep"
-	//DoAlert 0, fDAQmx_ErrorString()
-	//fDAQmx_ResetDevice("dev1")
-	DoWindow /f Cell_Window
-	Button start_btn title="Start"
-	acquiring=0
+static Function ErrorHook([DAQ]) // This static Functionis called when a scanning or waveform generation error is encountered
+	String DAQ
+	
+	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
+	dfref daqDF=GetDaqDF(DAQ)
+	printf "Error Sweep on DAQ '%s',\r",DAQ
+	BoardReset(1,DAQ=DAQ)
+	variable /g daqDF:acquiring=0
 End
 
-// This function reports the numeric value of an error reported by the NIDAQ board.  
-Function NoDaq_CheckError() 
-//	NVar error=root:packages:nidaqtools:NIDAQ_ERROR
-//	print "NIDAQ Error is "+num2str(error)
+static Function SlaveHook(DAQ)
+	String DAQ
+	
 End
+
+static function Listening(s)
+	struct wmbackgroundstruct &s
+	
+	dfref df = $input_path
+	string input_waves = Core#StrPackageSetting(module,"DAQs",MasterDAQ(),"inputWaves")
+	variable i
+	for(i=0;i<min(num_inputs,itemsinlist(input_waves));i+=1)
+		string input_wave = stringfromlist(i,input_waves)
+		string name = stringfromlist(0,input_wave,",")
+		variable chan = str2num(stringfromlist(1,input_wave,","))
+		wave w = $name
+		wave /sdfr=df buffer = $("ch"+num2str(i))
+		nvar /sdfr=df xx = $("x"+num2str(i))
+		if(numpnts(buffer)-xx >=numpnts(w))
+			print numpnts(buffer),xx,numpnts(w)
+			w = buffer[p+xx]
+			xx += numpnts(w)
+			printf "Listening read from the buffer...\r"
+		endif
+		if(numpnts(buffer)>max_buffer_size)
+			PurgeInput(i)
+		endif
+	endfor
+	return 0
+end
+
+static function Waiting(s)
+	struct wmbackgroundstruct &s
+	
+	Speak(1,"",0)
+	nvar /sdfr=$noDAQ_path t_init,t_update
+	variable then = (t_update - t_init)/1e6
+	variable now = (stopmstimer(-2) - t_init)/1e6
+	variable elapsed = now - then
+	//variable points = Hz*elapsed/1e6
+	dfref inDF = $input_path
+	dfref outDF = $output_path
+	variable i,j
+	
+	// Inputs matched up one-to-one to outputs.  
+	for(i=0;i<min(num_inputs,num_outputs);i+=1)	
+		wave /sdfr=outDF out = $("ch"+num2str(i))
+		nvar /sdfr=outDF out_x = $("x"+num2str(i))
+		wave response = IO(out,out_x)
+		out_x += numpnts(response)
+		wave /sdfr=inDF in = $("ch"+num2str(i))
+		concatenate /np {response},in
+		printf "Added %d points to the input buffer.\r",numpnts(response)
+	endfor
+	
+	// Extra inputs not matched up to any output.  
+	for(j=i;j<num_inputs;j+=1)	
+		wave /sdfr=inDF in = $("ch"+num2str(j))
+		in = gnoise(1)
+	endfor	
+	
+	printf "Waiting executed once...\r"
+	t_update = now*1e6 + t_init
+	return 0
+end
+
+static function PurgeInput(chan)
+	variable chan
+	
+	dfref df = $input_path
+	make /o/d/n=0 df:$("ch"+num2str(chan)) /wave=w = 0
+	setscale /p x,0,1/Hz,w
+	variable /g df:$("x"+num2str(chan)) = 0 // Buffer cursor.  
+end
+
+static function PurgeOutput(chan)
+	variable chan
+	
+	dfref df = $output_path
+	make /o/d/n=0 df:$("ch"+num2str(chan)) /wave=w = 0
+	setscale /p x,0,1/Hz,w
+	variable /g df:$("x"+num2str(chan)) = 0 // Buffer cursor.  
+end
+
+static function /wave IO(w,start)
+	wave w
+	variable start
+	
+	duplicate /free w,convolved
+	make /free/n=(1000) expo = exp(-x/200)
+	variable summ = sum(expo)
+	expo /= summ // Normalize to a sum of 1.  
+	Convolve expo,convolved
+	copyscales /p w,convolved
+	duplicate /free/r=[start,] convolved,result
+	return result
+end

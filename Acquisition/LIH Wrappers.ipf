@@ -31,8 +31,7 @@ static Function BoardGain(DAQ)
 	return 3.2
 End
 
-static Function SpeakReset(device[,DAQ])
-	Variable device
+static Function SpeakReset([DAQ])
 	String DAQ
 	
 	//printf "SpeakReset() is not available for this device.\r"

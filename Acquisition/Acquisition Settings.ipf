@@ -186,10 +186,10 @@ Function SelectPackageInstance(package,instance[,special])
 							struct rect coords
 							Core#CopyInstance(module,package,liveInstance,targetInstance)
 							Core#GetWinCoords(package,coords) // Assumes package and window have the same name.  
-							Core#SetVarPackageSetting(module,package,targetInstance,"left",coords.left,sub="position")
-							Core#SetVarPackageSetting(module,package,targetInstance,"top",coords.top,sub="position")
-							Core#SetVarPackageSetting(module,package,targetInstance,"right",coords.right,sub="position")
-							Core#SetVarPackageSetting(module,package,targetInstance,"bottom",coords.bottom,sub="position")
+							Core#SetVarPackageSetting(module,package,targetInstance,"left",coords.left,sub="position",create=1)
+							Core#SetVarPackageSetting(module,package,targetInstance,"top",coords.top,sub="position",create=1)
+							Core#SetVarPackageSetting(module,package,targetInstance,"right",coords.right,sub="position",create=1)
+							Core#SetVarPackageSetting(module,package,targetInstance,"bottom",coords.bottom,sub="position",create=1)
 							
 							// Copy one of the vertical axes to the generic "Ampl_Axis".   
 							dfref df = Core#InstanceHome(module,package,targetInstance,sub=curr_view)

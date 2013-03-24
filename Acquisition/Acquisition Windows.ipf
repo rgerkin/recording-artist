@@ -62,7 +62,7 @@ Function WaveSelector([coords2,DAQ,instance])
 	SetWindow kwTopWin userData(y_height)=num2str(y_height)
 	SetWindow kwTopWin userData(y_offset)=num2str(y_offset)
 	setwindow kwTopWin userData(instance)=instance
-	SetWindow kwTopWin hook=RefreshHook, hookEvents=1
+	SetWindow kwTopWin hook(main)=SelectorHook
 	SetWindow kwTopWin userData(DAQ)=DAQ
 	SetDrawLayer ProgBack; SetDrawEnv fillfgc= (39321,1,1); SetDrawLayer UserBack
 	
@@ -1229,61 +1229,65 @@ function /df WinRecMacrosDF()
 end
 
 // The window that plots the values of interest (like the peak amplitude of an EPSC)
-Function AnalysisWindow([diskCoords]) : Graph
-	Variable diskCoords // Use the coordinates from the macro on disk.  
+Function AnalysisWindow([instance]) : Graph
+	string instance
 	
-	DoWindow /K AnalysisWin
-	dfref df=Core#PackageHome(module,"analysisWin",create=1)
+	string win = "analysisWin"
+	string package = win
+	dfref df = Core#CopyInstance(module,package,"_default_","win0")
+	DoWindow /K $win
+	SetDataFolder root:
+	Struct rect coords
+	variable use_default_coords = 1
+	if(!paramisdefault(instance) && Core#InstanceExists(module,package,instance))
+		coords.left = Core#VarPackageSetting(module,package,instance,"left",sub="position")
+  	coords.top = Core#VarPackageSetting(module,package,instance,"top",sub="position")
+  	coords.right = Core#VarPackageSetting(module,package,instance,"right",sub="position")
+  	coords.bottom = Core#VarPackageSetting(module,package,instance,"bottom",sub="position")
+		if(coords.right > 10 && coords.bottom > 10) // Sane coordinates.  
+			use_default_coords = 0  
+  	endif
+  endif
+  if(use_default_coords)
+  	IgorWinCoords(coords)
+		coords.left+=1
+  	coords.right-=1
+  	coords.top=(coords.bottom-coords.top)*0.6
+  endif
+	
 	svar /z/sdfr=df lastMethod
 	if(!svar_exists(lastMethod))
 		string /g df:lastMethod=""
 		svar /z/sdfr=df lastMethod
 	endif
-	AnalysisMethodListBoxUpdate()
 	
-  struct rect win
-  IgorWinCoords(win)
-	dfref macrosDF=WinRecMacrosDF()
-	svar /z/sdfr=macrosDF winRec=AnalysisWin 
-	variable oldCoords=0
-      if(svar_exists(winRec))
-      		oldCoords=ExtractCoordsFromWinRec(winRec,win)==0
-     	else
-      		win.left+=1
-      		win.top=(win.bottom+win.top)*0.6
-      		win.right-=1
-      endif
-      
+	AnalysisMethodListBoxUpdate() // Create a bunch of variables that will be used in the next section.  
 	Variable axisPaddingLeft=0.04
-	Display /N=AnalysisWin /K=2 /W=(win.left,win.top,win.right,win.bottom) /L=Ampl_axis /B=Time_axis as "Analysis"
+	Display /N=AnalysisWin /K=2 /W=(coords.left,coords.top,coords.right,coords.bottom) /L=Ampl_axis /B=Time_axis as "Analysis"
 	ControlBar /W=AnalysisWin /T 25
 	Button AnalysisSelect, title="Analysis", proc=AnalysisWinButtons, win=AnalysisWin
 	PopupMenu Trend, size={55,20},proc=AnalysisWinPopupMenus,mode=0,value="Linear Regression;Decimation;Loess;----;Remove", title="Trend", win=AnalysisWin
-      Button Normalize, size={65,20},proc=AnalysisWinButtons,title="Normalize", win=AnalysisWin
-      Button Scale, size={55,20},proc=AnalysisWinButtons,title="Scale",win=AnalysisWin
-      Button Recalculate, size={110,20},proc=AnalysisWinButtons,title="Recalculate", win=AnalysisWin
-      dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
-      wave /sdfr=analysisWinDF parameter
-      SetVariable Parameter, disable=1,size={80,20},value=parameter[0], win=AnalysisWin
-      PopupMenu Minimum, title="Minimum", value=#"ChannelCombos(\"minimum\",\"\")", mode=0, proc=AnalysisWinPopupMenus, win=AnalysisWin
-      SetVariable SweepNum_A,pos={685,3},title="A",value=root:status:cursorSweepNum_A,proc=AnalysisWinSetVariables,limits={0,inf,1}, win=AnalysisWin
-      SetVariable SweepNum_B,title="B",value=root:status:cursorSweepNum_B,proc=AnalysisWinSetVariables,limits={0,inf,1}, win=AnalysisWin
-    	//Checkbox Value_0 pos={510,4}, value=1, win=AnalysisWin, proc=AnalysisWinCheckboxes
-//Checkbox Value_1 pos={570,4}, value=1, win=AnalysisWin, proc=AnalysisWinCheckboxes
-      SetDrawEnv fsize=6,save
-      DoUpdate
-      GetWindow AnalysisWin, gsizeDC
-      Variable graph_height=V_bottom-V_top-50
+  Button Normalize, size={65,20},proc=AnalysisWinButtons,title="Normalize", win=AnalysisWin
+  Button Scale, size={55,20},proc=AnalysisWinButtons,title="Scale",win=AnalysisWin
+  Button Recalculate, size={110,20},proc=AnalysisWinButtons,title="Recalculate", win=AnalysisWin
+  wave /sdfr=df parameter
+  SetVariable Parameter, disable=1,size={80,20},value=parameter[0], win=AnalysisWin
+  PopupMenu Minimum, title="Minimum", value=#"ChannelCombos(\"minimum\",\"\")", mode=0, proc=AnalysisWinPopupMenus, win=AnalysisWin
+  SetVariable SweepNum_A,pos={685,3},title="A",value=root:status:cursorSweepNum_A,proc=AnalysisWinSetVariables,limits={0,inf,1}, win=AnalysisWin
+  SetVariable SweepNum_B,title="B",value=root:status:cursorSweepNum_B,proc=AnalysisWinSetVariables,limits={0,inf,1}, win=AnalysisWin
+  SetDrawEnv fsize=6,save
+  DoUpdate
+  GetWindow $win, gsizeDC
+  Variable graph_height=V_bottom-V_top-50
 
-     	variable numChannels=GetNumChannels()
+  variable numChannels=GetNumChannels()
 	Wave /T Labels=GetChanLabels()
 	
 	Variable plotNum=0,numPlots=0,axisSizeTotal=0,axisSizeSoFar=0,i,j,k
 	String axisSizeStr=""
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin",create=1)
-	wave /sdfr=analysisWinDF SelWave
-	wave /t/sdfr=analysisWinDF ListWave
-	wave /sdfr=analysisWinDF AxisIndex; AxisIndex=NaN
+	wave /sdfr=df SelWave
+	wave /t/sdfr=df ListWave
+	wave /sdfr=df AxisIndex; AxisIndex=NaN
 	
 	string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 	for(i=0;i<ItemsInList(analysisMethods);i+=1) // Over all the available analysis methods.  
@@ -1402,42 +1406,42 @@ Function AnalysisWindow([diskCoords]) : Graph
 		axisBottomCoord=str2num(StringFromList(i+1,axisBottomCoords))
 		axisTopCoord=str2num(StringFromList(i,axisTopCoords))
 		Variable lineCoord=1-(axisBottomCoord+axisTopCoord)/2
-	      	SetDrawEnv xcoord=prel,ycoord=prel
-	      	DrawLine /W=AnalysisWin axisPaddingLeft,lineCoord,1-axisPaddingLeft,lineCoord 
+	  SetDrawEnv xcoord=prel,ycoord=prel
+	  DrawLine /W=AnalysisWin axisPaddingLeft,lineCoord,1-axisPaddingLeft,lineCoord 
 	endfor
 	
-      //if(WinExist("SweepsWin"))
-      //	PeakProc("",0)
-      	//endif
-     	SetAxis /Z /W=AnalysisWin Time_axis 0,30
-       ModifyGraph /Z /W=AnalysisWin mode=3
-       ModifyGraph /Z /W=AnalysisWin fSize=fsize, btLen=2
-       ModifyGraph /Z /W=AnalysisWin freePos(Time_axis)=0,axisEnab(Time_axis)={axisPaddingLeft,1-axisPaddingLeft},lblpos(Time_axis)=100
-       Label /Z /W=AnalysisWin Time_axis "Time (min)"
+  SetAxis /Z /W=AnalysisWin Time_axis 0,30
+  ModifyGraph /Z /W=AnalysisWin mode=3
+  ModifyGraph /Z /W=AnalysisWin fSize=fsize, btLen=2
+  ModifyGraph /Z /W=AnalysisWin freePos(Time_axis)=0,axisEnab(Time_axis)={axisPaddingLeft,1-axisPaddingLeft},lblpos(Time_axis)=100
+  Label /Z /W=AnalysisWin Time_axis "Time (min)"
 
-       Cursors()
-       variable A = GetCursorSweepNum("A")
-       variable B = GetCursorSweepNum("B")
-       if(strlen(CsrWave(A)))
-       	Cursor /W=AnalysisWin A, $CsrWave(A), A
-       	Cursor /W=AnalysisWin B, $CsrWave(B), B
-       endif
+  Cursors()
+  variable A = GetCursorSweepNum("A")
+  variable B = GetCursorSweepNum("B")
+  if(strlen(CsrWave(A)))
+		Cursor /W=AnalysisWin A, $CsrWave(A), A
+		Cursor /W=AnalysisWin B, $CsrWave(B), B
+  endif
        
-       SetWindow AnalysisWin hook=RefreshHook, hookEvents=5
-	 
-	 // What does this do?  
-	 for(i=0;i<ItemsInList(analysisMethods);i+=1)
-       	analysisMethod=StringFromList(i,analysisMethods)
-       	if(StringMatch(analysisMethod,lastMethod))
-       		Variable axisNum=AxisIndex[i]
-       		if(numtype(axisNum)==0)
-       			break
-       		endif
-       	endif
-       endfor
-  		 AnalysisMethodSubSelections(axisNum)  
-       DrugTags()
-        RefreshHook("WINDOW:AnalysisWin;EVENT:resize")
+  // What does this do?  
+	for(i=0;i<ItemsInList(analysisMethods);i+=1)
+		analysisMethod=StringFromList(i,analysisMethods)
+	 	if(StringMatch(analysisMethod,lastMethod))
+    	Variable axisNum=AxisIndex[i]
+      if(numtype(axisNum)==0)
+       	break
+      endif
+    endif
+  endfor
+  
+  AnalysisMethodListBoxUpdate()
+  AnalysisMethodSubSelections(axisNum)  
+  DrugTags()
+  SetWindow $win hook(mainHook)=AnalysisWinHook
+	struct wmwinhookstruct info
+	info.eventName="resize"
+	AnalysisWinHook(info)
 End
 
 Function AnalysisWinSetVariables(info)
@@ -1531,17 +1535,17 @@ End
 
 Function AnalysisMethodListBoxUpdate()
 	String currFolder=GetDataFolder(1)
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin",create=1)
+	dfref df=Core#InstanceHome(module,"analysisWin","win0")
 	variable i=0,j
 	variable numChannels=GetNumChannels()
 	String analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 	Variable numMethods=ItemsInList(analysisMethods)
 	
-	Make /o/T/n=(numMethods,numChannels+2) analysisWinDF:ListWave /wave=ListWave=""
-	Make /o/n=(numMethods,numChannels+2) analysisWinDF:SelWave /wave=SelWave =32
-	Make /o/n=(numMethods,numChannels) analysisWinDF:Parameter /wave=Parameter=NaN
-	Make /o/n=(numMethods) analysisWinDF:AxisIndex /wave=AxisIndex, analysisWinDF:Minimum /wave=Minimum
-	Make /o/T/n=(numChannels+2) analysisWinDF:Titles /wave=Titles
+	Make /o/T/n=(numMethods,numChannels+2) df:ListWave /wave=ListWave=""
+	Make /o/n=(numMethods,numChannels+2) df:SelWave /wave=SelWave =32
+	Make /o/n=(numMethods,numChannels) df:Parameter /wave=Parameter=NaN
+	Make /o/n=(numMethods) df:AxisIndex /wave=AxisIndex, df:Minimum /wave=Minimum
+	Make /o/T/n=(numChannels+2) df:Titles /wave=Titles
 	for(i=0;i<numChannels;i+=1)
 		Variable red,green,blue; String titleStr
 		GetChanColor(i,red,green,blue)
@@ -1551,7 +1555,7 @@ Function AnalysisMethodListBoxUpdate()
 	
 	Titles[numChannels]="All"
 	Titles[numChannels+1]="Show"
-	sVar /z/sdfr=analysisWinDF methodSelected=selected
+	sVar /z/sdfr=df methodSelected=selected
 	i=0
 	do
 		String analysisMethod=StringFromList(i,analysisMethods)
@@ -1650,7 +1654,7 @@ End
 Function AnalysisSelector(flag)
 	Variable flag
 	
-	dfref analysisWin=Core#PackageHome(module,"analysisWin")
+	dfref analysisWin=Core#InstanceHome(module,"analysisWin","win0")
 	variable numChannels=GetNumChannels()
 	Wave /T Labels=GetChanLabels()
 	Make /o/T/n=(numChannels+2) analysisWin:Titles /wave=Titles
@@ -1705,32 +1709,42 @@ Function AnalysisSelector(flag)
 End
 
 // The window that plots the region right after stimulation, as well as the stimulus artifact (sodium current), and the beginning of the test pulse.  
-Function SweepsWindow()
-	DoWindow /K SweepsWin
+Function SweepsWindow([instance])
+	string instance
+	
+	instance = selectstring(!paramisdefault(instance),"_default_",instance)
+	string win = "sweepsWin"
+	string package = win
+	Core#CopyInstance(module,package,instance,"win0")
+	DoWindow /K $win
 	SetDataFolder root:
-	Struct rect win
-	IgorWinCoords(win)
-	if(DataFolderExists("root:Packages:Profiles:Macros"))
-	      SVar /Z winRec=root:Packages:Profiles:Macros:SweepsWin 
-	endif
-      Variable oldCoords=0
-      if(SVar_Exists(winRec))
-      		oldCoords=ExtractCoordsFromWinRec(winRec,win)==0
-     	else
-      		win.left+=1
-      		win.right-=1
-      		win.bottom=(win.bottom-win.top)*0.6-1
-      endif
-      
-      variable fsize=GetFontSize()
-	Display /N=SweepsWin /W=(win.left,win.top,win.right,win.bottom) /K=2 as "Sweeps"
+	Struct rect coords
+	variable use_default_coords = 1
+	if(!paramisdefault(instance) && Core#InstanceExists(module,package,instance))
+		coords.left = Core#VarPackageSetting(module,package,instance,"left",sub="position")
+  	coords.top = Core#VarPackageSetting(module,package,instance,"top",sub="position")
+  	coords.right = Core#VarPackageSetting(module,package,instance,"right",sub="position")
+  	coords.bottom = Core#VarPackageSetting(module,package,instance,"bottom",sub="position")
+		if(coords.right > 10 && coords.bottom > 10) // Sane coordinates.  
+			use_default_coords = 0  
+  	endif
+  endif
+  if(use_default_coords)
+  	IgorWinCoords(coords)
+		coords.left+=1
+  	coords.right-=1
+  	coords.bottom=(coords.bottom-coords.top)*0.6-1
+  endif
+  	
+  variable fsize=GetFontSize()
+	Display /N=$win /W=(coords.left,coords.top,coords.right,coords.bottom) /K=2 as "Sweeps"
 	Button SetBaselineRegion,pos={575,3},size={75,15},fsize=fsize+1, proc=SweepsWinButtons,title="Set Baseline"
 	Checkbox AutoBaseline,pos={655,3},title="Auto"
 	string default_view=Core#StrPackageSetting(module,"random","","defaultView",default_="Broad")
 	Checkbox SwitchView, pos={700,3},size={100,29},proc=SweepsWinCheckboxes,title="Focus",userData=default_view
 	Button ResetSweepAxes,pos={575,20},size={75,15},fsize=fsize+1,proc=SweepsWinButtons,title="Restore Axes"
-	PopupMenu SweepOverlay,pos={655,20},title="Sweep Overlay",mode=0,value=#"PopupOptions(\"SweepsWin\",\"SweepOverlay\",\"Stack;By Mode;Split\")",userData(selected)="Split",proc=SweepsWinPopupMenus
-	PopupMenu PulseOverlay,pos={755,20},title="Pulse Overlay",mode=0,value=#"PopupOptions(\"SweepsWin\",\"PulseOverlay\",\"None;Stacked\")",userData(selected)="None",proc=SweepsWinPopupMenus
+	PopupMenu SweepOverlay,pos={655,20},title="Sweep Overlay",mode=0,value=#("PopupOptions(\""+win+"\",\"SweepOverlay\",\"Stack;By Mode;Split\")"),userData(selected)="Split",proc=SweepsWinPopupMenus
+	PopupMenu PulseOverlay,pos={755,20},title="Pulse Overlay",mode=0,value=#("PopupOptions(\""+win+"\",\"PulseOverlay\",\"None;Stacked\")"),userData(selected)="None",proc=SweepsWinPopupMenus
 	//Button SaveWin, pos={725,3},size={75,15},proc=SweepsWinButtons,title="Save Window"
 	//Button LoadWin, pos={725,20},size={75,15},proc=SweepsWinButtons,title="Load Window"
 	
@@ -1743,7 +1757,7 @@ Function SweepsWindow()
 	Checkbox Range,pos={405,1}, title="Range",value=0,disable=0,proc=SweepsWinCheckboxes
 	Checkbox LastSweep,pos={405,18},title="Last Sweep",value=1,proc=SweepsWinCheckboxes
 	SetVariable Inc,pos={504,35},title="Inc",value=_NUM:1, limits={1,Inf,1},disable=1,proc=SweepsWinSetVariables
-	DoUpdate; GetWindow SweepsWin,wsizeDC
+	DoUpdate; GetWindow $win,wsizeDC
 	
 	//Button RemoveAllTraces pos={V_right-284,5}, size={100,29}, title="Remove Traces", proc=RemoveTracesWrap
 	Button WaveSelector,pos={V_right-303,5},size={100,29},fsize=fsize+2,proc=SweepsWinButtons,title="Selector"
@@ -1768,7 +1782,7 @@ Function SweepsWindow()
 	SwitchView(default_view) // Set broad or focused (check user data for SwitchView button)	
 	ResetSweepAxes(default_view)
 	SweepsWinControlsUpdate()
-	SetWindow SweepsWin hook(mainHook)=SweepsWinHook
+	SetWindow $win hook(mainHook)=SweepsWinHook
 	struct wmwinhookstruct info
 	info.eventName="resize"
 	SweepsWinHook(info)
@@ -2620,7 +2634,7 @@ End
 Function AnalysisMethodSubSelections(axisNum)
 	variable axisNum
 	
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#InstanceHome(module,"analysisWin","win0")
 	wave /t/sdfr=analysisWinDF ListWave
 	wave /sdfr=analysisWinDF SelWave,AxisIndex
 	
@@ -2656,7 +2670,6 @@ Function AnalysisMethodSubSelections(axisNum)
 				SetWindow SweepsWin hook=$""
 				Cursor /W=SweepsWin A,$trace,x_left-offset
 				Cursor /W=SweepsWin B,$trace,x_right-offset
-				SetWindow SweepsWin hook=RefreshHook
 			endif
 		endif
 	endif	
@@ -2866,7 +2879,7 @@ Function AnalysisWinCheckboxes(ctrlName,val) : CheckboxControl
 	String ctrlName
 	Variable val
 	
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#InstanceHome(module,"analysisWin","win0")
 	wave /t/sdfr=analysisWinDF ListWave
 	wave /sdfr=analysisWinDF SelWave,Parameter
 	variable methodIndex=0
@@ -2928,7 +2941,7 @@ Function MoveCursor(curs,num)
 		cursorSweepNum=num
 	endif
 	if(!strlen(cursorInfo))
-		SwitchView("New Sweep") // Since we didn't go through RefreshHook, let's do SwitchView from here.  
+		SwitchView("New Sweep") // Since we didn't go through SweepsWinHook, let's do SwitchView from here.  
 	else
 		String cursorTrace=StringByKey("TName",cursorInfo)
 		// If the cursor's trace is hidden, move to the cursor to the top visible trace
@@ -2943,7 +2956,12 @@ Function MoveCursor(curs,num)
 		if(WhichListItem(curs,"A;B")>=0)
 			Cursor /W=AnalysisWin /P $curs $cursorTrace num
 		endif
-		RefreshHook("WINDOW:AnalysisWin;EVENT:cursormoved;CURSOR:"+curs+";POINT:"+num2str(num)+";")
+		struct wmwinhookstruct info
+		info.winname = "analysisWin"
+		info.eventName = "cursormoved"
+		info.cursorName = curs
+		info.pointNumber = num
+		AnalysisWinHook(info)
 	endif
 	// There is a hook function in AnalysisWin that checks to see if the cursor has moved.  
 	// If it has, it updates the window "SweepsWin".  
@@ -3273,44 +3291,44 @@ function SweepsWinHook(info)
 			string method=SelectedMethod()
 			if(strlen(method))
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method,create=1)
-				ControlInfo /W=SweepsWin SwitchView; String view=S_userdata
+				ControlInfo /W=$info.winname SwitchView; String view=S_userdata
 				Variable focused=StringMatch(view,"Focused")
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
 				strswitch(info.cursorName)
 					case "A":
-						variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
+						variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win=info.winname) : xcsr(A,info.winname)
 						break
 					case "B":
-						variable /G instanceDF:$("x_right_"+view)=focused ? xcsr2("B",win="SweepsWin") : xcsr(B,"SweepsWin")
+						variable /G instanceDF:$("x_right_"+view)=focused ? xcsr2("B",win=info.winname) : xcsr(B,info.winname)
 						break
 					endswitch
 				endif
 			break
 		case "resize":
-			if(!WinType("SweepsWin"))
+			if(!WinType(info.winname))
 				return -1
 			endif
-			GetWindow SweepsWin,wsizeDC
-			Variable narrow=(V_right-V_left<1200)
-			ControlBar /W=SweepsWin /L 105*narrow
+			GetWindow $info.winname,wsizeDC
+			Variable narrow = (V_right-V_left<1275)
+			ControlBar /W=$info.winname /L 105*narrow
 			variable numChannels=GetNumChannels()
 			String sweepsWinButtons="WaveSelector;Logger"
 			variable i
 			for(i=0;i<ItemsInList(sweepsWinButtons);i+=1)
 				String buttonName=StringFromList(i,sweepsWinButtons)
 				Variable ypos=max(3,numChannels)*18+5
-				Button $buttonName pos={narrow ? 2 : V_right-(2-i)*201,narrow ? ypos+i*35 : 5}, fsize=GetFontSize()+2, win=SweepsWin
+				Button $buttonName pos={narrow ? 2 : V_right-(2-i)*201,narrow ? ypos+i*35 : 5}, fsize=GetFontSize()+2, win=$info.winname
 			endfor
 			break
 		case "modified":
-			ControlInfo /W=SweepsWin sweepOverlay
+			ControlInfo /W=$info.winname sweepOverlay
 			if(v_flag<=0 || !StringMatch(ClearBrackets(s_value),"Split"))
 				break
 			endif
-			String axes=AxisList("SweepsWin")
+			String axes=AxisList(info.winname)
 			for(i=0;i<ItemsInList(axes);i+=1)
 				String axis=StringFromList(i,axes)
-				String axis_info=AxisInfo("SweepsWin",axis)
+				String axis_info=AxisInfo(info.winname,axis)
 				String axisType=StringByKey("AXTYPE",axis_info)
 				if((StringMatch(axisType,"left") || StringMatch(axisType,"right")) && !StringMatch(axis,"Stim*") && !StringMatch(axis,"TestPulse*"))
 					SweepsWinVertAxisOffsets(axis)
@@ -3319,34 +3337,109 @@ function SweepsWinHook(info)
 		case "mousedown":
 			string str
 			structput /s info.mouseLoc str
-			SetWindow SweepsWin userData(mouseDown)=str
+			SetWindow $info.winname userData(mouseDown)=str
 			if(info.mouseLoc.v<30)
-				PopupContextualMenu Core#ListPackageInstances(module,"sweepsWin")+"_Save_"
+				PopupContextualMenu Core#ListPackageInstances(module,info.winname)+"_Save_"
 				if(v_flag>=0)
-					SelectPackageInstance("sweepsWin",s_selection)
+					SelectPackageInstance(info.winname,s_selection)
 				endif
 			endif
 			break
 		case "mouseup":
 			structput /s info.mouseLoc str
-			SetWindow SweepsWin userData(mouseUp)=str
+			SetWindow $info.winname userData(mouseUp)=str
 			break
 	endswitch
 end
 
-Function RefreshHook(info_str)
-	string info_str
+function AnalysisWinHook(info)
+	struct WMWinHookStruct &info
+	if(info.eventCode==4)
+		return 0
+	endif
+	variable lock_cursors=Core#VarPackageSetting(module,"random","","lockCursors")
+	strswitch(info.eventName)
+		case "cursormoved":
+			string cursorName=info.cursorname
+			nvar /z/sdfr=GetStatusDF() cursorNum=$("cursorSweepNum_"+cursorName)
+			Variable value
+			Variable sweepNum=info.pointnumber
+			if(NVar_exists(cursorNum) && strlen(CsrInfo($cursorName,info.winname)))
+				cursorNum=sweepNum
+				value=xcsr($cursorName,info.winname)
+				//Cursor /H=2/W=Membrane_Constants $cursor_name,$LongestVisibleTrace(win="Membrane_Constants"),value
+			endif
+			SwitchView("New Sweep")
+			if(lock_cursors && StringMatch(cursorName,"A"))
+				Variable spacing=10
+				Cursor /W=$info.winname B,$LongestVisibleTrace(win=info.winname),value+spacing
+				//Cursor /H=2/W=Membrane_Constants B,$LongestVisibleTrace(win="Membrane_Constants"),value+spacing
+			endif
+			break
+		case "mouseup":
+			Variable xpixel=info.mouseLoc.h
+			GetWindow $info.winname wsizeDC
+			Variable width=(V_right-V_left)
+			variable isNarrow=str2num(getuserdata(info.winname,"","isNarrow"))
+			Variable xFrac=(xpixel-105*isNarrow)/(width-105*isNarrow)
+			if(xFrac>0 && (xFrac<0.04 || xFrac>0.96)) // Outside the plot area but not in the control bar.  
+				Variable ypixel=info.mouseLoc.v
+				String axisName=GetYAxisFromClick(ypixel,win=info.winname)
+				Variable axisNum
+				sscanf axisName,"Axis_%d",axisNum
+				if(strlen(axisName) && axisNum>=0)
+					AnalysisMethodSubSelections(axisNum)
+				endif
+			endif
+		case "resize":
+			if(!WinType(info.winname))
+				return -1
+			endif
+			GetWindow $info.winname,wsizeDC
+			variable narrow = (V_right-V_left<900)
+			ControlBar /W=$info.winname /L 105*narrow
+			SetWindow $info.winname, userData(isNarrow)=num2str(narrow)
+			String analysisWinControls="Parameter;Minimum;Value_0;Value_1;SweepNum_A;SweepNum_B"
+			if(!narrow)
+				analysisWinControls = ReverseListOrder(analysisWinControls)
+			endif
+			variable numControls=itemsinlist(analysisWinControls)
+			variable xx = v_right
+			variable i,j
+			for(i=0;i<ItemsInList(analysisWinControls);i+=1)
+				String controlNames=StringFromList(i,analysisWinControls)
+				strswitch(controlNames)
+					case "Value_0":
+						controlNames = ControlNameList(info.winname,";","column_0_*")
+						break
+					case "Value_1":
+						controlNames = ControlNameList(info.winname,";","column_1_*")
+						break
+					default:
+				endswitch
+				for(j=0;j<itemsinlist(controlNames);j+=1)
+					string controlName = stringfromlist(j,controlNames)
+					ControlInfo /W=$info.winname $controlName
+					Variable isPopup=(V_flag==3)
+					xx -= 80+isPopup*25
+					ModifyControl /Z $controlName pos={narrow ? 2 : xx,narrow ? 30+i*25 : numControls-isPopup*3}, win=$info.winname
+				endfor
+			endfor
+			break
+	endswitch
+end
+
+Function SelectorHook(info)
+	struct WMWinHookStruct &info
 	
-	string win=StringByKey("WINDOW",info_str)
-	string event=StringByKey("EVENT",info_str)
-	string fullWin=win
-	win=selectstring(stringMatch(win,"*_Selector"),win,"Selector")
+	if(info.eventCode==4)
+		return 0
+	endif
+	string win = info.winName
 	variable i,fsize=GetFontSize()
-	strswitch(win)
-		case "Selector":	
-			string DAQ=GetUserData(fullWin,"","DAQ")
-			strswitch(event)
-				case "killvote":
+	string DAQ=GetUserData(win,"","DAQ")
+	strswitch(info.eventName)
+		case "killvote":
 //					if(stringmatch(winname(0,65),fullWin))
 //						DoAlert 1,"Are you sure you want to kill this DAQ?\rIt's acquisition will stop.  It can be re-added from the menu."
 //						if(v_flag==1)
@@ -3354,24 +3447,23 @@ Function RefreshHook(info_str)
 //							DoWindow /K $fullWin
 //						endif
 //					endif
-					break
-				case "moved":
-					Struct rect coords
-					Struct rect igorCoords
-					Core#GetWinCoords(fullWin,coords)
-					IgorWinCoords(igorCoords)
-					if(coords.top+100<(igorCoords.bottom)*ScreenResolution/72) // If window was not just minimized.  
-						
-						if(strlen(DAQ))
-							dfref df=GetDaqDF(DAQ)
-							variable /g df:left=coords.left, df:top=coords.top, df:right=coords.right, df:bottom=coords.bottom
-						endif
-					endif
-					break
-				case "mousedown":
-					if(NumberByKey("MODIFIERS",info_str) & 16)
-						//string DAQs=GetDAQs()
-						PopupContextualMenu /N "SelectorContext"
+			break
+		case "moved":
+			Struct rect coords
+			Struct rect igorCoords
+			Core#GetWinCoords(win,coords)
+			IgorWinCoords(igorCoords)
+			if(coords.top+100<(igorCoords.bottom)*ScreenResolution/72) // If window was not just minimized.  
+				if(strlen(DAQ))
+					dfref df=GetDaqDF(DAQ)
+					variable /g df:left=coords.left, df:top=coords.top, df:right=coords.right, df:bottom=coords.bottom
+				endif
+			endif
+			break
+		case "mousedown":
+			if(info.eventMod & 16)
+				//string DAQs=GetDAQs()
+				PopupContextualMenu /N "SelectorContext"
 //						if(V_flag==1)
 //							MakeQuickPulseSetsPanel(selectorWin=fullWin)
 //						elseif(V_flag>=3)
@@ -3382,141 +3474,7 @@ Function RefreshHook(info_str)
 //								DoWindow /B $(currDAQ+"_Selector")
 //							endif
 //						endif
-					endif
-					break
-			endswitch
-			break
-		case "DrugWin":
-			break
-		case "SweepsWin":
-			//SetWindow SweepsWin hook=$""
-			strswitch(event)
-				case "cursormoved":
-					String method=SelectedMethod()
-					if(strlen(method))
-						dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method,create=1)
-						ControlInfo /W=SweepsWin SwitchView; String view=S_userdata
-						Variable focused=StringMatch(view,"Focused")
-						String cursorName=StringByKey("cursor",info_str)
-						dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
-						strswitch(cursorName)
-							case "A":
-								variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
-								break
-							case "B":
-								variable /G instanceDF:$("x_right_"+view)=focused ? xcsr2("B",win="SweepsWin") : xcsr(B,"SweepsWin")
-								break
-						endswitch
-					endif
-					break
-				case "resize":
-					if(!WinType("SweepsWin"))
-						return -1
-					endif
-					GetWindow SweepsWin,wsizeDC
-					Variable narrow=(V_right-V_left<1200)
-					ControlBar /W=SweepsWin /L 105*narrow
-					variable numChannels=GetNumChannels()
-					String sweepsWinButtons="WaveSelector;Logger"
-					for(i=0;i<ItemsInList(sweepsWinButtons);i+=1)
-						String buttonName=StringFromList(i,sweepsWinButtons)
-						Variable ypos=max(3,numChannels)*18+5
-						Button $buttonName pos={narrow ? 2 : V_right-(2-i)*201,narrow ? ypos+i*35 : 5}, fsize=fsize+2, win=SweepsWin
-					endfor
-					break
-				case "modified":
-					ControlInfo /W=SweepsWin sweepOverlay
-					if(v_flag<=0 || !StringMatch(ClearBrackets(s_value),"Split"))
-						break
-					endif
-					String axes=AxisList("SweepsWin")
-					for(i=0;i<ItemsInList(axes);i+=1)
-						String axis=StringFromList(i,axes)
-						String axis_info=AxisInfo("SweepsWin",axis)
-						String axisType=StringByKey("AXTYPE",axis_info)
-						if((StringMatch(axisType,"left") || StringMatch(axisType,"right")) && !StringMatch(axis,"Stim*") && !StringMatch(axis,"TestPulse*"))
-							SweepsWinVertAxisOffsets(axis)
-						endif
-					endfor
-				case "mousedown":
-					struct point mouseDown
-					mouseDown.h=NumberByKey("MouseX",info_str)
-					mouseDown.v=NumberByKey("MouseY",info_str)
-					string str
-					structput /s mouseDown str
-					SetWindow SweepsWin userData(mouseDown)=str
-					if(mouseDown.v<30)
-						PopupContextualMenu Core#ListPackageInstances(module,"sweepsWin")+"_Save_"
-					endif
-					break
-				case "mouseup":
-					struct point mouseUp
-					mouseUp.h=NumberByKey("MouseX",info_str)
-					mouseUp.v=NumberByKey("MouseY",info_str)
-					structput /s mouseUp str
-					SetWindow SweepsWin userData(mouseUp)=str
-					break
-			endswitch
-			//SetWindow SweepsWin hook=RefreshHook
-			break
-		case "AnalysisWin":
-			variable lock_cursors=Core#VarPackageSetting(module,"random","","lockCursors")
-			strswitch(event)
-				case "cursormoved":
-					cursorName=StringByKey("CURSOR",info_str)
-					nvar /z/sdfr=GetStatusDF() cursorNum=$("cursorSweepNum_"+cursorName)
-					Variable value
-					Variable sweepNum=str2num(StringByKey("POINT",info_str))
-					if(NVar_exists(cursorNum) && strlen(CsrInfo($cursorName,win)))
-						cursorNum=sweepNum
-						value=xcsr($cursorName,"AnalysisWin")
-						//Cursor /H=2/W=Membrane_Constants $cursor_name,$LongestVisibleTrace(win="Membrane_Constants"),value
-					endif
-					SwitchView("New Sweep")
-					if(lock_cursors && StringMatch(cursorName,"A"))
-						Variable spacing=10
-						Cursor /W=AnalysisWin B,$LongestVisibleTrace(win="AnalysisWin"),value+spacing
-						//Cursor /H=2/W=Membrane_Constants B,$LongestVisibleTrace(win="Membrane_Constants"),value+spacing
-					endif
-					break
-				case "mouseup":
-					Variable xpixel=NumberByKey("MOUSEX",info_str)
-					GetWindow AnalysisWin wsizeDC
-					Variable width=(V_right-V_left)
-					variable isNarrow=str2num(getuserdata("AnalysisWin","","isNarrow"))
-					Variable xFrac=(xpixel-105*isNarrow)/(width-105*isNarrow)
-					if(xFrac>0 && (xFrac<0.04 || xFrac>0.96)) // Outside the plot area but not in the control bar.  
-						Variable ypixel=NumberByKey("MOUSEY",info_str)
-						String axisName=GetYAxisFromClick(ypixel,win="AnalysisWin")
-						Variable axisNum
-						sscanf axisName,"Axis_%d",axisNum
-						if(strlen(axisName) && axisNum>=0)
-							AnalysisMethodSubSelections(axisNum)
-						endif
-					endif
-				case "resize":
-					if(!WinType("AnalysisWin"))
-						return -1
-					endif
-					GetWindow AnalysisWin,wsizeDC
-					narrow=(V_right-V_left<900)
-					ControlBar /W=AnalysisWin /L 105*narrow
-					SetWindow analysisWin, userData(isNarrow)=num2str(narrow)
-					String analysisWinControls="Parameter;Minimum;Value_0;Value_1;SweepNum_A;SweepNum_B"
-					if(!narrow)
-						analysisWinControls = ReverseListOrder(analysisWinControls)
-					endif
-					variable numControls=itemsinlist(analysisWinControls)
-					variable xx = v_right
-					for(i=0;i<ItemsInList(analysisWinControls);i+=1)
-						String controlName=StringFromList(i,analysisWinControls)
-						ControlInfo /W=AnalysisWin $controlName
-						Variable isPopup=(V_flag==3)
-						xx -= 80+isPopup*25
-						ModifyControl /Z $controlName pos={narrow ? 2 : xx,narrow ? 30+i*25 : numControls-isPopup*3}, win=AnalysisWin
-					endfor
-					break
-			endswitch
+			endif
 			break
 	endswitch
 End

@@ -43,6 +43,11 @@ static constant maxDAQs=10
 #include "SIDX6 Wrappers"
 #endif
 
+#if !exists("ITC18Init") && !exists("DAQmx_Scan") && !exists("LIH_InitInterface")
+#define NoDAQ
+#include "No DAQ Wrappers"
+#endif
+
 function /s DAQTypes()
 	return "ITC;LIH;NIDAQmx;"
 end

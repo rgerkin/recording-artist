@@ -85,25 +85,19 @@ Function Initialization([profileName,acqInstance])
 	Core#SetSelectedInstance(module,"Acq",acqInstance)
 	
 	variable defaults=stringmatch(acqInstance,"_default_")
-	if(defaults)
-		printf "Initializing experiment using default acquisition settings.\r"
-	else
-		printf "Initializing experiment from Acquisition instance %s.\r",acqInstance
-	endif
 
 	variable fsize=GetFontSize()
 	DefaultGuiFont all= {"Arial",fsize,0}
 	Make /o/D/n=0 root:SweepT // Time of each sweep, in minutes since experiment start.  
 	BoardInit() // Initializes A/D Interface.  
-	DoWindow /K AnalysisWin; DoWindow /K SweepsWin; DoWindow /K Selector // Removes all graphs 
-	if(defaults || Core#ExecuteProfileMacro(module,"SweepsWin","",1)<0)
-		SweepsWindow()
-	endif
-	SweepsWinControlsUpdate()
-	if(defaults || Core#ExecuteProfileMacro(module,"AnalysisWin","",1)<0 || AnalysisMethodListBoxUpdate())
-		AnalysisWindow()
-	endif
-
+	DoWindow /K Selector
+	
+	string sweepsWinInstance = Core#StrPackageSetting(module,"Acq",acqInstance,"sweepsWin")
+	SweepsWindow(instance=sweepsWinInstance)
+	
+	string analysisWinInstance = Core#StrPackageSetting(module,"Acq",acqInstance,"analysisWin")
+	AnalysisWindow(instance=analysisWinInstance)
+	
 	string defaultDataDir=SpecialDirPath("Desktop",0,0,0)+"Data"
 	string dataDir=Core#StrPackageSetting(module,"random","","dataDir",default_=defaultDataDir)
 	NewPath /C/Z/O/Q Data, dataDir
@@ -121,7 +115,13 @@ Function Initialization([profileName,acqInstance])
 	InitAxon()
 #endif
 	Variable /G root:status:acqInit=1
-	printf "Initialized acquisition @ %s\r",time()
+	string how,init_msg = "Initialized experiment %s @ %s\r"
+	if(defaults)
+		how = "using default acquisition settings"
+	else
+		sprintf how,"from Acquisition instance %s",acqInstance
+	endif
+	printf init_msg,how,time()
 End
 
 Function /s InitializeVariables([acqInstance,noContainers,quiet])
@@ -262,7 +262,10 @@ Function SetNumChannels(info) : SetVariableControl
 	ControlBar /T/W=SweepsWin max(3,GetNumChannels())*18+3 
 	SwitchView("")
 	
-	RefreshHook("WINDOW:SweepsWin;EVENT:resize") // Mark selector window as resized.  
+	struct wmwinhookstruct info2
+	info2.winname = "sweepsWin"
+	info2.eventName = "resize"
+	SweepsWinHook(info2) // Mark Sweeps window as resized.  
 End
 
 function ActivateChan(chan[,DAQ])

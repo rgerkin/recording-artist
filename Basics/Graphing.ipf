@@ -1890,9 +1890,6 @@ Function RestoreCursors(name[,trace,win,offset])
 	if(err)
 		Cursors(win=win)
 	endif
-	if(wintype("SweepsWin"))
-		SetWindow SweepsWin hook=RefreshHook
-	endif
 	return err
 End
 

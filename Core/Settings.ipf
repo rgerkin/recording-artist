@@ -295,7 +295,7 @@ function ShowPackageInstance(module,package,instance,x,y[,generic,sub,hideVars,f
 				ShowPackageInstanceObject(module,package,instance,object,info+"_0",x,y,yJump,generic=generic,sub=sub,hideVars=hideVars,firstInstance=firstInstance)
 				ShowPackageInstance(module,package,instance,x,y,generic=generic,sub=joinpath({sub,object}),hideVars=hideVars,firstInstance=firstInstance)
 				//isSubPackage_=1
-				continue
+				//continue
 				break
 		endswitch
 		//if(isSubPackage_)
@@ -2697,6 +2697,9 @@ function LoadPackageFromManifest(module,package[,sub,quiet])
 			string objectLoc=getdatafolder(1,sourceObject)
 			string type=ObjectType(objectLoc+"value")
 			strswitch(type)
+				case "FLDR": // Subpackage.  
+					LoadPackageFromManifest(module,package,sub=joinpath({sub,object}),quiet=quiet) // Load recursively.  
+					break
 				case "WAV":
 					wave /z WAVvalue=sourceObject:value
 					duplicate /o WAVvalue dest:$object
@@ -2738,7 +2741,7 @@ function RunInstanceGenerators(module,package,instance[,context,sub,quiet])
 	
 	context=selectstring(!paramisdefault(context),"",context)
 	sub=selectstring(!paramisdefault(sub),"",sub)
-	dfref manifestDF=PackageManifest(module,package,quiet=quiet)
+	dfref manifestDF=PackageManifest(module,package,sub=sub,quiet=quiet)
 	variable i,err=0
 	for(i=0;i<CountObjectsDFR(manifestDF,4);i+=1)
 		string object=GetIndexedObjNameDFR(manifestDF,4,i)

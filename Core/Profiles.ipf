@@ -858,16 +858,16 @@ function LoadProfile(profile[,quiet])
 	return v_flag
 end
 
-// The old way of defining packages.  Scheduled for deletion.  
-Function LoadPackageDefinitionsOld()
-	NewDataFolder /O/S root:Packages
-	NewDataFolder /O/S profiles
-	NewDataFolder /O/S Acq
-	String /G acqModesSettings="VAR:inputGain=1000,outputGain=1000,testPulsestart,testPulselength,testPulseampl;CHECK:dynamic=0;STR:inputUnits,outputUnits;"
-	String /G analysisMethodsSettings="VAR:axisMin,axisMax=100,axisSize=1;CHECK:show=1,crossChannel,logScale;STR:units=#;WAVE:marker=19|8,mSize=3|3,active=channels,analysisWin|Minimum=channels,analysisWin|parameter,analysisWin|features=1|0"
-	String /G channelConfigsSettings="VAR:filters|notchFreq=60,filters|notchHarmonics=10,filters|wyldpointWidth=3,filters|wyldpointThresh=0,filters|lowFreq=200,filters|highFreq=1,red,green,blue;CHECK:filters|notch,filters|wyldpoint,filters|low,filters|high,filters|zero,filters|powerSpec;STR:inputMap=N,outputMap=N,acqMode,stimulusName;"
-	String /G stimuliSettings="VAR:pulseSets=1,duration=1,ISI=2,saveMode=2;CHECK:continuous;STR:acqmode;WAVE:divisor,remainder,width,ampl,dampl,pulses,IPI,begin,testPulseOn;"
-	String /G randomSettings="VAR:lblpos|Axis Label Position|0|100|1,fsize|Font Size|6|24|1,ITC_kHz|ITC kHz|0.1|100|1,NIDAQ_kHz|NIDAQ kHz|0.1|100|1;CHECK:lineFeedLabels|Axis Label Line Breaks|0|1|1;STR:defaultView|Default Sweeps View|Broad|Focused,dataDir:Default Data Directory;"
-	String /G sealtestSettings="VAR:left=10,top=10;right=800;bottom=600"
-	String /G selectorSettings="VAR:left=10,top=10;right=800;bottom=600"
-End
+//// The old way of defining packages.  Scheduled for deletion.  
+//Function LoadPackageDefinitionsOld()
+//	NewDataFolder /O/S root:Packages
+//	NewDataFolder /O/S profiles
+//	NewDataFolder /O/S Acq
+//	String /G acqModesSettings="VAR:inputGain=1000,outputGain=1000,testPulsestart,testPulselength,testPulseampl;CHECK:dynamic=0;STR:inputUnits,outputUnits;"
+//	String /G analysisMethodsSettings="VAR:axisMin,axisMax=100,axisSize=1;CHECK:show=1,crossChannel,logScale;STR:units=#;WAVE:marker=19|8,mSize=3|3,active=channels,analysisWin|Minimum=channels,analysisWin|parameter,analysisWin|features=1|0"
+//	String /G channelConfigsSettings="VAR:filters|notchFreq=60,filters|notchHarmonics=10,filters|wyldpointWidth=3,filters|wyldpointThresh=0,filters|lowFreq=200,filters|highFreq=1,red,green,blue;CHECK:filters|notch,filters|wyldpoint,filters|low,filters|high,filters|zero,filters|powerSpec;STR:inputMap=N,outputMap=N,acqMode,stimulusName;"
+//	String /G stimuliSettings="VAR:pulseSets=1,duration=1,ISI=2,saveMode=2;CHECK:continuous;STR:acqmode;WAVE:divisor,remainder,width,ampl,dampl,pulses,IPI,begin,testPulseOn;"
+//	String /G randomSettings="VAR:lblpos|Axis Label Position|0|100|1,fsize|Font Size|6|24|1,ITC_kHz|ITC kHz|0.1|100|1,NIDAQ_kHz|NIDAQ kHz|0.1|100|1;CHECK:lineFeedLabels|Axis Label Line Breaks|0|1|1;STR:defaultView|Default Sweeps View|Broad|Focused,dataDir:Default Data Directory;"
+//	String /G sealtestSettings="VAR:left=10,top=10;right=800;bottom=600"
+//	String /G selectorSettings="VAR:left=10,top=10;right=800;bottom=600"
+//End

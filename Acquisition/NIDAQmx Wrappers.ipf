@@ -67,8 +67,7 @@ static Function /s OutputChannelList([DAQ])
 	return list
 end
 
-static Function SpeakReset(device[,DAQ])
-	variable device
+static Function SpeakReset([DAQ])
 	String DAQ
 	
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQtype),DAQ)
