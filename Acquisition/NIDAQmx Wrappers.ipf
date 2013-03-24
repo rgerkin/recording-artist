@@ -30,11 +30,13 @@ static function /s GetDAQDevices([types])
 	return fDAQmx_DeviceNames()
 end
 
-static function /s DAQType(DAQ)
+static function /s DAQType(DAQ[,quiet])
 	string DAQ
+	variable quiet
 	
 	return "NIDAQmx"
 end
+
 
 static function /s DAQ2Device(DAQ) // TO DO: Make DAQ map onto a device number.  
 	string DAQ

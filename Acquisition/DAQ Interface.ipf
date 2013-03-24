@@ -49,7 +49,7 @@ static constant maxDAQs=10
 #endif
 
 function /s DAQTypes()
-	return "ITC;LIH;NIDAQmx;"
+	return "ITC;LIH;NIDAQmx;NoDAQ"
 end
 
 function /s GetDAQDevices([types])
@@ -221,7 +221,25 @@ function /s DAQType(DAQ[,quiet])
 	string DAQ
 	variable quiet
 	
-	return Core#StrPackageSetting(module,"DAQs",DAQ,"type",quiet=quiet)
+	if(strlen(DAQ) && !stringmatch(DAQ,"_default_"))
+		string result = Core#StrPackageSetting(module,"DAQs",DAQ,"type",quiet=quiet)
+	else
+		result = ""
+		string types=DAQTypes() 
+		variable i
+		for(i=0;i<itemsinlist(types);i+=1)
+			string type=stringfromlist(i,types)
+			string funcName=type+"#"+GetRTStackInfo(1)
+			if(exists(funcName)==6 && strlen(type))
+				FuncRef DAQType f=$funcName
+				if(!numberbykey("ISPROTO",FuncRefInfo(f)))
+					result = f(DAQ,quiet=quiet) 
+					break
+				endif
+			endif
+		endfor
+	endif
+	return result
 end
 
 //// Returns 1 if this channel name is consistent with this type of DAQ.  

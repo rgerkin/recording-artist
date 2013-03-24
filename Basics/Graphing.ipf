@@ -848,6 +848,14 @@ Function IgorWinCoords(coords)
 	endif
 End
 
+function /s IgorWinCoords2()
+	Struct rect coords
+	IgorWinCoords(coords)
+	string result = num2str(coords.left)+";"+num2str(coords.top)+";"
+	result += num2str(coords.right)+";"+num2str(coords.bottom)+";"
+	return result
+end
+
 Function RegenLayout([replace,with,win])
 	String replace,with,win
 	

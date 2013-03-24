@@ -46,8 +46,9 @@ static function /s GetDAQDevices([types])
 	return "dev1"
 end
 
-static function /s DAQType(DAQ)
+static function /s DAQType(DAQ[,quiet])
 	string DAQ
+	variable quiet
 	
 	return "NoDAQ"
 end
@@ -173,7 +174,7 @@ static Function Speak(device,list,param[,now,DAQ])
 		variable start = numpnts(buffer)
 		redimension /n=(start+dimsize(w,0)) buffer
 		buffer[start,] = w[p-start]
-		printf "Speaking wrote to the buffer...\r"
+		//printf "Speaking wrote to the buffer...\r"
 		if(numpnts(buffer)>max_buffer_size)
 			PurgeOutput(i)
 			buffer = w[0]
@@ -247,10 +248,9 @@ static function Listening(s)
 		wave /sdfr=df buffer = $("ch"+num2str(i))
 		nvar /sdfr=df xx = $("x"+num2str(i))
 		if(numpnts(buffer)-xx >=numpnts(w))
-			print numpnts(buffer),xx,numpnts(w)
 			w = buffer[p+xx]
 			xx += numpnts(w)
-			printf "Listening read from the buffer...\r"
+			//printf "Listening read from the buffer...\r"
 		endif
 		if(numpnts(buffer)>max_buffer_size)
 			PurgeInput(i)
@@ -280,7 +280,7 @@ static function Waiting(s)
 		out_x += numpnts(response)
 		wave /sdfr=inDF in = $("ch"+num2str(i))
 		concatenate /np {response},in
-		printf "Added %d points to the input buffer.\r",numpnts(response)
+		//printf "Added %d points to the input buffer.\r",numpnts(response)
 	endfor
 	
 	// Extra inputs not matched up to any output.  
@@ -289,8 +289,10 @@ static function Waiting(s)
 		in = gnoise(1)
 	endfor	
 	
-	printf "Waiting executed once...\r"
+	//printf "Waiting executed once...\r"
 	t_update = now*1e6 + t_init
+	string DAQ = MasterDAQ()
+	CollectSweep(DAQ)
 	return 0
 end
 
@@ -323,5 +325,6 @@ static function /wave IO(w,start)
 	Convolve expo,convolved
 	copyscales /p w,convolved
 	duplicate /free/r=[start,] convolved,result
+	result += gnoise(0.0001)
 	return result
 end

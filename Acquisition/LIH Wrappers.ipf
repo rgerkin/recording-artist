@@ -8,6 +8,14 @@
 static strconstant module="Acq"
 static strconstant type=LIH
 
+static function /s DAQType(DAQ[,quiet])
+	string DAQ
+	variable quiet
+	
+	return "LIH"
+end
+
+
 static function /s InputChannelList([DAQ])
 	string DAQ
 	

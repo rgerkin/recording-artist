@@ -734,7 +734,7 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 		analysisMethods=SelectedMethod() // Plural here, the local variable to loop through.  Will have only one element because analysis is restricted to the argument.  
 	endif
 	wave /T Labels=GetChanLabels()
-	dfref df=Core#PackageHome(module,"analysisWin")
+	dfref df=Core#InstanceHome(module,"analysisWin","win0")
 	wave /t/sdfr=df ListWave
 	wave /sdfr=df SelWave
 	string measurementCompleted=""

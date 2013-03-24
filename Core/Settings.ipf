@@ -2634,7 +2634,7 @@ function /df CopyInstance(module,package,instance,newInstance[,sub,useGenerators
 		endif
 		instance = "_default_"
 	endif
-	if(stringmatch(instance,"_default_") || stringmatch(instance,"")) // If copying from default instance.  
+	if(stringmatch(instance,defaultInstance_) || stringmatch(instance,"_default_") || stringmatch(instance,"")) // If copying from default instance.  
 		if(!InstanceExists(module,package,defaultInstance_,quiet=quiet))
 			LoadPackageInstance(module,package,defaultInstance_,quiet=quiet)
 		endif
