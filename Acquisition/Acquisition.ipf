@@ -294,7 +294,8 @@ Function InitChan(chan[,DAQ,instance,noContainer,label_,quiet])
 	variable noContainer,quiet
 	
 	string name=GetChanName(chan)
-	label_ = selectstring(!paramisdefault(label_),"",label_)
+	string instance_label = Core#StrPackageSetting(module,"channelConfigs",name,"label_")
+	label_ = selectstring(!paramisdefault(label_),instance_label,label_)
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(quiet=quiet),DAQ)
 	string context
 	sprintf context,"_chan_:%d",chan
@@ -307,8 +308,8 @@ Function InitChan(chan[,DAQ,instance,noContainer,label_,quiet])
 	Core#InheritInstancesOrDefault(module,"channelConfigs","stimuli",{name},parentInstance=name,context=context,quiet=quiet)
 	Core#InheritInstancesOrDefault(module,"channelConfigs","filters",{name},parentInstance=name,context=context,quiet=quiet)
 	//SetAcqSetting("channelConfigs",name,"DAQ",DAQ)
-	//SetUniqueChanLabel(chan,label_=label_,quiet=quiet)
-	//SetUniqueChanColor(chan,quiet=quiet)
+	SetUniqueChanLabel(chan,label_=label_,quiet=quiet)
+	SetUniqueChanColor(chan,quiet=quiet)
 	wave /z chanHistory=GetChanHistory(chan,quiet=quiet)
 	if(!waveexists(chanHistory) && !noContainer)
 		InitChanContainer(chan,quiet=quiet)
@@ -632,7 +633,7 @@ Function CollectSweep(DAQ) // This function is called when the input data has be
 		
 	if(WhichListItem(DAQ,MasterDAQ())==0) // If this is the master DAQ.  
 		// Finish up tasks for this sweep.  
-		lastSweepT=lastDAQSweepT // Set the sweep time to be the sweep time for the master DAQ.  
+		lastSweepT=lastDAQSweepT // Set the sweep time to be the sweep time for the master DAQ. 
 		SweepT [currSweep] = {(lastSweepT-bootT) / (60*1000000)} // Convert from microseconds to minutes.  
 		//UpdateDrugs() // TO DO: Add this back.  
 		SaveSweepParameters()

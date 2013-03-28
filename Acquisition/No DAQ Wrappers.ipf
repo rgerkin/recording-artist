@@ -263,10 +263,17 @@ static function Waiting(s)
 	struct wmbackgroundstruct &s
 	
 	Speak(1,"",0)
+	
+	string DAQ=MasterDAQ(type=DAQtype)
+	dfref df = GetDAQdf(DAQ)
+	nvar /sdfr=df lastDAQSweepT
+	lastDAQSweepT=StopMSTimer(-2)
+	
 	nvar /sdfr=$noDAQ_path t_init,t_update
 	variable then = (t_update - t_init)/1e6
-	variable now = (stopmstimer(-2) - t_init)/1e6
+	variable now = (lastDAQSweepT - t_init)/1e6
 	variable elapsed = now - then
+	
 	//variable points = Hz*elapsed/1e6
 	dfref inDF = $input_path
 	dfref outDF = $output_path
@@ -291,7 +298,6 @@ static function Waiting(s)
 	
 	//printf "Waiting executed once...\r"
 	t_update = now*1e6 + t_init
-	string DAQ = MasterDAQ()
 	CollectSweep(DAQ)
 	return 0
 end
@@ -326,5 +332,6 @@ static function /wave IO(w,start)
 	copyscales /p w,convolved
 	duplicate /free/r=[start,] convolved,result
 	result += gnoise(0.0001)
+	result *= 1000
 	return result
 end

@@ -562,7 +562,7 @@ function /s SetUniqueChanLabel(chan[,label_,quiet])
 	variable i
 	do
 		if(InWavT(Labels,newLabel))
-			newLabel=label_+"_"+num2char(97+i)
+			newLabel += "_"+num2str(chan)
 			i+=1
 		else
 			break

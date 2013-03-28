@@ -145,7 +145,7 @@ Function WaveSelector([coords2,DAQ,instance])
 		DAQChan+=1
 		// Continued in PulseSetTabs.  
 	endfor
-	SetVariable NumChannels, limits={1,Inf,1}, pos={5,5}, variable=numDAQChannels, size={90,20}, title="# Channels", proc=SetNumChannels, userData=num2str(DAQChan)
+	SetVariable NumChannels, limits={1,Inf,1}, pos={5,5}, variable=numDAQChannels, size={90,20}, title="# Channels", proc=WaveSelectorSetVariables, userData=num2str(DAQChan)
 	Variable Universal_ypos=5+y_offset+numDAQChannels*y_height
 	SetDrawEnv fillpat=0; DrawRect 5,Universal_ypos-4,865,Universal_ypos+24
 	Button Preview,pos={605,Universal_ypos},size={75,20},title="\\Z10Preview",proc=WaveSelectorButtons
@@ -241,6 +241,9 @@ Function WaveSelectorSetVariables(info) : SetVariableControl
 	variable chan=str2num(StringFromList(1,info.ctrlName,"_"))
 	string DAQ=GetUserData(info.win,"","DAQ")
 	strswitch(type)
+		case "NumChannels":
+			SetNumChannels(info)
+			break
 		case "Label":
 			string oldLabel=Core#GetControlUserData(info.ctrlName,"oldLabel",win=info.win)
 			string label_=info.sval
@@ -3500,15 +3503,15 @@ Menu "SelectorContext",contextualmenu, dynamic
 		GetDAQInfo(""),/Q,GetLastUserMenuInfo;WaveSelector(DAQ=stringfromlist(0,s_value,","))
 	End
 	SubMenu "DAQ Instance"
-		Core#ListPackageInstances("Acq","DAQs",quiet=1)+"_Save_",/Q,GetLastUserMenuInfo;SelectPackageInstance("Acq","DAQs",s_value)
+		Core#ListPackageInstances("Acq","DAQs",quiet=1)+"_Save_",/Q,GetLastUserMenuInfo;Core#SelectPackageInstance("Acq","DAQs",s_value)
 	End
 	SubMenu "Change DAQ Type"
-		Core#PopupMenuOptions("Acq","DAQs",GetWinDAQ(),"type",brackets=1,quiet=1),/Q,GetLastUserMenuInfo;SetStrPackageSetting("Acq","DAQs",GetWinDAQ(),"type",ClearBrackets(s_value))
+		Core#PopupMenuOptions("Acq","DAQs",GetWinDAQ(),"type",brackets=1,quiet=1),/Q,GetLastUserMenuInfo;Core#SetStrPackageSetting("Acq","DAQs",GetWinDAQ(),"type",ClearBrackets(s_value))
 	End
 End
 
 Menu "DAQ Instance",contextualmenu, dynamic
-	Core#ListPackageInstances("Acq","DAQs",quiet=1),/Q,GetLastUserMenuInfo;SelectPackageInstance("Acq","DAQs",s_value); SetSelectedInstance("Acq","DAQs",s_value)
+	Core#ListPackageInstances("Acq","DAQs",quiet=1),/Q,GetLastUserMenuInfo;Core#SelectPackageInstance("Acq","DAQs",s_value); Core#SetSelectedInstance("Acq","DAQs",s_value)
 End
 
 Function MarkSelected(axisNum)

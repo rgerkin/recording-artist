@@ -223,7 +223,7 @@ Function SelectPackageInstance(package,instance[,special])
 			strswitch(instance)
 				case "_Save_":
 					string winDAQ=GetWinDAQ()
-					wave labels = GetChanLabels()
+					wave /t labels = GetChanLabels()
 					do
 						string targetDAQ = Core#DefaultInstance(module,package)
 						prompt targetDAQ,"Name:"
@@ -259,9 +259,26 @@ Function SelectPackageInstance(package,instance[,special])
 			endswitch
 			break
 		case "channelConfigs":
-			Core#SetStrPackageSetting(module,"channelConfigs",name,"DAQ",DAQ) // Set the stimulus name.  
-			string stimName=GetStimulusName(chan)
-			SelectPackageInstance("stimuli",stimName,special=special)
+			Core#SetStrPackageSetting(module,package,name,"DAQ",DAQ) // Set the DAQ for the current channel, e.g. ch0.
+			InitChan(chan)
+//			do // Use the default channel label, or a pick a new one if it is already taken.  
+//				string label_ = Core#StrPackageSetting(module,"channelConfigs",name,"label_")
+//				duplicate /free/t GetChanLabels() labels
+//				extract /free/indx labels,matching_labels,stringmatch(labels[p],label_)
+//				if(numpnts(matching_labels)>1) // If there was already a channel with this label: 
+//					label_ += "_"+num2str(GetChannelNum(name))
+//					Core#SetStrPackageSetting(module,"channelConfigs",name,"label_",label_)
+//				else
+//					break
+//				endif
+//			while(1)
+//			if(!DataFolderExists(GetChannelFolder(label_))) // If there is no channel folder corresponding to this label...
+//				InitChanContainer(chan) // ... create one.  
+//			endif  
+			acqMode=Core#StrPackageSetting(module,package,instance,"acqMode")
+			SetAcqMode(acqMode,chan)
+			string stimName=GetStimulusName(chan) // Get the stimulus for this channelConfig.  
+			SelectPackageInstance("stimuli",stimName,special=special) // Set the stimulus name.  
 			break
 		case "stimuli":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"stimulus",instance) // Set the stimulus name.  

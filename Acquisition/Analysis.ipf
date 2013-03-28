@@ -929,7 +929,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  				waveStats /Q/M=1 /R=(baselineLeft+i*IPI,baselineRight+i*IPI) Sweep
  				variable baseline=v_avg
  				wavestats/M=1/Q/R=(x_left+i*IPI,x_right+i*IPI) Sweep
-				result[sweepNum][i][layer] = (IPI || i==0) ? (flip_sign ? baseline-V_min : v_max-baseline) : 0
+ 				result[sweepNum][i][layer] = (IPI || i==0) ? (flip_sign ? baseline-V_min : v_max-baseline) : 0
  			endfor
  			break
  		case "PeakWX": // The maximum/minimum value between the cursors (normalized to baseline).  

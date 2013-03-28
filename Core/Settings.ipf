@@ -2942,7 +2942,7 @@ Function SelectPackageInstance(module,package,instance[,special])
 	
 	special=selectstring(!paramisdefault(special),"",special)
 	string cmd
-	sprintf cmd,"ProcGlobal#%s#SelectPackageInstance(%s,%s,special=%s)",module,package,instance,special
+	sprintf cmd,"ProcGlobal#%s#SelectPackageInstance(\"%s\",\"%s\",special=\"%s\")",module,package,instance,special
 	Execute /Q/Z cmd
 End
 
