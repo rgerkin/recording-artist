@@ -263,7 +263,7 @@ Function KillDataFolders(match[,df,except])
 	if(paramisdefault(df))
 		df=:
 	endif
-	string list=Dir2("folders",df=df,match=match,except=except)
+	string list=Core#Dir2("folders",df=df,match=match,except=except)
 	variable i
 	for(i=0;i<ItemsInList(list);i+=1)
 		string item=StringFromList(i,list)

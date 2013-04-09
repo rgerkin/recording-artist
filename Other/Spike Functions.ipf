@@ -1,7 +1,7 @@
 // $URL: svn://raptor.cnbc.cmu.edu/rick/recording-artist/Recording%20Artist/Other/Spike%20Functions.ipf $
 // $Author: rick $
-// $Rev: 632 $
-// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
+// $Rev: 633 $
+// $Date: 2013-03-28 15:53:22 -0700 (Thu, 28 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 #include "Stats Plot"

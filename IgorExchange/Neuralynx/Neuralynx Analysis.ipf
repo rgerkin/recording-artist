@@ -26,7 +26,7 @@ Function ConcatSessions(sessions[,target])
 	
 	variable i,j
 	dfref session=sessions[0]
-	string folders=dir2("folders",df=session)
+	string folders=core#dir2("folders",df=session)
 	for(j=0;j<itemsinlist(folders);j+=1)
 		string folder=stringfromlist(j,folders)
 		dfref df=session:$folder
@@ -451,7 +451,7 @@ Function NlxChopIgorData(df,guideDF)
 	wave /sdfr=root: IgorT
 	
 	variable i,j
-	string epochs=Dir2("folders",df=guideDF)
+	string epochs=core#Dir2("folders",df=guideDF)
 	variable numEpochs=itemsinlist(epochs)
 	
 	for(i=0;i<numEpochs;i+=1)
@@ -2483,7 +2483,7 @@ function FixWaveBitDepth(df)
 	string type=Nlx#DataType(df)
 	strswitch(type)
 		case "ntt":
-			string waves=dir2("waves",df=df)
+			string waves=core#dir2("waves",df=df)
 			for(i=0;i<itemsinlist(waves);i+=1)
 				string wave_name=stringfromlist(i,waves)
 				wave w=df:$wave_name

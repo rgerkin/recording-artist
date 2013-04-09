@@ -1,7 +1,7 @@
 
 // $Author: rick $
-// $Rev: 632 $
-// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
+// $Rev: 633 $
+// $Date: 2013-03-28 15:53:22 -0700 (Thu, 28 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 static strconstant module=Acq
@@ -425,7 +425,11 @@ Function AverageWaves()
 		first=last
 		last=temp
 	endif
-	Wave Ampl=CsrWaveRef(A,analysisWin)
+	Wave /Z Ampl=CsrWaveRef(A,analysisWin)
+	if(!waveexists(Ampl))
+		DoAlert 0,"Please place a cursor on a plot in the Analysis Window."
+		return -1
+	endif
 	Variable red,green,blue
 	GetTraceColor(CsrWave(A,analysisWin),red,green,blue,win=analysisWin)
 	String folder=GetWavesDataFolder(Ampl,1)

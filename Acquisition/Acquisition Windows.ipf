@@ -1,6 +1,6 @@
 // $Author: rick $
-// $Rev: 632 $
-// $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
+// $Rev: 633 $
+// $Date: 2013-03-28 15:53:22 -0700 (Thu, 28 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
 
@@ -1782,6 +1782,7 @@ Function SweepsWindow([instance])
 	SweepsWinTextBoxUpdate()
 	//WaveSelector();DoWindow /B Selector
 	WaveUpdate()
+	SweepsChooserUpdate()
 	SwitchView(default_view) // Set broad or focused (check user data for SwitchView button)	
 	ResetSweepAxes(default_view)
 	SweepsWinControlsUpdate()
@@ -1803,6 +1804,7 @@ Function SweepsWinButtons(info) : ButtonControl
 			break
 		case 2:
 			string win=info.win
+			dfref df = Core#InstanceHome(module,"SweepsWin","win0")
 			strswitch(info.ctrlName)
 				case "WaveSelector":
 					string daqInstance = Core#GetSelectedInstance(module,"DAQs",noDefault=1)
@@ -1815,6 +1817,14 @@ Function SweepsWinButtons(info) : ButtonControl
 					break
 				case "Logger":
 					MakeLogPanel()
+					break
+				case "ChooseSweeps":
+					ControlInfo SweepChooser
+					if(v_flag!=11) // No SweepChooser.  
+						ListBox SweepChooser listWave=df:ListWave, selWave=df:SelWave, pos={385,55}, size={150,200}, mode=4, titleWave=df:Titles, win=SweepsWin, proc=SweepsWinListBoxes
+					else
+						KillControl SweepChooser
+					endif
 					break
 				case "SetBaselineRegion":
 					if(CursorExists("A") && CursorExists("B"))
@@ -1855,6 +1865,101 @@ Function SweepsWinButtons(info) : ButtonControl
 			break
 	endswitch
 End
+
+function SweepsWinListboxes(info)
+	struct WMListboxAction &info
+	
+	if(info.eventCode==2)
+		wave selWave = info.selWave
+		variable i,numChannels = GetNumChannels()
+		if(info.col==numChannels) // All was checked or unchecked.  
+			variable checked=selWave[info.row][info.col] & 16
+			for(i=0;i<info.col;i+=1)
+				struct WMListBoxAction info2
+				info2=info
+				info2.col=i
+				info2.userData = "noSwitchView"
+				if(checked) // If all is checked.  
+					selWave[info.row][i]=selWave[info.row][i] | 16 // Set channel checked.  
+				else // If all is unchecked.  
+					selWave[info.row][i]=selWave[info.row][i] & ~16 // Set channel unchecked.  
+				endif
+				SweepsWinListBoxes(info2)
+			endfor
+			info.selWave[info.row][0,info.col-1] = 32+checked
+		endif
+		if(!stringmatch(info.userData,"noSwitchView"))
+			SwitchView("")
+		endif
+	endif
+end
+
+function SweepsChooserUpdate([matrix])
+	wave matrix
+	
+	String currFolder=GetDataFolder(1)
+	dfref df=Core#InstanceHome(module,"sweepsWin","win0")
+	variable i,j
+	variable numChannels = GetNumChannels()
+	variable numSweeps = GetCurrSweep()
+	
+	Make /o/T/n=(numSweeps,numChannels+1) df:ListWave /wave=ListWave=""
+	Make /o/n=(numSweeps,numChannels+1) df:SelWave /wave=SelWave = 48
+	if(!paramisdefault(matrix))
+		SelWave = 32+16*matrix[p][q]
+		SelWave[][numChannels-1] = SelWave[p][0]
+	endif
+	Make /o/T/n=(numChannels+1) df:Titles /wave=Titles
+	for(i=0;i<numChannels;i+=1)
+		Variable red,green,blue; String titleStr
+		GetChanColor(i,red,green,blue)
+		sprintf titleStr,"\K(%d,%d,%d)%s",red,green,blue,GetChanLabel(i)
+		Titles[i]=titleStr
+	endfor
+	
+	Titles[numChannels]="All"
+	for(i=0;i<numSweeps;i+=1)
+//		dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
+//		if(datafolderrefstatus(instanceDF))
+//			variable active=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"active",default_=1)
+//			if(!active)
+//				deletepoints i,1,ListWave,SelWave,Parameter,AxisIndex,Minimum
+//			else
+//				ListWave[i][numChannels]=analysisMethod
+//				variable numChannelsWithMethod=0
+//				for(j=0;j<numChannels;j+=1)
+//					wave /t chanAnalysisMethods=Core#WavTPackageSetting(module,"channelConfigs",GetChanName(j),"analysisMethods")
+//					findvalue /text=analysisMethod /txop=4 chanAnalysisMethods
+//					if(v_value>=0 && strlen(analysisMethod))
+//						SelWave[i][j]+=16
+//						numChannelsWithMethod+=1
+//					endif
+//				endfor
+//				SelWave[i][numChannels]=32+16*(numChannelsWithMethod==numChannels) // Set "All" box.  
+//				//AxisIndex[i]=i
+//				Minimum[i]=0
+//				Parameter[i]=0
+//				nvar /z/sdfr=instanceDF show
+//				if(NVar_Exists(show) && show) 
+//					SelWave[i][numChannels+1]=SelWave[p][q] | 16 // Check the box for "Show".  
+//				else
+//					SelWave[i][numChannels+1]=SelWave[p][q] & ~16 // Uncheck the box for "Show".  
+//				endif
+//				//extract /free Active,TempActive,p<numChannels
+//				//SelWave[i][numChannels]=32+16*(sum(TempActive)==numChannels)
+//				if(SVar_Exists(methodSelected) && StringMatch(analysisMethod,methodSelected))
+//					SelWave[i][] = SelWave | 1 // Set to selected.
+//				else
+//					SelWave[i][] = SelWave & ~1 // Set to unselected.
+//				endif
+//			endif
+//			i+=1
+//		endif
+	endfor
+	return 0
+End
+
+end
 
 Function SweepsWinPopupMenus(info)
 	Struct WMPopupAction &info
@@ -2141,7 +2246,7 @@ Function SwitchView(view)
 	if(!WinType("SweepsWin"))
 		return -1
 	endif
-	dfref df=Core#PackageHome(module,"sweepsWin",create=1)
+	dfref df=Core#InstanceHome(module,"sweepsWin","win0")
 	Variable i,j,k,sweepNum,pulse,appended=0
 
 	variable numChannels=GetNumChannels()
@@ -2186,6 +2291,7 @@ Function SwitchView(view)
 		endif
 	endfor
 	
+	wave /sdfr=df SelWave
 	strswitch(view)
 		case "Focused": 
 			controlinfo /w=sweepsWin PulseOverlay
@@ -2255,10 +2361,12 @@ Function SwitchView(view)
 						ControlInfo /W=SweepsWin Inc; inc=V_Value
 						if(!numtype(first) && !numtype(last))
 							for(sweepNum=min(first,last);sweepNum<=max(first,last);sweepNum+=inc)
-								maxPulses=pulsesStacked ? MaxStimParam("Pulses",i,sweep=sweepNum) : 1
-								for(pulse=0;pulse<maxPulses;pulse+=1)
-									appended+=AppendAndOffsetSweep(i,j,sweepNum,pulse,"Response",0,red,green,blue)
-								endfor
+								if(SelWave[k][i] & 16)
+									maxPulses=pulsesStacked ? MaxStimParam("Pulses",i,sweep=sweepNum) : 1
+									for(pulse=0;pulse<maxPulses;pulse+=1)
+										appended+=AppendAndOffsetSweep(i,j,sweepNum,pulse,"Response",0,red,green,blue)
+									endfor
+								endif
 							endfor
 						endif
 					else // Append only the sweeps indicated by the cursors.  
@@ -2309,7 +2417,9 @@ Function SwitchView(view)
 						ControlInfo /W=SweepsWin Inc; inc=V_Value
 						if(!numtype(first) && !numtype(last))
 							for(k=min(first,last);k<=max(first,last);k+=inc)
-								appended+=AppendAndOffsetSweep(-1,i,k,0,"Sweep",0,red,green,blue)
+								if(SelWave[k][i] & 16)
+									appended+=AppendAndOffsetSweep(-1,i,k,0,"Sweep",0,red,green,blue)
+								endif
 							endfor
 						endif
 					else // Append only the sweeps indicated by the cursors.  
@@ -2581,6 +2691,10 @@ Function SweepsWinCheckboxes(ctrlName,val)
 			break
 		case "Range":
 			SetVariable Inc, disable=!val, pos={504,35}, title="Inc", value=_NUM:1, limits={1,Inf,1}, win=SweepsWin, proc=SweepsWinSetVariables
+			Button ChooseSweeps, disable=!val, pos={424,32}, title="Choose", win=SweepsWin, proc=SweepsWinButtons
+			if(val)
+				SweepsChooserUpdate()
+			endif
 			if(numChannels<=2)
 				ControlBar /W=SweepsWin/T 3*18+3  
 			endif

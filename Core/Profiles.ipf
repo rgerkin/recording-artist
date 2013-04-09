@@ -650,9 +650,9 @@ end
 
 // Returns a string version of the profile structure.  
 Function /s GetProfile()
-	svar /z profile=root:Packages:profiles:profile
-	if(svar_exists(profile))
-		return profile
+	svar /z/sdfr=ProfilesDF() profileStr=profile
+	if(svar_exists(profileStr))
+		return profileStr
 	endif
 	return ""
 End
@@ -678,8 +678,8 @@ Function /S GetProfileInfo(profile[,name,forceLoad])
 	if(forceLoad || (!ParamIsDefault(name) && !IsCurrProfile(name)))
 		LoadPackagePreferences "Profiles",name+".bin",0,profile
 	else // Get info for the current profile.  
-		svar /z/sdfr=ProfilesDF() profileStr=profile
-		if(svar_exists(profileStr))
+		string profileStr = GetProfile()
+		if(strlen(profileStr))
 			StructGet /S profile, profileStr
 		endif
 	endif

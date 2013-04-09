@@ -986,7 +986,7 @@ Function ClusterAllData([df,method,match,except,dataLoad,dataChop,dataSave,noKlu
 			i+=1
 		while(1)
 	else
-		files=dir2("folders",df=df,match=match,except=except)
+		files=core#dir2("folders",df=df,match=match,except=except)
 	endif
 	variable numFiles=itemsinlist(files)
 	
@@ -1043,7 +1043,7 @@ Function ClusterElectrodes(df,electrodes,epoch[,method,write,noKlustakwik])
 	variable noKlustakwik // (0) Write feature files, cluster, load cluster files; (1) write feature files only; (2) load cluster files only.  
 	
 	method=selectstring(!paramisdefault(method),defaultFeatureMethod,method)
-	string folders=Dir2("FOLDERS",df=df)
+	string folders=core#Dir2("FOLDERS",df=df)
 	electrodes=ListMatch2(folders,electrodes)
 	variable i
 	for(i=0;i<itemsinlist(electrodes);i+=1)
@@ -1109,7 +1109,7 @@ Function KlustakwikFeatureFiles(match,feature)
 	string match // String of data folders to match.  Data folders should exists at the current folder level.  If we are in 'TTA', we would usually want to match all the epochs, so match="E*".  
 	string feature
 	
-	match=Dir2("folders",match=match)
+	match=core#Dir2("folders",match=match)
 	variable i; string list=""
 	for(i=0;i<itemsinlist(match);i+=1)
 		string name=stringfromlist(i,match)
