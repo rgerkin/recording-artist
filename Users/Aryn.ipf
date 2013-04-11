@@ -2,9 +2,14 @@
 
 #ifdef Acq
 #include "Spike Functions"
+<<<<<<< local
+=======
+#endif
+>>>>>>> other
 #include "Waves Average"
 
 override function MakeLogPanel()
+<<<<<<< local
 	if(WinType("LogPanel"))
 		DoWindow /F LogPanel
     return 0
@@ -12,7 +17,23 @@ override function MakeLogPanel()
     NewNotebook/W=(600,570,940,710) /F=0/N=LogPanel
  	endif
 end
+=======
+        if(WinType("LogPanel"))
+                DoWindow /F LogPanel
+                return 0
+        else
+                NewNotebook/W=(600,570,940,710) /F=0/N=LogPanel
+        endif
+        end
+        
+>>>>>>> other
       
+<<<<<<< local
+=======
+
+
+
+>>>>>>> other
 function StimulusTable()
 	dowindow /k StimTable
 	edit /k=1/n=StimTable as "Stimulus Table"
@@ -40,6 +61,12 @@ function StimulusTable()
 end
 
 
+<<<<<<< local
+=======
+
+#pragma rtGlobals=1		// Use modern global access method.
+
+>>>>>>> other
 //This procedure file keeps track of all custom preferences.  In general, these preferences are 
 //user entered parameters in dialog boxes.  Managing preferences this way causes dialog box
 //values to be preserved, even when Igor is turned off.  See the Igor manual for more information
@@ -5807,6 +5834,8 @@ Function AttachedFR([win_name])
 			print "cell attached CV = ", extraCellCV
 	
 
+<<<<<<< local
 End
 
-#endif
+#endif=======
+End>>>>>>> other
