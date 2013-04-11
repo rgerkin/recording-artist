@@ -643,6 +643,9 @@ Function CollectSweep(DAQ) // This function is called when the input data has be
 #ifdef Rick
 	//ISI=10+floor(abs(enoise(10)))
 #endif
+#ifdef Aryn
+	//printf "We injected %d pA\r",GetCurrent()
+#endif
 	//endif
 End
 
