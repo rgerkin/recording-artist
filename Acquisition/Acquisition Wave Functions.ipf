@@ -1542,6 +1542,23 @@ function /wave GetdAmpl(chan[,sweepNum])
 	return dAmpl
 end
 
+function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
+	variable chan,sweepNum,pulseSet,pulseNum
+	
+	wave ampl = GetAmpl(chan,sweepNum=sweepNum)
+	wave dampl = GetdAmpl(chan,sweepNum=sweepNum)
+	if(paramisdefault(pulseSet))
+		wave livePulseSets = GetLivePulseSets(chan,sweepNum=sweepNum)
+	else
+		make /free/n=1 livePulseSets = pulseSet
+	endif
+	variable k,result = 0
+	for(k=0;k<numpnts(livePulseSets);k+=1)
+		result += ampl[livePulseSets[k]] + pulseSet*dampl[livePulseSets[k]]
+	endfor
+	return result
+end
+
 function /wave GetLivePulseSets(chan[,sweepNum])
 	variable chan,sweepNum
 	

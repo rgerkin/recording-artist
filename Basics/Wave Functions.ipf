@@ -197,9 +197,9 @@ threadsafe function /wave OpBeams(w,dim,op[,mt])
 			break
 		case "CV":
 			if(mt)
-				multithread result=CV(GetBeam(w,dim,{p,q,r}))
+				multithread result=ComputeCV(GetBeam(w,dim,{p,q,r}))
 			else
-				result=CV(GetBeam(w,dim,{p,q,r}))
+				result=ComputeCV(GetBeam(w,dim,{p,q,r}))
 			endif
 			break
 		case "Z":

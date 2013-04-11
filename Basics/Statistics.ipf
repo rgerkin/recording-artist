@@ -2805,7 +2805,7 @@ function /wave BestCorrelationClustering(corrMatrix[,iter])
 	return ClusterDispersions
 end
 
-threadsafe Function CV(w)//[,correction,x1,x2])
+threadsafe Function ComputeCV(w)//[,correction,x1,x2])
 	wave w
 	//Variable correction // Correct for slow variations in the signal that artificially increase the standard deviation.  
 	//Variable x1,x2

@@ -12,7 +12,7 @@ override function MakeLogPanel()
     NewNotebook/W=(600,570,940,710) /F=0/N=LogPanel
  	endif
 end
-        
+      
 function StimulusTable()
 	dowindow /k StimTable
 	edit /k=1/n=StimTable as "Stimulus Table"
@@ -38,7 +38,7 @@ function StimulusTable()
 	make /o/n=(curr_sweep) StimulusAmpls_1 = StimulusAmplitudes[p][1]
 	appendtotable StimulusAmpls_0//,StimulusAmpls_1
 end
-#endif
+
 
 //This procedure file keeps track of all custom preferences.  In general, these preferences are 
 //user entered parameters in dialog boxes.  Managing preferences this way causes dialog box
@@ -5808,3 +5808,5 @@ Function AttachedFR([win_name])
 	
 
 End
+
+#endif
