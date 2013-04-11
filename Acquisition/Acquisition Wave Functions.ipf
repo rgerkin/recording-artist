@@ -1542,7 +1542,7 @@ function /wave GetdAmpl(chan[,sweepNum])
 	return dAmpl
 end
 
-function GetLivePulseSets(chan[,sweepNum])
+function /wave GetLivePulseSets(chan[,sweepNum])
 	variable chan,sweepNum
 	
 	wave divisor = GetChanDivisor(chan,sweepNum=sweepNum)
