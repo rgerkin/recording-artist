@@ -49,6 +49,20 @@ Function /S GetChanLabel(chan)
 	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"label_",default_="ch"+num2str(chan),quiet=1)
 End
 
+function GetLabelChan(labell)
+	string labell
+	
+	variable numChannels = GetNumChannels()
+	wave /t labels = GetChanLabels()
+	variable i
+	for(i=0;i<numpnts(labels);i+=1)
+		if(stringmatch(labell,labels[i]))
+			return i
+		endif
+	endfor
+	return -1
+end
+
 function /wave GetChanLabels()
 	variable numChannels=GetNumChannels()
 	make /free/t/n=(numChannels) labels
@@ -1547,6 +1561,7 @@ function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	
 	wave ampl = GetAmpl(chan,sweepNum=sweepNum)
 	wave dampl = GetdAmpl(chan,sweepNum=sweepNum)
+	wave pulses = GetNumPulses(chan,sweepNum=sweepNum)
 	if(paramisdefault(pulseSet))
 		wave livePulseSets = GetLivePulseSets(chan,sweepNum=sweepNum)
 	else
@@ -1554,7 +1569,7 @@ function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	endif
 	variable k,result = 0
 	for(k=0;k<numpnts(livePulseSets);k+=1)
-		result += ampl[livePulseSets[k]] + pulseSet*dampl[livePulseSets[k]]
+		result +=  (pulseNum<pulses[k]) * (ampl[livePulseSets[k]] +pulseNum*dampl[livePulseSets[k]])
 	endfor
 	return result
 end
@@ -1564,7 +1579,7 @@ function /wave GetLivePulseSets(chan[,sweepNum])
 	
 	wave divisor = GetChanDivisor(chan,sweepNum=sweepNum)
 	wave remainder = GetChanRemainder(chan,sweepNum=sweepNum)
-	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(divisor[p],sweepNum) & remainder[p]
+	make /free/n=(numpnts(divisor)) pulseSetState = (divisor[p]==1 || 2^mod(sweepNum,divisor[p]) & remainder[p])
 	extract /free/indx pulseSetState,livePulseSets,pulseSetState>0
 	return livePulseSets
 end
