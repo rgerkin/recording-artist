@@ -1173,6 +1173,19 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 				result[sweepNum][i][layer] = 1000/K2 // Time constant in ms.  
  			endfor
  			break
+ 		case "Ten_Ninety": // The time to get from 10% to 90% of the peak amplitude between the cursors.  
+			for(i=0;i<numPulses_;i+=1)
+				waveStats /Q/M=1 /R=(baselineLeft+i*IPI,baselineRight+i*IPI) Sweep
+ 				baseline = V_avg
+ 				wavestats/M=1/Q/R=(x_left+i*IPI,x_right+i*IPI) Sweep
+ 				variable peak = (IPI || i==0) ? (flip_sign ? baseline-V_min : v_max-baseline) : 0
+ 				findlevel /q/r=(x_left+i*IPI,x_right+i*IPI) sweep,baseline+0.1*(peak-baseline)
+ 				variable ten = v_levelx
+ 				findlevel /q/r=(x_left+i*IPI,x_right+i*IPI) sweep,baseline+0.9*(peak-baseline)
+ 				variable ninety = v_levelx
+ 				result[sweepNum][i][layer] = ninety - ten
+ 			endfor
+ 			break
 		case "Generic":
 		case "Baseline":
 			variable points=x2pnt(sweep,baselineRight)-x2pnt(sweep,baselineLeft)
