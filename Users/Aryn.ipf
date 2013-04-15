@@ -5,12 +5,12 @@
 #include "Waves Average"
 
 override function MakeLogPanel()
-	if(WinType("LogPanel"))
-		DoWindow /F LogPanel
-    return 0
-  else
-    NewNotebook/W=(600,570,940,710) /F=0/N=LogPanel
- 	endif
+        if(WinType("LogPanel"))
+                DoWindow /F LogPanel
+                return 0
+        else
+                NewNotebook/W=(600,570,940,710) /F=0/N=LogPanel
+        endif
 end
         
 function StimulusTable()
@@ -38,7 +38,49 @@ function StimulusTable()
 	make /o/n=(curr_sweep) StimulusAmpls_1 = StimulusAmplitudes[p][1]
 	appendtotable StimulusAmpls_0//,StimulusAmpls_1
 end
-#endif
+
+function DoIhStuff(chan)
+	variable chan
+	
+	variable i,sweepNum
+	variable first = GetCursorSweepNum("A")
+	variable last = GetCursorSweepNum("B")
+	string list = ""
+	dfref df=Core#InstanceHome("Acq","sweepsWin","win0")
+	wave /sdfr=df SelWave
+	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
+		if(SelWave[sweepNum][chan] & 16)
+			variable ampl = GetEffectiveAmpl(chan,sweepNum=sweepNum)
+			wave w = GetChanSweep(chan,sweepNum)
+			string name = "Ih_average_"+num2str(ampl)
+			wave /z avg = $CleanupName(name,0)
+			if(!waveexists(avg))
+				make /o/n=(numpnts(w)) $CleanupName(name,0) /wave=avg=0
+			endif
+			if(whichlistitem(name,list)<0)
+				avg=0
+				note /k avg, ""
+				list += name+";"
+			endif
+			avg += w[p]
+			note /nocr avg, "X"
+		endif
+	endfor
+	display /k=1
+	for(i=0;i<itemsinlist(list);i+=1)
+		name = stringfromlist(i,list)
+		wave avg = $CleanupName(name,0)
+		string the_note = note(avg)
+		avg /= strlen(the_note)
+		colortab2wave rainbow
+		wave m_colors
+		setscale x,0,1,m_colors
+		variable red = m_colors(i/itemsinlist(list))[0]
+		variable green = m_colors(i/itemsinlist(list))[1]
+		variable blue = m_colors(i/itemsinlist(list))[2]
+		appendtograph /c=(red,green,blue) avg
+	endfor
+end
 
 //This procedure file keeps track of all custom preferences.  In general, these preferences are 
 //user entered parameters in dialog boxes.  Managing preferences this way causes dialog box
@@ -3924,6 +3966,11 @@ Function IFplot([win_name])
 	for(i=0;i<ItemsInList(traces);i+=1)
 		string Trace =  stringfromlist(i,traces)
 		Wave TraceWave=TraceNameToWaveRef(win_name,trace)
+		string labell = getwavesdatafolder(TraceWave,0)
+		variable chan = GetLabelChan(labell)
+		variable sweepNum
+		sscanf nameofwave(traceWave),"sweep%d",sweepNum
+		InputCurrent = GetEffectiveAmpl(chan,sweepNum=sweepNum)
 		variable strLength = strlen(Trace)
 			if (strLength >=12)	
 				 InputValue = Trace[12,strLength]
@@ -5806,5 +5853,6 @@ Function AttachedFR([win_name])
 			variable extraCellCV = v_avg
 			print "cell attached CV = ", extraCellCV
 	
-
 End
+
+#endif
