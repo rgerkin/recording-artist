@@ -3455,7 +3455,7 @@ function SweepsWinHook(info)
 			string str
 			structput /s info.mouseLoc str
 			SetWindow $info.winname userData(mouseDown)=str
-			if(info.mouseLoc.v<30)
+			if(info.mouseLoc.v<0 && (info.eventMod & 16))
 				PopupContextualMenu Core#ListPackageInstances(module,info.winname)+"_Save_"
 				if(v_flag>=0)
 					SelectPackageInstance(info.winname,s_selection)
@@ -3506,6 +3506,15 @@ function AnalysisWinHook(info)
 				sscanf axisName,"Axis_%d",axisNum
 				if(strlen(axisName) && axisNum>=0)
 					AnalysisMethodSubSelections(axisNum)
+				endif
+			endif
+			break
+		case "mousedown":
+			print info.mouseLoc
+			if(info.mouseLoc.v<0 && (info.eventMod & 16))
+				PopupContextualMenu Core#ListPackageInstances(module,info.winname)+"_Save_"
+				if(v_flag>=0)
+					SelectPackageInstance(info.winname,s_selection)
 				endif
 			endif
 		case "resize":

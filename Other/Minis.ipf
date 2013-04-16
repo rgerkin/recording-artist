@@ -1025,9 +1025,16 @@ Function ShowMinisHook(info)
 			endif
 			break
 		case 11: // Key down.  
-			if(info.keyCode==8 || info.keyCode==127)
-				
-			endif
+			switch(info.keyCode)
+				case 8: // Delete.  
+					RejectMini()
+				case 28: // Left arrow.  
+					GotoMini(currMini-1)
+					break
+				case 29: // Right arrow.  
+					GotoMini(currMini+1)
+					break	
+			endswitch
 			break
 		case 22: // Mouse wheel:
 			controlinfo Channel; channel=s_value

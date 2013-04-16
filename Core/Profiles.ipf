@@ -390,7 +390,6 @@ function NewProfile(profile)
 	string style
 	
 	string profileName=profile.name
-	string profileStyle=profile.style
 	variable err=0
 	// Check for conflict with an existing profile name.  
 	string profiles=ListProfiles()

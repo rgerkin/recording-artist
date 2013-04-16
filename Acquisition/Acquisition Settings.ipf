@@ -171,6 +171,7 @@ Function SelectPackageInstance(package,instance[,special])
 	
 	strswitch(package)
 		case "sweepsWin":
+		case "analysisWin":
 			string liveInstance = "win0"
 			strswitch(instance)
 				case "_Save_":
@@ -191,21 +192,25 @@ Function SelectPackageInstance(package,instance[,special])
 							Core#SetVarPackageSetting(module,package,targetInstance,"right",coords.right,sub="position",create=1)
 							Core#SetVarPackageSetting(module,package,targetInstance,"bottom",coords.bottom,sub="position",create=1)
 							
-							// Copy one of the vertical axes to the generic "Ampl_Axis".   
-							dfref df = Core#InstanceHome(module,package,targetInstance,sub=curr_view)
-							string acqModes = ListAcqModes()
-							variable i
-							for(i=0;i<itemsinlist(acqModes);i+=1)
-								string acqMode = stringfromlist(i,acqModes)
-								dfref sourceDF = df:$(acqMode+"_axis")
-								if(datafolderrefstatus(sourceDF))
+							strswitch(package)
+								case "sweepsWin":
+									// Copy one of the vertical axes to the generic "Ampl_Axis".   
+									dfref df = Core#InstanceHome(module,package,targetInstance,sub=curr_view)
+									string acqModes = ListAcqModes()
+									variable i
+									for(i=0;i<itemsinlist(acqModes);i+=1)
+										string acqMode = stringfromlist(i,acqModes)
+										dfref sourceDF = df:$(acqMode+"_axis")
+										if(datafolderrefstatus(sourceDF))
+											break
+										endif
+									endfor
+									if(datafolderrefstatus(sourceDF))
+										string targetFolder = joinpath({getdatafolder(1,df),"Ampl_Axis"})
+										Core#CopyData(sourceDF,targetFolder)
+									endif
 									break
-								endif
-							endfor
-							if(datafolderrefstatus(sourceDF))
-								string targetFolder = joinpath({getdatafolder(1,df),"Ampl_Axis"})
-								Core#CopyData(sourceDF,targetFolder)
-							endif
+							endswitch
 							
 							if(!Core#SavePackageInstance(module,package,targetInstance))
 								printf "%s instance %s successfully saved.\r",package,targetInstance
