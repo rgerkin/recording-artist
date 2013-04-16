@@ -3675,7 +3675,7 @@ End
 //Note, sampling rate for fast spikes is a bit of an issue- spike times aren't exactly at the peak of each spike.
 Function GraphRate([win_name])
 	string win_name
-	variable threshold = -20
+	variable threshold =-20
 	string RateDisplayName, TimeDisplayName
 	string Name
 	
@@ -3685,6 +3685,7 @@ Function GraphRate([win_name])
 	string traces = TraceNameList(win_name, ";", 1)
 	string trace = StringFromList(0,traces)
 	Wave TraceWave=TraceNameToWaveRef(win_name,trace)
+
 
 	FindSpikeTimesAG(TraceWave, 0, 30, Threshold)
 	
@@ -5537,6 +5538,7 @@ Function FindSpikeTimesSmoothed(w, startTime, endTime, thresh, minSpikeWidth, mi
 	if(startPoint >= endPoint)
 		DoAlert 0, "Given range for FindSpikes has zero or negative size"
 	endif
+	
 	
 	Variable primed = 0 // assures that no partial spikes will be picked up at the beginning of the detection window.
 	Variable spikeStartTime = startPoint
