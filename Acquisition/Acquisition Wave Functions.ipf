@@ -1234,13 +1234,22 @@ function SetAssembler(chan,assembler)
 	string daq=Chan2DAQ(chan)
 	string win=DAQ+"_Selector"
 	Core#SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
+	string ampl_title="Ampl"
+	string dAmpl_title="\F'Symbol'D\F'Default'Ampl"
 	strswitch(assembler)
+		case "Ramp":
+			ampl_title="Min"
+			dAmpl_title="Max"
+			break
+		case "Sine":
+			dAmpl_title="Freq"
+			break
 		case "Noisy":
-			string title="StDev"
+			dAmpl_title="StDev"
 			break
 		case "Frozen":
 		case "FrozenPlusNegative":
-			title="Multiplier"
+			dAmpl_title="Multiplier"
 			dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
 			wave /z/sdfr=df Frozen
 			if(!waveexists(Frozen))
@@ -1263,10 +1272,12 @@ function SetAssembler(chan,assembler)
 		case "Optimus2":
 			SweepIndexWindow()
 		default:
-			title="\F'Symbol'D\F'Default'Ampl"
+			//ampl_title="Ampl"
+			//dAmpl_title="\F'Symbol'D\F'Default'Ampl"
 			break
 	endswitch
-	Titlebox Title_dAmpl title=title, win=$win
+	Titlebox Title_ampl title=ampl_title, win=$win
+	Titlebox Title_dAmpl title=dAmpl_title, win=$win
 end
 
 function SetListenHook(hook[,DAQ])
@@ -1579,7 +1590,10 @@ function /wave GetLivePulseSets(chan[,sweepNum])
 	
 	wave divisor = GetChanDivisor(chan,sweepNum=sweepNum)
 	wave remainder = GetChanRemainder(chan,sweepNum=sweepNum)
-	make /free/n=(numpnts(divisor)) pulseSetState = (divisor[p]==1 || 2^mod(sweepNum,divisor[p]) & remainder[p])
+	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(divisor[p],sweepNum) & remainder[p]
+	if(numpnts(divisor)==1)
+		pulseSetState = 1
+	endif
 	extract /free/indx pulseSetState,livePulseSets,pulseSetState>0
 	return livePulseSets
 end
@@ -2207,6 +2221,35 @@ function PoissonAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	endif
 end
 
+//sin function added by AG 3-21-13
+function Sine_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable freq=GetStimParam("dAmpl",chan,pulseSet)		//Set frequency (Hz)
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)		//Set amplitude
+	variable kHz=GetKHz(MasterDAQ())
+	variable start = firstSample/(1000*kHz)
+	
+	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+= ampl * sin(2*pi*(x-start)*freq)
+end
+
+//sin function added by AG 3-21-13
+function Ramp_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable amplEnd=GetStimParam("dAmpl",chan,pulseSet)		//Set frequency (Hz)
+	variable amplStart=GetStimParam("Ampl",chan,pulseSet)		//Set amplitude
+	variable kHz=GetKHz(MasterDAQ())
+	variable start = firstSample/(1000*kHz)
+	variable width = (lastSample-firstSample+1)/(1000*kHz)
+	variable slope = (amplEnd-amplStart)/width
+	
+	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+= amplStart + slope*(x-start)
+end
+
+#ifndef Aryn
 function Optimus1_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
 	wave Stimulus
 	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
