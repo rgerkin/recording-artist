@@ -1472,7 +1472,7 @@ Function AnalysisWinPopupMenus(info)
 	if(!PopupInput(info.eventCode))
 		return 0
 	endif
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#InstanceHome(module,"analysisWin","win0")
 	variable i
 	strswitch(info.ctrlName)
 		case "Minimum":
@@ -1743,11 +1743,11 @@ Function SweepsWindow([instance])
   	
   variable fsize=GetFontSize()
 	Display /N=$win /W=(coords.left,coords.top,coords.right,coords.bottom) /K=2 as "Sweeps"
-	Button SetBaselineRegion,pos={575,3},size={75,15},fsize=fsize+1, proc=SweepsWinButtons,title="Set Baseline"
-	Checkbox AutoBaseline,pos={655,3},title="Auto"
+	Button SetBaselineRegion,pos={575,3},size={75,23},fsize=fsize+1, proc=SweepsWinButtons,title="Set Baseline"
+	Checkbox AutoBaseline,pos={655,4},title="Auto"
 	string default_view=Core#StrPackageSetting(module,"random","","defaultView",default_="Broad")
-	Checkbox SwitchView, pos={700,3},size={100,29},proc=SweepsWinCheckboxes,title="Focus",userData=default_view
-	Button ResetSweepAxes,pos={575,20},size={75,15},fsize=fsize+1,proc=SweepsWinButtons,title="Restore Axes"
+	Checkbox SwitchView, pos={655,21},size={100,29},proc=SweepsWinCheckboxes,title="Focus",userData=default_view
+	Button ResetSweepAxes,pos={575,20},size={75,23},fsize=fsize+1,proc=SweepsWinButtons,title="Restore Axes"
 	PopupMenu SweepOverlay,pos={655,20},title="Sweep Overlay",mode=0,value=#("PopupOptions(\""+win+"\",\"SweepOverlay\",\"Stack;By Mode;Split\")"),userData(selected)="Split",proc=SweepsWinPopupMenus
 	PopupMenu PulseOverlay,pos={755,20},title="Pulse Overlay",mode=0,value=#("PopupOptions(\""+win+"\",\"PulseOverlay\",\"None;Stacked\")"),userData(selected)="None",proc=SweepsWinPopupMenus
 	//Button SaveWin, pos={725,3},size={75,15},proc=SweepsWinButtons,title="Save Window"
@@ -1765,8 +1765,8 @@ Function SweepsWindow([instance])
 	DoUpdate; GetWindow $win,wsizeDC
 	
 	//Button RemoveAllTraces pos={V_right-284,5}, size={100,29}, title="Remove Traces", proc=RemoveTracesWrap
-	Button WaveSelector,pos={V_right-303,5},size={100,29},fsize=fsize+2,proc=SweepsWinButtons,title="Selector"
-	Button Logger,pos={V_right-101,5},size={100,29},fsize=fsize+2,proc=SweepsWinButtons,title="Log"
+	Button WaveSelector,pos={V_right-303,5},size={100,22},fsize=fsize+2,proc=SweepsWinButtons,title="Selector"
+	Button Logger,pos={V_right-101,5},size={100,22},fsize=fsize+2,proc=SweepsWinButtons,title="Log"
 	//Textbox/N=Recording/F=0/X=7/Y=1 "\\Z08Waiting..."
 	//NVar testPulsestart=root:parameters:testPulsestart
 	//Variable stim_point_start,test_point_start
@@ -1823,7 +1823,10 @@ Function SweepsWinButtons(info) : ButtonControl
 				case "ChooseSweeps":
 					ControlInfo SweepChooser
 					if(v_flag!=11) // No SweepChooser.  
-						ListBox SweepChooser listWave=df:ListWave, selWave=df:SelWave, pos={385,55}, size={150,200}, mode=4, titleWave=df:Titles, win=SweepsWin, proc=SweepsWinListBoxes
+						variable numChannels = GetNumChannels()
+						variable hasAllColumn = numChannels >= 1
+						ListBox SweepChooser listWave=df:ListWave, selWave=df:SelWave, pos={385,55}, size={40+40*(numChannels+hasAllColumn+1),250}, widths={4,3}, mode=4
+						ListBox SweepChooser titleWave=df:Titles, win=SweepsWin, proc=SweepsWinListBoxes
 					else
 						KillControl SweepChooser
 					endif
@@ -1874,9 +1877,9 @@ function SweepsWinListboxes(info)
 	if(info.eventCode==2)
 		wave selWave = info.selWave
 		variable i,numChannels = GetNumChannels()
-		if(info.col==numChannels) // All was checked or unchecked.  
+		if(info.col==(numChannels+1)) // All was checked or unchecked.  
 			variable checked=selWave[info.row][info.col] & 16
-			for(i=0;i<info.col;i+=1)
+			for(i=1;i<info.col;i+=1)
 				struct WMListBoxAction info2
 				info2=info
 				info2.col=i
@@ -1888,7 +1891,7 @@ function SweepsWinListboxes(info)
 				endif
 				SweepsWinListBoxes(info2)
 			endfor
-			info.selWave[info.row][0,info.col-1] = 32+checked
+			info.selWave[info.row][1,info.col-1] = 32+checked
 		endif
 		if(!stringmatch(info.userData,"noSwitchView"))
 			SwitchView("")
@@ -1904,60 +1907,29 @@ function SweepsChooserUpdate([matrix])
 	variable i,j
 	variable numChannels = GetNumChannels()
 	variable numSweeps = GetCurrSweep()
+	variable hasAllColumn = numChannels > 1
 	
-	Make /o/T/n=(numSweeps,numChannels+1) df:ListWave /wave=ListWave=""
-	Make /o/n=(numSweeps,numChannels+1) df:SelWave /wave=SelWave = 48
+	Make /o/T/n=(numSweeps,numChannels+1+hasAllColumn) df:ListWave /wave=ListWave= selectstring(q==0,"","Sweep "+num2str(p)) // Sweep numbers for column 0.  
+	Make /o/n=(numSweeps,numChannels+1+hasAllColumn) df:SelWave /wave=SelWave = q==0 ? 0 : 48 // Check boxes for column >= 1.
+	SelWave[][1,numChannels] *= ChanSweepExists(q-1,p) // Remove checkbox if sweep does not exist for the channel.  
 	if(!paramisdefault(matrix))
-		SelWave = 32+16*matrix[p][q]
-		SelWave[][numChannels-1] = SelWave[p][0]
+		SelWave[][1,] = 32+16*matrix[p][q]
+		SelWave[][1,numChannels-1] = SelWave[p][1]
 	endif
-	Make /o/T/n=(numChannels+1) df:Titles /wave=Titles
+	Make /o/T/n=(numChannels+1+hasAllColumn) df:Titles /wave=Titles
 	for(i=0;i<numChannels;i+=1)
 		Variable red,green,blue; String titleStr
 		GetChanColor(i,red,green,blue)
 		sprintf titleStr,"\K(%d,%d,%d)%s",red,green,blue,GetChanLabel(i)
-		Titles[i]=titleStr
+		Titles[i+1]=titleStr
 	endfor
 	
-	Titles[numChannels]="All"
-	for(i=0;i<numSweeps;i+=1)
-//		dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
-//		if(datafolderrefstatus(instanceDF))
-//			variable active=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"active",default_=1)
-//			if(!active)
-//				deletepoints i,1,ListWave,SelWave,Parameter,AxisIndex,Minimum
-//			else
-//				ListWave[i][numChannels]=analysisMethod
-//				variable numChannelsWithMethod=0
-//				for(j=0;j<numChannels;j+=1)
-//					wave /t chanAnalysisMethods=Core#WavTPackageSetting(module,"channelConfigs",GetChanName(j),"analysisMethods")
-//					findvalue /text=analysisMethod /txop=4 chanAnalysisMethods
-//					if(v_value>=0 && strlen(analysisMethod))
-//						SelWave[i][j]+=16
-//						numChannelsWithMethod+=1
-//					endif
-//				endfor
-//				SelWave[i][numChannels]=32+16*(numChannelsWithMethod==numChannels) // Set "All" box.  
-//				//AxisIndex[i]=i
-//				Minimum[i]=0
-//				Parameter[i]=0
-//				nvar /z/sdfr=instanceDF show
-//				if(NVar_Exists(show) && show) 
-//					SelWave[i][numChannels+1]=SelWave[p][q] | 16 // Check the box for "Show".  
-//				else
-//					SelWave[i][numChannels+1]=SelWave[p][q] & ~16 // Uncheck the box for "Show".  
-//				endif
-//				//extract /free Active,TempActive,p<numChannels
-//				//SelWave[i][numChannels]=32+16*(sum(TempActive)==numChannels)
-//				if(SVar_Exists(methodSelected) && StringMatch(analysisMethod,methodSelected))
-//					SelWave[i][] = SelWave | 1 // Set to selected.
-//				else
-//					SelWave[i][] = SelWave & ~1 // Set to unselected.
-//				endif
-//			endif
-//			i+=1
-//		endif
-	endfor
+	Titles[0] = " " // Sweep number column title.  
+	if(hasAllColumn)
+		Titles[numChannels+1] = "All"
+	endif
+	//for(i=0;i<numSweeps;i+=1)
+	//endfor
 	return 0
 End
 
@@ -2363,7 +2335,7 @@ Function SwitchView(view)
 						ControlInfo /W=SweepsWin Inc; inc=V_Value
 						if(!numtype(first) && !numtype(last))
 							for(sweepNum=min(first,last);sweepNum<=max(first,last);sweepNum+=inc)
-								if(SelWave[k][i] & 16)
+								if(SelWave[k][i+1] & 16)
 									maxPulses=pulsesStacked ? MaxStimParam("Pulses",i,sweep=sweepNum) : 1
 									for(pulse=0;pulse<maxPulses;pulse+=1)
 										appended+=AppendAndOffsetSweep(i,j,sweepNum,pulse,"Response",0,red,green,blue)
@@ -2419,7 +2391,7 @@ Function SwitchView(view)
 						ControlInfo /W=SweepsWin Inc; inc=V_Value
 						if(!numtype(first) && !numtype(last))
 							for(k=min(first,last);k<=max(first,last);k+=inc)
-								if(SelWave[k][i] & 16)
+								if(SelWave[k][i+1] & 16)
 									appended+=AppendAndOffsetSweep(-1,i,k,0,"Sweep",0,red,green,blue)
 								endif
 							endfor
@@ -3428,15 +3400,36 @@ function SweepsWinHook(info)
 				return -1
 			endif
 			GetWindow $info.winname,wsizeDC
-			Variable narrow = (V_right-V_left<1275)
-			ControlBar /W=$info.winname /L 105*narrow
+			variable narrow = (v_right-v_left<1100)
+			ControlBar /W=$info.winname /L 125*narrow
+			SetWindow $info.winname, userData(isNarrow)=num2str(narrow)
+			String controls="SetBaselineRegion;ResetSweepAxes;SwitchView;AutoBaseline;SweepOverlay;PulseOverlay;WaveSelector;Logger;"
+			if(!narrow)
+				controls = ReverseListOrder(controls)
+			endif
+			variable numControls=itemsinlist(controls)
 			variable numChannels=GetNumChannels()
-			String sweepsWinButtons="WaveSelector;Logger"
-			variable i
-			for(i=0;i<ItemsInList(sweepsWinButtons);i+=1)
-				String buttonName=StringFromList(i,sweepsWinButtons)
-				Variable ypos=max(3,numChannels)*18+5
-				Button $buttonName pos={narrow ? 2 : V_right-(2-i)*201,narrow ? ypos+i*35 : 5}, fsize=GetFontSize()+2, win=$info.winname
+			variable xx = narrow ? 2 : v_right
+			variable yy = narrow ? max(3,numChannels)*18 : 2
+			variable i,j
+			for(i=0;i<numControls;i+=1)
+				string controlName = stringfromlist(i,controls)
+				ControlInfo /W=$info.winname $controlName
+				if(v_disable != 1) // If visible.  
+					variable isPopup=(V_flag==3)
+					variable isCheckbox=(V_flag==2)
+					if(narrow)
+						yy += i==0 ? 10 : 30
+					else
+						if(mod(i,2)==0)
+							xx -= 120+isPopup*25-isCheckbox*25
+							yy = 2
+						else
+							yy = 26
+						endif
+					endif
+					ModifyControl /Z $controlName pos={xx,yy+isPopup*3+isCheckbox*4}, win=$info.winname
+				endif
 			endfor
 			break
 		case "modified":
@@ -3547,9 +3540,11 @@ function AnalysisWinHook(info)
 				for(j=0;j<itemsinlist(controlNames);j+=1)
 					string controlName = stringfromlist(j,controlNames)
 					ControlInfo /W=$info.winname $controlName
-					Variable isPopup=(V_flag==3)
-					xx -= 80+isPopup*25
-					ModifyControl /Z $controlName pos={narrow ? 2 : xx,narrow ? 30+i*25 : numControls-isPopup*3}, win=$info.winname
+					if(v_disable != 1) // If visible.  
+						variable isPopup=(V_flag==3)
+						xx -= 80+isPopup*25
+						ModifyControl /Z $controlName pos={narrow ? 2 : xx,narrow ? 30+i*25 : numControls-isPopup*3}, win=$info.winname
+					endif
 				endfor
 			endfor
 			break
@@ -3699,9 +3694,13 @@ Function ChannelColorCode([win])
 	KillVariables /Z red,green,blue
 End
 
-Function AnalysisWinButtons(ctrlName) : ButtonControl
-	String ctrlName
-	strswitch(ctrlName)
+Function AnalysisWinButtons(info) : ButtonControl
+	struct wmbuttonaction &info
+	
+	if(info.eventCode!=2)
+		return 0
+	endif
+	strswitch(info.ctrlName)
 		case "AnalysisSelect":
 			ControlInfo AnalysisSelector
 			AnalysisSelector(V_flag)
@@ -3721,7 +3720,17 @@ Function AnalysisWinButtons(ctrlName) : ButtonControl
 				DoAlert 0,"No axis is active."
 				return -1
 			endif
-			SetAxis /W=AnalysisWin /A=2 $("axis_"+num2str(axisNum))
+			string csr_trace = CursorTrace("A",win=info.win)
+			string axis = TraceYAxis(csr_trace,win=info.win)
+			string target_axis = "axis_"+num2str(axisNum)
+			if(stringmatch(axis,target_axis))
+				wave w = TraceNameToWaveRef(info.win,csr_trace)
+				wavestats /q/r=(xcsr(A),xcsr(B)) w
+				variable range = v_max-v_min
+				SetAxis /W=$info.win $target_axis,v_min-range/5,v_max+range/5
+			else	
+				SetAxis /W=$info.win /A=2 $target_axis
+			endif
 			break
 		case "Recalculate":
 			Recalculate()

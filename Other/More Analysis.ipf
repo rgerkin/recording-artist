@@ -942,8 +942,8 @@ Function CVAnalysis2(wave_names[,correction])
 		MeanChange[i]=after/before
 		duplicate /free/r=(before1,before2) theWave,beforeWave
 		duplicate /free/r=(before1,before2) theWave,afterWave
-		before=1/(CV(beforeWave))
-		after=1/(CV(afterWave))
+		before=1/(ComputeCV(beforeWave))
+		after=1/(ComputeCV(afterWave))
 		CVSquaredChange[i]=after/before
 		print wave_name+" STDP Ratio: "+num2str(MeanChange[i])+"; 1/CV^2 change: "+num2str(CVSquaredChange[i])
 	endfor
@@ -962,10 +962,9 @@ Function TestReductionLengths()
 	Wave /T Locs,Vals
 	for(i=0;i<numpnts(Vals);i+=1)
 		if(strlen(Locs[i])>65535 || strlen(Vals[i])>65535)
-			print "Too many characters: Sweep "+num2str(i+1)
-			print "Locs="+num2str(strlen(Locs[i]))
-			print "Vals="+num2str(strlen(Vals[i]))
-			print "\r"
+			printf "Too many characters: Sweep %d.\r",num2str(i+1)
+			printf "Locs=%f\r",num2str(strlen(Locs[i]))
+			printf "Vals=%f\r\r",num2str(strlen(Vals[i]))
 		endif
 	endfor
 End
@@ -974,7 +973,6 @@ End
 Function /S PeakFinderOld(first,last,smooth_val[,refractory])
 	Variable first,last,smooth_val
 	Variable refractory
-	//print first,last
 	SetDataFolder root:reanalysis:SweepSummaries
 	NVar VC=VC
 	Wave CursorWave=CsrWaveRef(A)
@@ -994,7 +992,6 @@ Function /S PeakFinderOld(first,last,smooth_val[,refractory])
 		Wave levels=W_FindLevels
 		for(i=0;i<numpnts(levels)-1;i+=1)
 			if(mean(theWave,levels[i],levels[i+1]) > thresh)
-				//print levels[i],levels[i+1]
 				WaveStats /Q/R=(levels[i],levels[i+1]) theWave // Search for a maximum in between those crossings.  
 				//if(!V_flag) // If a peak was found
 					peak_locs+=num2str(V_maxloc)+";"
@@ -1020,7 +1017,6 @@ Function /S PeakFinderOld(first,last,smooth_val[,refractory])
 		Smooth smooth_val, smoothed
 		Wave levels=W_FindLevels
 		//Display smoothed
-		//print levels
 		for(i=0;i<numpnts(levels);i+=1)			
 			if(smoothed(levels[i])<0) // If the second derivative is negative (concave up, since the wave was flipped, indicating a peak in voltage clamp)
 				//Display hpf
@@ -1028,15 +1024,10 @@ Function /S PeakFinderOld(first,last,smooth_val[,refractory])
 				if(theWave(levels[i])>-vcsr(A)) // and if the peak is above the original cutoff (larger than the point indicated by Cursor A)
 					peak_locs+=num2str(levels[i])+";" // Add it to the list
 					peak_vals+=num2str(theWave(levels[i]))+";" // ...
-					if(i<4)
-						//print levels[i]
-						//print theWave(levels[i])
-					endif
 				endif
 			endif
 		endfor
 	endif
-	//print peak_locs
 	SpacePeaks(refractory)
 	Variable left,right
 	for(i=1;i<ItemsInList(peak_locs);i+=1)
@@ -1142,63 +1133,6 @@ Proc PickCell(ctrlName,popNum,popStr) : PopupMenuControl // Which pathway do you
 	Duplicate /o $("root:cell"+popStr[4,5]+":ampl_"+popStr[0,1]+"_"+popStr[4,5]) $("root:cell"+popStr[4,5]+":ampl")
 End
 
-//Function AnalysisProc(ctrlName) : ButtonControl // Route the button press to the appropriate function.  
-//	String ctrlName
-//	SVar whichCells=root:reanalysis:whichCells
-//	SVar sweepString=root:reanalysis:sweepString
-//	NVar offset=root:reanalysis:offset
-//	NVar whichPulse=root:reanalysis:whichPulse
-//	NVar method=root:reanalysis:method
-//	NVar firstInduction=root:reanalysis:firstInduction
-//	NVar lastInduction=root:reanalysis:lastInduction
-//	NVar lowerTiming=root:reanalysis:lowerTiming
-//	Nvar upperTiming=root:reanalysis:upperTiming
-//	Svar inductionOrder=root:reanalysis:inductionOrder
-//	
-//	strswitch(ctrlName)		
-//		case "Data2Access":
-//			print whichCells+";"+sweepString
-//			print offset
-//			Data2Access(whichCells+";"+sweepString,offset)
-//		break
-//		case "RedoAmps":
-//			RedoAmps(whichCells,whichPulse,method)
-//		break
-//		case "HistoryGraph":
-//			HistoryGraph("poop",method)
-//		break
-//		case "RemoveAll":
-//			RemoveGraphsAndTables()
-//		break
-//		case "TimeDif":
-//			TimeDif()
-//		break
-//		case "Access2Igor":
-//			Access2Igor()
-//		break
-//		case "SelectN":
-//			SelectN(firstInduction,lastInduction,lowerTiming,upperTiming,poop)
-//		break
-//		case "SelectOrder":
-//			SelectOrder(inductionOrder,firstInduction,lastInduction,inputOrig)
-//		break
-//		case "ImpulseFuncs":
-//			GetImpulseResponses(str2num(whichCells[1]),method,offset)
-//			break
-//		case "RsComp":
-//			RsCompensateAll(str2num(whichCells[1]),method)
-//			break
-//		case "Redo1Amp":
-//			Redo1Amp(str2num(whichCells[1]))
-//			break
-//		case "Rid":
-//			Rid(offset,whichCells)
-//			break
-//		default:
-//			Print "Default case executed [AnalysisProc()]"
-//	endswitch
-//End
-
 Function Redo1Amp(channel)
 	Variable channel
 	NVar sweep_num=root:reanalysis:wave_number
@@ -1222,11 +1156,10 @@ Function Redo1Amp(channel)
 			Duplicate /o $("root:cellL2:sweep"+num2str(sweep_num)+appendString), smoothed
 			Smooth 15, smoothed
 			Wavestats/Q/R=(cursorX1,cursorX2) smoothed
-			print V_min
 			amplL2 [(sweep_num-1)] = mean(smoothed,ampl_zero_L2,ampl_zero_L2+0.04)-V_min
 			break
 		default:
-			print "Not a valid channel"
+			printf "Not a valid channel.\r"
 			return 0
 	endswitch
 End
@@ -1243,8 +1176,6 @@ Function RedoAmps(whichCell,pulse,method) // Channel Number (1 or 2), Pulse numb
 	Variable cursorX1=hcsr(A)
 	Variable cursorX2=hcsr(B)
 	Variable n
-	
-	print whichCell
 	
 	cellString="root:cell"+whichCell[4,5]+":sweep"
 	Wave/Z ampl = $("root:cell"+whichCell[4,5]+":ampl_"+whichCell[0,1]+"_"+whichCell[4,5])//; Wave/Z ampl = $("root:cell"+whichCell[4,5]+":ampl") 
@@ -1276,9 +1207,8 @@ Function RedoAmps(whichCell,pulse,method) // Channel Number (1 or 2), Pulse numb
 			appendString="D"
 			break
 		case 4:
-			//print "poop"
 			if(!waveExists(root:impact) || !waveExists(root:fitCoefs))
-				Print "Run ImpactRs() first"
+				printf "Run ImpactRs() first.\r"
 				return 0
 			endif
 			appendString=""
@@ -1291,12 +1221,11 @@ Function RedoAmps(whichCell,pulse,method) // Channel Number (1 or 2), Pulse numb
 			for(n=1;n<=numpnts(ampl);n+=1)
 				timeConstants[n]=round(10000*timeConstants[n])
 				ampl[n-1]/=impact[timeConstants[n]]
-				print impact[timeConstants[n]]
 			endfor
 			return 0
 			break
 		default:
-			print "Not a valid adjustment value"
+			printf "Not a valid adjustment value.\r"
 			return 0
 	endswitch
 	
@@ -1311,7 +1240,6 @@ Function RedoAmps(whichCell,pulse,method) // Channel Number (1 or 2), Pulse numb
 				Redimension/n=(total_sweeps) ampl
 				waveN=cellString+num2str(n)+appendString
 				if(waveExists($waveN) )//&& series_res[n-1]!=0)
-					print n
 					//Duplicate /o $(cellString+num2str(n)+appendString), smoothed
 					//Smooth 25, smoothed
 					Wavestats/Q/R=(cursorX1,cursorX2) $waveN
@@ -1332,7 +1260,7 @@ Function RedoAmps(whichCell,pulse,method) // Channel Number (1 or 2), Pulse numb
 				endif
 			endfor
 		default:
-			print "Not a valid pulse number"
+			printf "Not a valid pulse number.\r"
 			return 0
 	endswitch
 End
@@ -1505,7 +1433,6 @@ Function /S AverageWave([sweep_list,no_append,pathway,presynaptic,postsynaptic,a
 			sscanf actual_name, "sweep%d", sweep_num
 		endif
 		Variable stim_start=EarliestStim(sweep_num,channel_label=pre)
-		//print channel,sweep_num,stim_start
 		ModifyGraph /W=$win_name offset($trace_name)={-stim_start,-baseline+(is_post*post_mean*(1-post_vertical_align))}
 	endfor
 	
@@ -1571,7 +1498,7 @@ Function UltimateAvgLayout(pre,post,baselinestart,baselineend) // Go through a b
 	DoWindow/K AvgLayout
 	
 	if(!exists("root:cursA"))
-		print "Store cursor values with StoreCurs() first."
+		printf "Store cursor values with StoreCurs() first.\r"
 		return 0
 	endif
 	
@@ -1641,9 +1568,9 @@ Function AvgAmplitudes(baselinestart,baselineend)
 	Variable baselinestart,baselineend
 	NVar cursA=root:cursA
 	NVar cursB=root:cursB
-	print "ROI is "+num2str(cursA)+" to "+num2str(cursB)+" or "+num2str((cursB-cursA)/(1/60))+" wavelengths of 60 Hz"
-	print "Baseline is "+num2str(baselinestart)+" to "+num2str(baselineend)+" or "+num2str((baselineend-baselinestart)/(1/60))+" wavelengths of 60 Hz"
-	print "From Baseline start to ROI start is "+num2str((cursA-baselinestart)/(1/60))+" wavelengths of 60 Hz"
+	printf "ROI is %3f to %.3f or %.2f wavelengths of 60 Hz\r",num2str(cursA),num2str(cursB),num2str((cursB-cursA)/(1/60))
+	printf "Baseline is %.3f to %.3f or %.2f wavelengths of 60 Hz\r",num2str(baselinestart),num2str(baselineend),num2str((baselineend-baselinestart)/(1/60))
+	printf "From Baseline start to ROI start is %.2f wavelengths of 60 Hz",num2str((cursA-baselinestart)/(1/60))
 	SetDataFolder root:reanalysis:avgwaves
 	String waves=DataFolderDir(2) // Get a list of the waves in that directory
 	waves=StringFromList(0,RemoveListItem(0,waves,":")); // Clean up the list (remove the word WAVES and : and ;
@@ -1701,7 +1628,6 @@ End
 //		DoWindow /F $win
 //		if(numpnts(MeanWave)>5)
 //			FuncFit /Q IntegratedPowerLaw W_coef  MeanWave[1,] /D 
-//			print win,cutoff,W_Coef[0]
 //			Exponents[i][log(cutoff/100000)/log(2)]=W_Coef[0]
 //		endif
 //	endfor
@@ -1742,7 +1668,7 @@ Function GetImpulseResponses(channel,method,offset) // Method is 1=Time Constant
 			cellFolder="root:cellL2:"
 			break
 		default:
-			Print "Not a valid channel choice!"
+			printf "Not a valid channel choice!\r"
 	endswitch
 	
 	Variable V_fitOptions=4
@@ -1774,7 +1700,6 @@ Function GetImpulseResponses(channel,method,offset) // Method is 1=Time Constant
 					smoothed-=V_avg // Make the impulse response function decay to zero
 					smoothed=NormalizeToUnity(smoothed)
 					Duplicate /o smoothed $(cellFolder+"impulse"+num2str(n))
-					print n
 					break
 				case 1:
 					DeletePoints 0,x2pnt(WaveToFitA,0.035),waveToFitA
@@ -1792,7 +1717,6 @@ Function GetImpulseResponses(channel,method,offset) // Method is 1=Time Constant
 					fitCoefs[n][2]=1/K2
 					fitCoefs[n][3]=K3
 					fitCoefs[n][4]=1/K4
-					print n
 					break
 				endswitch
 		endif
@@ -1815,7 +1739,7 @@ Function RsCompensateAll(channel,method)
 			cellFolder="root:cellL2:"
 			break
 		default:
-			Print "Not a valid channel choice!"
+			printf "Not a valid channel choice!\r"
 	endswitch
 	
 	Variable n=1
@@ -1834,11 +1758,10 @@ Function RsCompensateAll(channel,method)
 					RsCompensateTau(waveToCompensate,fitcoefs[n][2],n)
 					break
 				default:
-					print "Not a valid method! (RsCompensateAll)"
+					printf "Not a valid method! (RsCompensateAll)\r"
 					return 0
 			endswitch
 			Duplicate/o deconvoluted $(cellFolder+"sweep"+num2str(n)+"A")
-		print n
 		endif
 		n+=1
 	While(waveexists($(cellFolder+"sweep"+num2str(n))))
@@ -1864,7 +1787,6 @@ Function PutReverbChargeIntoDatabase()
 	Wave /T Baseline_Sweeps,Post_Activity_Sweeps
 	Variable first_sweep=str2num(StringFromList(1,Baseline_Sweeps[0],","))
 	Variable last_sweep=str2num(StringFromList(0,Post_Activity_Sweeps[0],","))
-	print first_sweep,last_sweep
 	if(!numtype(first_sweep) && !numtype(last_sweep)) // If these values are both numbers.  
 		Variable j,sweep
 		for(j=0;j<ItemsInList(two_channels);j+=1)

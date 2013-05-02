@@ -45,6 +45,8 @@ function /wave RandomPhases(w[,width,trim])
 	//overlap = paramisdefault(overlap) ? 0 : overlap
 	trim = paramisdefault(trim) ? 25 : trim
 	width/=dimdelta(w,0)
+	width = round(width)
+	width -= mod(width,2) != 0 ? 1 : 0
 	//overlap*=width
 	variable i,numFFTs=floor(numpnts(w)/width)//1+floor((numpnts(w)-width)/(width-overlap))
 	variable start=0

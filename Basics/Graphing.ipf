@@ -3647,15 +3647,6 @@ Function TracePoints(trace,[win])
 	endif
 End
 
-Function /S TraceYAxis(trace,[win])
-	String trace,win
-	if(ParamIsDefault(win))
-		win=WinName(0,1)
-	endif
-	String info=TraceInfo(win,trace,0)
-	return StringByKey("YAxis",info)
-End
-
 // Brings a trace to the front of the window.  Actually removes it and reappends it, with all of its features intact.  
 Function BringToFront(trace,[win])
 	String trace,win
@@ -3691,6 +3682,17 @@ Function SetXAxis([win])
 	SetAxis /W=$win $axis,hcsr(A),hcsr(B)
 End
 
+function /s CursorTrace(csr,[win])
+	string csr,win
+	
+	if(ParamIsDefault(win))
+		win=WinName(0,1)
+	endif
+	string info = csrinfo($csr)
+	string trace = stringbykey("TNAME",info)
+	return trace
+end
+
 Function /S TraceXAxis(trace,[win])
 	String trace,win
 	if(ParamIsDefault(win))
@@ -3698,6 +3700,15 @@ Function /S TraceXAxis(trace,[win])
 	endif
 	String info=TraceInfo(win,trace,0)
 	return StringByKey("XAXIS",info)
+End
+
+Function /S TraceYAxis(trace,[win])
+	String trace,win
+	if(ParamIsDefault(win))
+		win=WinName(0,1)
+	endif
+	String info=TraceInfo(win,trace,0)
+	return StringByKey("YAxis",info)
 End
 
 Function PlotLevels(data,levels)
@@ -4459,10 +4470,10 @@ Menu "GraphMarquee"
    "-"
    "Toggle axis info",/Q
    SubMenu "Single Axis"
-       "Expandä",/Q, ax_single("Expand")
-       "Shrinkä",/Q, ax_single("Shrink")
-       "Centerä",/Q, ax_single("Center")
-       "Undoä  ",/Q, ax_single("Undo")
+       "Expand",/Q, ax_single("Expand")
+       "Shrink",/Q, ax_single("Shrink")
+       "Center",/Q, ax_single("Center")
+       "Undo",/Q, ax_single("Undo")
    End
 End
 
