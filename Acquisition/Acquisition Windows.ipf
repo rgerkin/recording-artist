@@ -1823,7 +1823,10 @@ Function SweepsWinButtons(info) : ButtonControl
 				case "ChooseSweeps":
 					ControlInfo SweepChooser
 					if(v_flag!=11) // No SweepChooser.  
-						ListBox SweepChooser listWave=df:ListWave, selWave=df:SelWave, pos={385,55}, size={150,200}, mode=4, titleWave=df:Titles, win=SweepsWin, proc=SweepsWinListBoxes
+						variable numChannels = GetNumChannels()
+						variable hasAllColumn = numChannels >= 1
+						ListBox SweepChooser listWave=df:ListWave, selWave=df:SelWave, pos={385,55}, size={40+40*(numChannels+hasAllColumn+1),250}, widths={4,3}, mode=4
+						ListBox SweepChooser titleWave=df:Titles, win=SweepsWin, proc=SweepsWinListBoxes
 					else
 						KillControl SweepChooser
 					endif
@@ -1874,9 +1877,9 @@ function SweepsWinListboxes(info)
 	if(info.eventCode==2)
 		wave selWave = info.selWave
 		variable i,numChannels = GetNumChannels()
-		if(info.col==numChannels) // All was checked or unchecked.  
+		if(info.col==(numChannels+1)) // All was checked or unchecked.  
 			variable checked=selWave[info.row][info.col] & 16
-			for(i=0;i<info.col;i+=1)
+			for(i=1;i<info.col;i+=1)
 				struct WMListBoxAction info2
 				info2=info
 				info2.col=i
@@ -1888,7 +1891,7 @@ function SweepsWinListboxes(info)
 				endif
 				SweepsWinListBoxes(info2)
 			endfor
-			info.selWave[info.row][0,info.col-1] = 32+checked
+			info.selWave[info.row][1,info.col-1] = 32+checked
 		endif
 		if(!stringmatch(info.userData,"noSwitchView"))
 			SwitchView("")
@@ -1904,60 +1907,29 @@ function SweepsChooserUpdate([matrix])
 	variable i,j
 	variable numChannels = GetNumChannels()
 	variable numSweeps = GetCurrSweep()
+	variable hasAllColumn = numChannels > 1
 	
-	Make /o/T/n=(numSweeps,numChannels+1) df:ListWave /wave=ListWave=""
-	Make /o/n=(numSweeps,numChannels+1) df:SelWave /wave=SelWave = 48
+	Make /o/T/n=(numSweeps,numChannels+1+hasAllColumn) df:ListWave /wave=ListWave= selectstring(q==0,"","Sweep "+num2str(p)) // Sweep numbers for column 0.  
+	Make /o/n=(numSweeps,numChannels+1+hasAllColumn) df:SelWave /wave=SelWave = q==0 ? 0 : 48 // Check boxes for column >= 1.
+	SelWave[][1,numChannels] *= ChanSweepExists(q-1,p) // Remove checkbox if sweep does not exist for the channel.  
 	if(!paramisdefault(matrix))
-		SelWave = 32+16*matrix[p][q]
-		SelWave[][numChannels-1] = SelWave[p][0]
+		SelWave[][1,] = 32+16*matrix[p][q]
+		SelWave[][1,numChannels-1] = SelWave[p][1]
 	endif
-	Make /o/T/n=(numChannels+1) df:Titles /wave=Titles
+	Make /o/T/n=(numChannels+1+hasAllColumn) df:Titles /wave=Titles
 	for(i=0;i<numChannels;i+=1)
 		Variable red,green,blue; String titleStr
 		GetChanColor(i,red,green,blue)
 		sprintf titleStr,"\K(%d,%d,%d)%s",red,green,blue,GetChanLabel(i)
-		Titles[i]=titleStr
+		Titles[i+1]=titleStr
 	endfor
 	
-	Titles[numChannels]="All"
-	for(i=0;i<numSweeps;i+=1)
-//		dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
-//		if(datafolderrefstatus(instanceDF))
-//			variable active=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"active",default_=1)
-//			if(!active)
-//				deletepoints i,1,ListWave,SelWave,Parameter,AxisIndex,Minimum
-//			else
-//				ListWave[i][numChannels]=analysisMethod
-//				variable numChannelsWithMethod=0
-//				for(j=0;j<numChannels;j+=1)
-//					wave /t chanAnalysisMethods=Core#WavTPackageSetting(module,"channelConfigs",GetChanName(j),"analysisMethods")
-//					findvalue /text=analysisMethod /txop=4 chanAnalysisMethods
-//					if(v_value>=0 && strlen(analysisMethod))
-//						SelWave[i][j]+=16
-//						numChannelsWithMethod+=1
-//					endif
-//				endfor
-//				SelWave[i][numChannels]=32+16*(numChannelsWithMethod==numChannels) // Set "All" box.  
-//				//AxisIndex[i]=i
-//				Minimum[i]=0
-//				Parameter[i]=0
-//				nvar /z/sdfr=instanceDF show
-//				if(NVar_Exists(show) && show) 
-//					SelWave[i][numChannels+1]=SelWave[p][q] | 16 // Check the box for "Show".  
-//				else
-//					SelWave[i][numChannels+1]=SelWave[p][q] & ~16 // Uncheck the box for "Show".  
-//				endif
-//				//extract /free Active,TempActive,p<numChannels
-//				//SelWave[i][numChannels]=32+16*(sum(TempActive)==numChannels)
-//				if(SVar_Exists(methodSelected) && StringMatch(analysisMethod,methodSelected))
-//					SelWave[i][] = SelWave | 1 // Set to selected.
-//				else
-//					SelWave[i][] = SelWave & ~1 // Set to unselected.
-//				endif
-//			endif
-//			i+=1
-//		endif
-	endfor
+	Titles[0] = " " // Sweep number column title.  
+	if(hasAllColumn)
+		Titles[numChannels+1] = "All"
+	endif
+	//for(i=0;i<numSweeps;i+=1)
+	//endfor
 	return 0
 End
 
@@ -2363,7 +2335,7 @@ Function SwitchView(view)
 						ControlInfo /W=SweepsWin Inc; inc=V_Value
 						if(!numtype(first) && !numtype(last))
 							for(sweepNum=min(first,last);sweepNum<=max(first,last);sweepNum+=inc)
-								if(SelWave[k][i] & 16)
+								if(SelWave[k][i+1] & 16)
 									maxPulses=pulsesStacked ? MaxStimParam("Pulses",i,sweep=sweepNum) : 1
 									for(pulse=0;pulse<maxPulses;pulse+=1)
 										appended+=AppendAndOffsetSweep(i,j,sweepNum,pulse,"Response",0,red,green,blue)
@@ -2419,7 +2391,7 @@ Function SwitchView(view)
 						ControlInfo /W=SweepsWin Inc; inc=V_Value
 						if(!numtype(first) && !numtype(last))
 							for(k=min(first,last);k<=max(first,last);k+=inc)
-								if(SelWave[k][i] & 16)
+								if(SelWave[k][i+1] & 16)
 									appended+=AppendAndOffsetSweep(-1,i,k,0,"Sweep",0,red,green,blue)
 								endif
 							endfor

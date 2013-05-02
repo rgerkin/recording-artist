@@ -387,6 +387,13 @@ function /wave GetChanSweepParam(chan,sweep,param)
 	return result
 end
 
+function ChanSweepExists(chan,sweep)
+	variable chan,sweep
+	
+	wave /z w = GetChanSweep(chan,sweep,quiet=1)
+	return waveexists(w)
+end
+
 function /wave GetChanSweep(chan,sweep[,quiet])
 	variable chan,sweep,quiet
 	
@@ -399,6 +406,12 @@ function /wave GetChannelSweep(channel,sweep[,proxy,renew,quiet])
 	variable sweep,quiet,proxy,renew
 	
 	dfref df=GetChannelDF(channel)
+	if(!DataFolderRefStatus(df))
+		if(!quiet)
+			printf "There is no folder for channel %s.\r",channel
+		endif
+		return NULL
+	endif
 	wave /z/sdfr=df w=$GetSweepName(sweep)
 	if(!waveexists(w))
 		if(!quiet)
