@@ -1512,7 +1512,9 @@ Function AnalysisWinPopupMenus(info)
 				Variable time_since_start=(currSweep>0) ? datetime - expStartT : 0
 				
 				text="After sweep "+num2str(currSweep)+" ("+Secs2MinsAndSecs(time_since_start)+"): \r"+text
-				Notebook LogPanel#ExperimentLog text=text
+				if(wintype("LogPanel#ExperimentLog"))
+					Notebook LogPanel#ExperimentLog text=text
+				endif
 			endif
 			KillWaves /Z OldMinimum
 			break
@@ -3510,7 +3512,6 @@ function AnalysisWinHook(info)
 			endif
 			break
 		case "mousedown":
-			print info.mouseLoc
 			if(info.mouseLoc.v<0 && (info.eventMod & 16))
 				PopupContextualMenu Core#ListPackageInstances(module,info.winname)+"_Save_"
 				if(v_flag>=0)

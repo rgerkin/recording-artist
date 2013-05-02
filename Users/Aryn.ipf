@@ -2918,77 +2918,212 @@ End
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
-Function TestPulseAnalysis()
-	string RinWaveName, RinString, RsSTring, CapString, AvgWaveName, TempName
+//Function TestPulseAnalysis()
+//	string RinWaveName, RinString, RsSTring, CapString, AvgWaveName, TempName
+//	variable voltageStep=-5
+//	variable holding
+//	variable integral, ichange, MinLocation, baseline, avgLate, MinLocPoint
+//	variable numerator, denominator, CapforRS
+//	variable RsPoint, Rs, RinValue, CapValue, tau, RsNew
+//	variable i, V_flag, indexNum
+//	string TPtextName, TPOutputName
+//	string baseName
+//	prompt BaseName, "BaseName"
+//	doprompt "", baseName
+//
+//	make/o/t/n=5 TPtext
+//	make/o/n=5 TPOutput
+//	
+//	TPtext[0] = "Rin"; TPtext[1] = "Capacitance"; TPtext[2] = "Rs"; TPtext[3] = "transient"; TPtext[4] = "holding"
+//	
+//	//make sure cancel button works
+//	if(V_flag)
+//		abort
+//	endif
+//	
+//	AverageTrace()
+//	
+//	make/o/t/n=0 AvgName
+//	//Get avg wave off the graph
+//	do	
+//		redimension/n=(numpnts(AvgName)+1) AvgName
+//		AvgWaveName = WaveName("", i, 1)
+//		AvgName[i]=AvgWaveName
+//		if (strlen(AvgWaveName) == 0)
+//			break
+//		endif
+//	
+//	i += 1
+//	indexNum = i
+//	while(1)
+//	
+//	indexNum-=1
+//
+//		tempName = WaveName("", indexNum, 1)
+//		wave RinWave =  $tempName 		
+//		display RinWave; ModifyGraph rgb=(0,0,0)
+//		
+//	//Calculate Rin
+//		wavestats/q/r=(0.006,0.0097) RinWave
+//			baseline = v_avg
+//			holding = v_avg
+//	//	wavestats/q/r=(0.017, 0.0194) RinWave
+//		wavestats/q/r=(0.027, 0.029) RinWave
+//			avgLate = v_avg
+//		iChange = baseline-avgLate
+//			iChange*=1e3	//convert current from pA to nA
+//			//R = V/I
+//			RinValue = (voltagestep)/(iChange)
+//				RinValue*=-1e6	//convert to MOhms
+//		TPOutput[0] = RinValue
+//	
+////	//Calculate Rs (simple way)
+////		WaveStats/q/r=[98, 107] RinWave
+////			MinLocation=V_minloc	
+////			Rspoint=V_min
+////		//Rs=(V/I)
+////			iChange=(RsPoint-baseline)*1e-9	//calculates change in current and converts to nA
+////			Rs=voltageStep/iChange
+////			Rs/=1e6	//conveerts Rs to MOhms
+//	
+//
+//	//Calculate Capacitance
+//		duplicate/o/r=(0.0099, 0.014) RinWave IntWave			//0.014 for MSNs; 0.0117 for FS or LTS
+//			IntWave-=baseline
+//		Integrate IntWave; integral = IntWave[numpnts(intWave)]
+//			// C=q/V  	
+//			VoltageStep/=-1000	//convert from mV to V
+//			capValue=(Integral/voltagestep)
+//			CapValue*=-1
+//		TPOutput[1] = CapValue
+//		
+//	//Caclulate Rs, independently of transient with tau = RC
+//			WaveStats/q/r=(0.01, 0.0114) RinWave
+//			MinLocation=V_minloc	
+//			MinLocPoint = x2pnt(RinWave, minLocation)
+//			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
+//			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
+//			wave W_coef
+//			tau = W_coef[2]
+//				CapforRs= CapValue
+//				CapforRs*=1e-12
+//			RsNew = tau/CapforRs
+//				RsNew*=1e-6
+//				TPOutput[2] = RsNew
+//				TPOutput[3] = tau
+//				TPOutput[4] = holding
+//				
+//		
+////	//Calculate Rs- resistant to filtering: Rs = (Tau * voltage step) / [(integral)+(Tau * final current)]
+////From Matthew
+////			MinLocPoint = x2pnt(RinWave, minLocation)
+////			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
+////			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
+////			wave W_coef
+////			tau = W_coef[2]
+////			numerator = tau * VoltageStep
+////				iChange*=1e-9		//Current in units of A
+////				integral *=1e-12	//Charge in units of Q/s
+////			denominator = integral + (tau * iChange)
+////			RsNew = numerator/denominator
+////				RsNew*=1e-6 		//Rs in units of MOhms
+////			print "Rs New = ", RsNew, "MOhms"
+//			
+//		
+//			RinString=  num2str (RinValue)
+//			RsString = num2str (RsNew)
+//			CapString = num2str (CapValue)
+//
+//			RinString = "Rin =  "+ RinString + " MOhms"
+//			RsString = "Rs =  " + RsString + " MOhms"
+//			CapString = "Cap = " + CapString + " pF"
+//
+//		TextBox/C/N=text2/F=0/S=3/M/A=RB/Y=20/X=10 CapString
+//		TextBox/C/N=text1/F=0/S=3/M/A=RB/Y=30/X=4 RsString
+//		TextBox/C/N=text0/F=0/S=3/M/A=RB/Y=40/x=2 RinString
+//		
+//		sprintf TPtextName, "%s%s", "TPtext_", baseName
+//			duplicate/o TPtext $TPTextName
+//		sprintf TPOutputName, "%s%s", "TPOutput_", baseName
+//			duplicate/o TPOutput $TPOutputName
+//		
+//		edit $TPtextName, $TPOutputName
+//	
+//End
+
+
+Function TestPulseAnalysis(chan)
+	variable chan
+	
+	variable i,sweepNum
+	variable first = GetCursorSweepNum("A")
+	variable last = GetCursorSweepNum("B")
+	variable sampleRate
+	string list = ""
+	string  RinString, RsSTring, CapString
 	variable voltageStep=-5
 	variable holding
 	variable integral, ichange, MinLocation, baseline, avgLate, MinLocPoint
 	variable numerator, denominator, CapforRS
 	variable RsPoint, Rs, RinValue, CapValue, tau, RsNew
-	variable i, V_flag, indexNum
-	string TPtextName, TPOutputName
-	string baseName
-	prompt BaseName, "BaseName"
-	doprompt "", baseName
-
-	make/o/t/n=5 TPtext
-	make/o/n=5 TPOutput
-	
-	TPtext[0] = "Rin"; TPtext[1] = "Capacitance"; TPtext[2] = "Rs"; TPtext[3] = "transient"; TPtext[4] = "holding"
-	
+	variable  V_flag
+	dfref df=Core#InstanceHome("Acq","sweepsWin","win0")
+	wave /sdfr=df SelWave
+		
 	//make sure cancel button works
 	if(V_flag)
 		abort
 	endif
 	
-	AverageTrace()
+	make/o/t/n=5 TPtext
+	make/o/n=5 TPOutput
 	
-	make/o/t/n=0 AvgName
-	//Get avg wave off the graph
-	do	
-		redimension/n=(numpnts(AvgName)+1) AvgName
-		AvgWaveName = WaveName("", i, 1)
-		AvgName[i]=AvgWaveName
-		if (strlen(AvgWaveName) == 0)
-			break
+	TPtext[0] = "Rin"; TPtext[1] = "Capacitance"; TPtext[2] = "Rs"; 
+	TPtext[3] = "transient"; TPtext[4] = "holding"
+	
+	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
+		if(SelWave[sweepNum][chan] & 16)
+			wave w = GetChanSweep(chan,sweepNum)
+			string name = "TP_avg"
+			wave /z avg = $CleanupName(name,0)
+			if(!waveexists(avg))
+				make /o/n=(numpnts(w)) $CleanupName(name,0) /wave=avg=0
+			endif
+			if(whichlistitem(name,list)<0)
+				avg=0
+				note /k avg, ""
+				list += name+";"
+			endif
+			avg += w[p]
+			note /nocr avg, "X"
 		endif
-	
-	i += 1
-	indexNum = i
-	while(1)
-	
-	indexNum-=1
-
-		tempName = WaveName("", indexNum, 1)
-		wave RinWave =  $tempName 		
-		display RinWave; ModifyGraph rgb=(0,0,0)
+	endfor
+	display /k=1
+	for(i=0;i<itemsinlist(list);i+=1)
+		name = stringfromlist(i,list)
+		wave avg = $CleanupName(name,0)
+		string the_note = note(avg)
+		avg /= strlen(the_note)
+			SampleRate = deltax(w)
+			SetScale/P x 0,SampleRate,"", avg
+			 appendtograph avg
+			ModifyGraph rgb=(0,0,0)
+	endfor
 		
 	//Calculate Rin
-		wavestats/q/r=(0.006,0.0097) RinWave
+		wavestats/q/r=(0.01,0.09) avg
 			baseline = v_avg
 			holding = v_avg
-	//	wavestats/q/r=(0.017, 0.0194) RinWave
-		wavestats/q/r=(0.027, 0.029) RinWave
+		wavestats/q/r=(0.18, 0.2) avg
 			avgLate = v_avg
 		iChange = baseline-avgLate
 			iChange*=1e3	//convert current from pA to nA
-			//R = V/I
 			RinValue = (voltagestep)/(iChange)
 				RinValue*=-1e6	//convert to MOhms
 		TPOutput[0] = RinValue
-	
-//	//Calculate Rs (simple way)
-//		WaveStats/q/r=[98, 107] RinWave
-//			MinLocation=V_minloc	
-//			Rspoint=V_min
-//		//Rs=(V/I)
-//			iChange=(RsPoint-baseline)*1e-9	//calculates change in current and converts to nA
-//			Rs=voltageStep/iChange
-//			Rs/=1e6	//conveerts Rs to MOhms
-	
 
 	//Calculate Capacitance
-		duplicate/o/r=(0.0099, 0.014) RinWave IntWave			//0.014 for MSNs; 0.0117 for FS or LTS
+		duplicate/o/r=(0.1, 0.125) avg IntWave			
 			IntWave-=baseline
 		Integrate IntWave; integral = IntWave[numpnts(intWave)]
 			// C=q/V  	
@@ -2997,11 +3132,11 @@ Function TestPulseAnalysis()
 			CapValue*=-1
 		TPOutput[1] = CapValue
 		
-	//Caclulate Rs, independently of transient with tau = RC
-			WaveStats/q/r=(0.01, 0.0114) RinWave
+	//Caclulate Rs, with tau = RC, resistant to filtering
+			WaveStats/q/r=(0.1, 0.125) avg
 			MinLocation=V_minloc	
-			MinLocPoint = x2pnt(RinWave, minLocation)
-			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
+			MinLocPoint = x2pnt(avg, minLocation)
+			duplicate/o/r=[MinLocPoint, 1300] avg TauWave
 			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
 			wave W_coef
 			tau = W_coef[2]
@@ -3010,26 +3145,9 @@ Function TestPulseAnalysis()
 			RsNew = tau/CapforRs
 				RsNew*=1e-6
 				TPOutput[2] = RsNew
-				TPOutput[3] = tau
+				TPOutput[3] = tau*1000
 				TPOutput[4] = holding
 				
-		
-//	//Calculate Rs- resistant to filtering: Rs = (Tau * voltage step) / [(integral)+(Tau * final current)]
-//From Matthew
-//			MinLocPoint = x2pnt(RinWave, minLocation)
-//			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
-//			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
-//			wave W_coef
-//			tau = W_coef[2]
-//			numerator = tau * VoltageStep
-//				iChange*=1e-9		//Current in units of A
-//				integral *=1e-12	//Charge in units of Q/s
-//			denominator = integral + (tau * iChange)
-//			RsNew = numerator/denominator
-//				RsNew*=1e-6 		//Rs in units of MOhms
-//			print "Rs New = ", RsNew, "MOhms"
-			
-		
 			RinString=  num2str (RinValue)
 			RsString = num2str (RsNew)
 			CapString = num2str (CapValue)
@@ -3042,12 +3160,9 @@ Function TestPulseAnalysis()
 		TextBox/C/N=text1/F=0/S=3/M/A=RB/Y=30/X=4 RsString
 		TextBox/C/N=text0/F=0/S=3/M/A=RB/Y=40/x=2 RinString
 		
-		sprintf TPtextName, "%s%s", "TPtext_", baseName
-			duplicate/o TPtext $TPTextName
-		sprintf TPOutputName, "%s%s", "TPOutput_", baseName
-			duplicate/o TPOutput $TPOutputName
+		edit TPtext, TPOutput 
 		
-		edit $TPtextName, $TPOutputName
+		
 	
 End
 
@@ -3752,7 +3867,7 @@ Function SpikeShapeAnalysis([win_name])
 	variable startTime, endTime
 	variable threshold = -35
 	variable trainTime, binLength
-	variable startAnalysis = 1.1
+	variable startAnalysis = 1.0
 	variable EndAnalysis = 2
 	variable APPeak, halfMaxPoint1, halfMaxPoint2, halfMax, halfheight, Apht
 	variable deltaOne, SampleRate
@@ -3766,7 +3881,8 @@ Function SpikeShapeAnalysis([win_name])
 	wave/t spkWaveNames
 	prompt startAnalysis, "Time to start Analysis"
 	prompt baseName, "BaseName"
-	doprompt "", startAnalysis, baseName
+	prompt threshold, "threshold"
+	doprompt "", startAnalysis, baseName, threshold
 	
 	
 //These lines magically get the waves you want off the SweepsWin window
@@ -3849,7 +3965,7 @@ Function SpikeShapeAnalysis([win_name])
 			//print "Spikes analyzed = ", nSpikesFinal
 			
 		wavestats/q SpikeLatencyWave
-			variable SpikeLatency = v_avg
+			variable SpikeLatency = v_avg*1000
 		//	print SpikeLatency
 	
 	
@@ -3998,7 +4114,7 @@ Function IFplot1([win_name])
 	make/o/n=0 ARratioWave
 	
 	//output waves
-	make/o/t/n=11 IFplotOutput
+	make/o/t/n=12 IFplotOutput
 	IFplotOutput[0] = "maxFR"
 	IFplotOutput[1] = "Rheobase"
 	IFplotOutput[2] = "Input Range"
@@ -4010,8 +4126,9 @@ Function IFplot1([win_name])
 	IFplotOutput[8] = "Adaptation 50 Hz"
 	IFplotOutput[9] = "Adaptation 150 Hz"
 	IFplotOutput[10] = "Adaptation 250 Hz"
+	IFPlotOutput[11] = "Vm rest"
 	
-	make/o/n=11 IFPlotData
+	make/o/n=12 IFPlotData
 	IFPlotData = nan
 	
 	//These lines magically get the waves you want off the SweepsWin window
@@ -4043,6 +4160,11 @@ Function IFplot1([win_name])
 			InputCurrentWave[i] = InputCurrent
 		FindSpikeTimesAG(TraceWave, startTime, endTime, Threshold)
 		wave spikeRates, spikeTimes
+			//gets avg Vm if no spikes
+			if (numpnts(SpikeRates)<1)
+				wavestats/q TraceWave
+				IFPlotData[11] = v_avg
+			endif
 		if (numpnts(SpikeRates)>0)
 		//Finds the average firing rate across the whole second
 			wavestats/q spikeRates
@@ -4062,6 +4184,7 @@ Function IFplot1([win_name])
 				m+=1
 			endif
 		endfor				
+			//EDIT FIRSTHUNDRED, LASTHUNDRED
 				if (numpnts(FirstHundred)>0)
 					wavestats/q FirstHundred
 					FRinitial = v_avg
@@ -5875,14 +5998,14 @@ End
 
 
 Menu "AG_Analysis"
-	"Graph firing rate!T/2", GraphRate()
 	"AverageTrace!T/1", AverageTrace()
+	"Graph firing rate!T/2", GraphRate()
 	"AppendWholeGraph!T/3", AppendWholeGraph()
-	"SpikeShapeAnalysis!T/4", SpikeShapeAnalysis()
-	"Cell attached FR!T/5", AttachedFR()
+	"Cell attached FR!T/4", AttachedFR()
+	"SpikeShapeAnalysis!T/5", SpikeShapeAnalysis()
 	"IF Plot!T/6", IFPlot1()
 	"Ih!T/7", IhAnalysis(0)
-	
+	"TestPulse!T/8", TestPulseAnalysis(0)
 	
 End
 
