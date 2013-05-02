@@ -2076,3 +2076,60 @@ function TTLs2Odors(ttl)
 		endif
 	endfor
 end
+
+function RosePlot(tuningMatrix[,rates,no_plot])
+	wave tuningMatrix // Assumes this scaled to have phase (the unit circle) respresented in X.  
+	wave rates // Wave of corresponding average spike rates for color-coding.  
+	variable no_plot
+	
+	dfref df = getwavesdatafolderdfr(tuningMatrix)
+	variable n_phaseBins = dimsize(tuningMatrix,0)
+	variable n_cells = dimsize(tuningMatrix,1)
+	make /o/n=(n_phaseBins+1,n_cells) df:rosePlot_X /wave=XX,df:rosePlot_Y /wave=YY
+	copyscales /p tuningMatrix,XX,YY
+	if(!no_plot)
+		display as "Rose Plot"
+	endif
+	if(!paramisdefault(rates))
+		duplicate /free rates log_rates
+		log_rates = log(rates)+log(2)
+		wavestats /q/m=1 log_rates
+		variable min_rate = -2//v_min
+		variable max_rate = 2//v_max
+		colortab2wave yellowhot
+		make /o/n=5 df:tick_values /wave=tick_values = p-2
+		make /o/t/n=5 df:tick_labels /wave=tick_labels = num2str(10^(tick_values[p]))
+		wave m_colors
+		setscale x,min_rate,max_rate,m_colors
+	endif
+	variable cell
+	for(cell=0;cell<=n_cells;cell+=1)
+		XX[][cell] = tuningMatrix[mod(p,n_phaseBins)][cell]*cos(x)
+		YY[][cell] = tuningMatrix[mod(p,n_phaseBins)][cell]*sin(x)
+		if(!no_plot)
+			if(!paramisdefault(rates))
+				variable rate = log_rates[cell]
+				variable red = m_colors(rate)[0]
+				variable green = m_colors(rate)[1]
+				variable blue = m_colors(rate)[2]
+			endif
+			if(log_rates[cell]>-1.5)
+				appendtograph /c=(red,green,blue) YY[][cell] vs XX[][cell]
+			endif
+		endif
+	endfor
+	if(!no_plot)
+		ModifyGraph mode=0,marker=8,zero=4,noLabel=2,axThick=0,zeroThick=5
+		ColorScale /F=0 side=2, ctab={min_rate,max_rate,yellowhot,0} "Mean Firing Rate (Hz)"
+		ColorScale/C/N=text0 userTicks={tick_values,tick_labels}
+		SetDrawEnv fname="Symbol",fsize=18,save
+		SetDrawEnv xcoord=bottom
+		DrawText 0,0,"p/2"
+		SetDrawEnv xcoord=bottom
+		DrawText 0,1,"-p/2"
+		SetDrawEnv ycoord=left
+		DrawText 1,0,"0"
+		SetDrawEnv ycoord=left
+		DrawText 0,0,"+/- p"
+	endif
+end

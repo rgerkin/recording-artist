@@ -1472,7 +1472,7 @@ Function AnalysisWinPopupMenus(info)
 	if(!PopupInput(info.eventCode))
 		return 0
 	endif
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#InstanceHome(module,"analysisWin","win0")
 	variable i
 	strswitch(info.ctrlName)
 		case "Minimum":
@@ -1512,7 +1512,9 @@ Function AnalysisWinPopupMenus(info)
 				Variable time_since_start=(currSweep>0) ? datetime - expStartT : 0
 				
 				text="After sweep "+num2str(currSweep)+" ("+Secs2MinsAndSecs(time_since_start)+"): \r"+text
-				Notebook LogPanel#ExperimentLog text=text
+				if(wintype("LogPanel#ExperimentLog"))
+					Notebook LogPanel#ExperimentLog text=text
+				endif
 			endif
 			KillWaves /Z OldMinimum
 			break
@@ -1741,11 +1743,11 @@ Function SweepsWindow([instance])
   	
   variable fsize=GetFontSize()
 	Display /N=$win /W=(coords.left,coords.top,coords.right,coords.bottom) /K=2 as "Sweeps"
-	Button SetBaselineRegion,pos={575,3},size={75,15},fsize=fsize+1, proc=SweepsWinButtons,title="Set Baseline"
-	Checkbox AutoBaseline,pos={655,3},title="Auto"
+	Button SetBaselineRegion,pos={575,3},size={75,23},fsize=fsize+1, proc=SweepsWinButtons,title="Set Baseline"
+	Checkbox AutoBaseline,pos={655,4},title="Auto"
 	string default_view=Core#StrPackageSetting(module,"random","","defaultView",default_="Broad")
-	Checkbox SwitchView, pos={700,3},size={100,29},proc=SweepsWinCheckboxes,title="Focus",userData=default_view
-	Button ResetSweepAxes,pos={575,20},size={75,15},fsize=fsize+1,proc=SweepsWinButtons,title="Restore Axes"
+	Checkbox SwitchView, pos={655,21},size={100,29},proc=SweepsWinCheckboxes,title="Focus",userData=default_view
+	Button ResetSweepAxes,pos={575,20},size={75,23},fsize=fsize+1,proc=SweepsWinButtons,title="Restore Axes"
 	PopupMenu SweepOverlay,pos={655,20},title="Sweep Overlay",mode=0,value=#("PopupOptions(\""+win+"\",\"SweepOverlay\",\"Stack;By Mode;Split\")"),userData(selected)="Split",proc=SweepsWinPopupMenus
 	PopupMenu PulseOverlay,pos={755,20},title="Pulse Overlay",mode=0,value=#("PopupOptions(\""+win+"\",\"PulseOverlay\",\"None;Stacked\")"),userData(selected)="None",proc=SweepsWinPopupMenus
 	//Button SaveWin, pos={725,3},size={75,15},proc=SweepsWinButtons,title="Save Window"
@@ -1763,8 +1765,8 @@ Function SweepsWindow([instance])
 	DoUpdate; GetWindow $win,wsizeDC
 	
 	//Button RemoveAllTraces pos={V_right-284,5}, size={100,29}, title="Remove Traces", proc=RemoveTracesWrap
-	Button WaveSelector,pos={V_right-303,5},size={100,29},fsize=fsize+2,proc=SweepsWinButtons,title="Selector"
-	Button Logger,pos={V_right-101,5},size={100,29},fsize=fsize+2,proc=SweepsWinButtons,title="Log"
+	Button WaveSelector,pos={V_right-303,5},size={100,22},fsize=fsize+2,proc=SweepsWinButtons,title="Selector"
+	Button Logger,pos={V_right-101,5},size={100,22},fsize=fsize+2,proc=SweepsWinButtons,title="Log"
 	//Textbox/N=Recording/F=0/X=7/Y=1 "\\Z08Waiting..."
 	//NVar testPulsestart=root:parameters:testPulsestart
 	//Variable stim_point_start,test_point_start
@@ -3426,15 +3428,36 @@ function SweepsWinHook(info)
 				return -1
 			endif
 			GetWindow $info.winname,wsizeDC
-			Variable narrow = (V_right-V_left<1275)
-			ControlBar /W=$info.winname /L 105*narrow
+			variable narrow = (v_right-v_left<1100)
+			ControlBar /W=$info.winname /L 125*narrow
+			SetWindow $info.winname, userData(isNarrow)=num2str(narrow)
+			String controls="SetBaselineRegion;ResetSweepAxes;SwitchView;AutoBaseline;SweepOverlay;PulseOverlay;WaveSelector;Logger;"
+			if(!narrow)
+				controls = ReverseListOrder(controls)
+			endif
+			variable numControls=itemsinlist(controls)
 			variable numChannels=GetNumChannels()
-			String sweepsWinButtons="WaveSelector;Logger"
-			variable i
-			for(i=0;i<ItemsInList(sweepsWinButtons);i+=1)
-				String buttonName=StringFromList(i,sweepsWinButtons)
-				Variable ypos=max(3,numChannels)*18+5
-				Button $buttonName pos={narrow ? 2 : V_right-(2-i)*201,narrow ? ypos+i*35 : 5}, fsize=GetFontSize()+2, win=$info.winname
+			variable xx = narrow ? 2 : v_right
+			variable yy = narrow ? max(3,numChannels)*18 : 2
+			variable i,j
+			for(i=0;i<numControls;i+=1)
+				string controlName = stringfromlist(i,controls)
+				ControlInfo /W=$info.winname $controlName
+				if(v_disable != 1) // If visible.  
+					variable isPopup=(V_flag==3)
+					variable isCheckbox=(V_flag==2)
+					if(narrow)
+						yy += i==0 ? 10 : 30
+					else
+						if(mod(i,2)==0)
+							xx -= 120+isPopup*25-isCheckbox*25
+							yy = 2
+						else
+							yy = 26
+						endif
+					endif
+					ModifyControl /Z $controlName pos={xx,yy+isPopup*3+isCheckbox*4}, win=$info.winname
+				endif
 			endfor
 			break
 		case "modified":
@@ -3510,7 +3533,6 @@ function AnalysisWinHook(info)
 			endif
 			break
 		case "mousedown":
-			print info.mouseLoc
 			if(info.mouseLoc.v<0 && (info.eventMod & 16))
 				PopupContextualMenu Core#ListPackageInstances(module,info.winname)+"_Save_"
 				if(v_flag>=0)
@@ -3546,9 +3568,11 @@ function AnalysisWinHook(info)
 				for(j=0;j<itemsinlist(controlNames);j+=1)
 					string controlName = stringfromlist(j,controlNames)
 					ControlInfo /W=$info.winname $controlName
-					Variable isPopup=(V_flag==3)
-					xx -= 80+isPopup*25
-					ModifyControl /Z $controlName pos={narrow ? 2 : xx,narrow ? 30+i*25 : numControls-isPopup*3}, win=$info.winname
+					if(v_disable != 1) // If visible.  
+						variable isPopup=(V_flag==3)
+						xx -= 80+isPopup*25
+						ModifyControl /Z $controlName pos={narrow ? 2 : xx,narrow ? 30+i*25 : numControls-isPopup*3}, win=$info.winname
+					endif
 				endfor
 			endfor
 			break
@@ -3698,9 +3722,13 @@ Function ChannelColorCode([win])
 	KillVariables /Z red,green,blue
 End
 
-Function AnalysisWinButtons(ctrlName) : ButtonControl
-	String ctrlName
-	strswitch(ctrlName)
+Function AnalysisWinButtons(info) : ButtonControl
+	struct wmbuttonaction &info
+	
+	if(info.eventCode!=2)
+		return 0
+	endif
+	strswitch(info.ctrlName)
 		case "AnalysisSelect":
 			ControlInfo AnalysisSelector
 			AnalysisSelector(V_flag)
@@ -3720,7 +3748,17 @@ Function AnalysisWinButtons(ctrlName) : ButtonControl
 				DoAlert 0,"No axis is active."
 				return -1
 			endif
-			SetAxis /W=AnalysisWin /A=2 $("axis_"+num2str(axisNum))
+			string csr_trace = CursorTrace("A",win=info.win)
+			string axis = TraceYAxis(csr_trace,win=info.win)
+			string target_axis = "axis_"+num2str(axisNum)
+			if(stringmatch(axis,target_axis))
+				wave w = TraceNameToWaveRef(info.win,csr_trace)
+				wavestats /q/r=(xcsr(A),xcsr(B)) w
+				variable range = v_max-v_min
+				SetAxis /W=$info.win $target_axis,v_min-range/5,v_max+range/5
+			else	
+				SetAxis /W=$info.win /A=2 $target_axis
+			endif
 			break
 		case "Recalculate":
 			Recalculate()

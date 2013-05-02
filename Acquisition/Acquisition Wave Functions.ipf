@@ -1063,7 +1063,7 @@ end
 
 Function /S SelectedMethod()
 	string result=""
-	dfref analysisWinDF=Core#PackageHome(module,"analysisWin")
+	dfref analysisWinDF=Core#InstanceHome(module,"analysisWin","win0")
 	if(datafolderrefstatus(analysisWinDF))
 		wave /z/sdfr=analysisWinDF selWave
 		wave /z/t/sdfr=analysisWinDF listWave
