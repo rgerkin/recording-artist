@@ -3291,10 +3291,16 @@ Function TrendRegion(method,options)
 	Duplicate /free/R=[start,finish] sweepT trendX
 	make /o/n=(finish-start+1) tempTrend
 	variable order=nan
+	variable neighbors=numberbykey("neighbors",options)
+	neighbors=numtype(neighbors) ? 5 : neighbors
 	
 	strswitch(method)
 		case "Remove":
 			tempTrend=NaN
+			variable red,green,blue
+			string channel = GetDataFolder(0,df)
+			GetChannelColor(channel,red,green,blue)
+			modifygraph /Z rgb($trace)=(red,green,blue)
 			break
 		case "Linear Regression":
 			//SetScale /P x,first,1,$fitName
@@ -3304,13 +3310,14 @@ Function TrendRegion(method,options)
 			variable error=GetRTError(1)
 			break
 		case "Decimation":
+			tempTrend = mean(trendY,pnt2x(trendY,p-neighbors/2),pnt2x(trendY,p+neighbors/2))
 			order=numtype(order) ? 0 : order
+			break
 		case "Lowess":
 			order=numtype(order) ? 1 : order
 		case "Loess":
 			order=numtype(order) ? 2 : order
-			variable neighbors=numberbykey("neighbors",options)
-			neighbors=numtype(neighbors) ? 5 : neighbors
+			variable orig_neighbors = neighbors
 			do
 				Loess /dest=tempTrend /N=(neighbors) /ORD=(order) /R=0 /Z=1 srcWave=trendY, factors={trendX}
 				error=v_flag
@@ -3326,15 +3333,23 @@ Function TrendRegion(method,options)
 	endswitch
 	
 	if(!error)
-		Trend[start,finish][value][pre]=tempTrend[p-start]
+		if(stringmatch(method,"Decimation"))
+			Trend[start,finish][value][pre]=mod(p,neighbors)==floor((neighbors-1)/2) ? tempTrend[p-start] : nan
+		else
+			Trend[start,finish][value][pre]=tempTrend[p-start]
+		endif
 		string appendedTrends=AppendedWave(Trend,dim1=value,dim2=pre,axis=activeAxis,win="AnalysisWin")
 		if(!strlen(appendedTrends))
-			variable red,green,blue
 			GetTraceColor(trace,red,green,blue)
 			appendToGraph /c=(red,green,blue) /L=$activeAxis /B=time_axis Trend vs sweepT
 			modifyGraph /Z lsize($nameofwave(Trend))=0.5
 			//Wave W_Coef=W_coef; Wave W_Sigma=W_Sigma
 			//printf "For trace %s, the slope is %f +/- %f\r",trace,W_Coef(2),W_Sigma(2)
+		endif
+		if(stringmatch(method,"Decimation"))
+			modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
+			variable marker = numberbykey("marker(x)",traceinfo("",trace,0),"=")
+			modifyGraph /Z mode=3,marker=marker,lsize($nameofwave(Trend))=5
 		endif
 	endif
 	killwaves /z tempTrend
