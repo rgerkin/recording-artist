@@ -2077,9 +2077,10 @@ function TTLs2Odors(ttl)
 	endfor
 end
 
-function RosePlot(tuningMatrix[,rates,no_plot])
+function RosePlot(tuningMatrix[,rates,phase_shift,no_plot])
 	wave tuningMatrix // Assumes this scaled to have phase (the unit circle) respresented in X.  
 	wave rates // Wave of corresponding average spike rates for color-coding.  
+	variable phase_shift // Rotate phase by this amount to match conventions in other figures.  
 	variable no_plot
 	
 	dfref df = getwavesdatafolderdfr(tuningMatrix)
@@ -2087,6 +2088,7 @@ function RosePlot(tuningMatrix[,rates,no_plot])
 	variable n_cells = dimsize(tuningMatrix,1)
 	make /o/n=(n_phaseBins+1,n_cells) df:rosePlot_X /wave=XX,df:rosePlot_Y /wave=YY
 	copyscales /p tuningMatrix,XX,YY
+	setscale /p x,dimoffset(tuningMatrix,0)+phase_shift,dimdelta(tuningMatrix,0),XX,YY
 	if(!no_plot)
 		display as "Rose Plot"
 	endif
