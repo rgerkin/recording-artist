@@ -182,6 +182,8 @@ function UpdateProfile(profile[,new,quiet])
 	string profileName=selectstring(new,profile.name,"_new_")
 	controlinfo $Hash32("isDev_"+profileName)
 	profile.dev=v_value
+	controlinfo $Hash32("orcid_"+profileName)
+	profile.orcid=s_value
 	string modules=ListAvailableModules()
 	variable i=0
 	do
@@ -737,6 +739,7 @@ function InitProfiles()
 	endif
 end
 
+// This function doesn't seem to be called by anything.  
 Function ModifyProfileInfo(profile,changes)
 	struct profileInfo &profile
 	string changes
@@ -749,6 +752,9 @@ Function ModifyProfileInfo(profile,changes)
 		strswitch(changeVar)
 			case "Dev":
 				profile.dev=str2num(changeValue)
+				break
+			case "Orcid":
+				profile.orcid = changeValue
 				break
 			default:
 				variable val=str2num(changeValue)
