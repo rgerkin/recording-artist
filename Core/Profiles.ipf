@@ -59,8 +59,6 @@ Function EditProfiles()
 	BuildMenu "Profiles"
 End
 
-SetVariable ProfileName variable=root:Packages:Profiles:profile, disable=2, title="Profile:",pos={2,5},size={100,25}
-
 function ShowProfile(profileName,xx)
 	string profileName
 	variable xx
@@ -81,14 +79,21 @@ function ShowProfile(profileName,xx)
 		TitleBox $("Title_"+profileName), pos={xx+7-width/2,yy}, title=profileName
 	endif
 	yy+=yJump
-	TitleBox $("Title_Dev"), pos={xMargin,yy-5}, title="Developer"
+	TitleBox $("Title_Dev"), pos={xMargin,yy-5}, title="Developer?"
 	Checkbox $Hash32("isDev_"+profileName), pos={xx+5,yy}, value=IsDeveloper(profile), title=" ",proc=Core#EditProfilesCheckboxes, userData="INFO:isDev;"+userData
+	yy+=yJump
+	TitleBox $("Title_Orcid"), pos={xMargin,yy-5}, title="ORCID id"
+	Button $Hash32("orcid_expand_"+profileName) pos={xx-25,yy}, size={15,15}, title="+", proc=Core#EditProfilesButtons
+	Button $Hash32("orcid_expand_"+profileName) userData="NAME:"+profileName+";EXPANDED:0;ACTION:Expand;TARGET:"+Hash32("orcid_"+profileName)
+	SetVariable $Hash32("orcid_"+profileName), pos={xx-10,yy}, size={55,20}, value=_STR:"", title=" "
+	yy+=yJump
+	TitleBox $("Title_Modules"), pos={xMargin,yy-5}, title="Modules:"
 	yy+=yJump
 	string modules=ListAvailableModules()
 	variable i
 	for(i=0;i<itemsinlist(modules);i+=1)
 		string module=stringfromlist(i,modules)
-		TitleBox $("Title_"+module), pos={xMargin,yy-5}, title=ModuleTitle(module)
+		TitleBox $("Title_"+module), pos={xMargin+5,yy-5}, title=ModuleTitle(module)
 		Checkbox $Hash32("has"+module+"_"+profileName), pos={xx+5,yy}, value=HasModule(profile,module), title=" ",proc=Core#EditProfilesCheckboxes, userData="INFO:has"+module+";"+userData
 		yy+=yJump
 	endfor
@@ -114,11 +119,16 @@ function /s Hash32(name[,length])
 	return "x"+result[0,length-1] 
 end
 
-function EditProfilesButtons(ctrlName)
-	string ctrlName
+function EditProfilesButtons(info)
+	struct WMButtonAction &info
 	
-	string userData=GetUserData(editor,ctrlName,"")
+	if(info.eventCode != 2)
+		return 0
+	endif
+	
+	string userData=GetUserData(editor,info.ctrlName,"")
 	string action=stringbykey("ACTION",userData)
+	string target=stringbykey("TARGET",userData)
 	string profileName=stringbykey("NAME",userData)
 	struct profileInfo profile
 	string currProfile=CurrProfileName()
@@ -145,6 +155,23 @@ function EditProfilesButtons(ctrlName)
 				EditProfiles()
 			endif
 			break
+		case "Expand": // Expand/unexpand control.  
+			variable wasExpanded=str2num(stringbykey("EXPANDED",userData))
+			button $info.ctrlName, title=selectstring(wasExpanded,"-","+"), win=$info.win
+			button $info.ctrlName, userData = ReplaceStringByKey("EXPANDED",userData,num2str(!wasExpanded))
+			controlinfo /w=$info.win $target
+			setvariable $target size={250-v_width,20}, win=$info.win
+			variable i
+			string controlsToHide=""
+			string profiles = ListProfiles()
+			profiles = RemoveFromList(profileName,profiles)+"_new_"
+			for(i=0;i<itemsinlist(profiles);i+=1)
+				string otherProfile=stringfromlist(i,profiles)	
+				string otherControls=Core#Hash32("orcid_"+otherProfile)+";"
+				otherControls+=Core#Hash32("orcid_expand_"+otherProfile)+";" 
+				controlsToHide += otherControls
+			endfor
+			ModifyControlList controlsToHide, disable=!wasExpanded
 	endswitch
 end
 
@@ -821,7 +848,8 @@ Structure profileInfo
 	char name[30] // The name of the profile.  
 	char style[30] // A style of the profile, used to set defaults.  
 	uint32 selected // Time (seconds from 1/1/2000) when this profile was last selected from the menu.  
-	double dummy[62]
+	char orcid[24] // ORCID.org ID, e.g. 0000-0002-2940-3378.  
+	double dummy[59]
 	uchar dev
 	char modules[100]
 	char dummy2[3]

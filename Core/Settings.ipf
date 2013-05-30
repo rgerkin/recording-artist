@@ -1294,7 +1294,7 @@ Function EditPackagesButtons(info) : ButtonControl
 			instances=removefromlist(instance,instances)
 			variable i
 			string controlsToHide=""
-			string objectControls=ControlNameList(info.win,";","*"+object+"*")
+			//string objectControls=ControlNameList(info.win,";","*"+object+"*")
 			for(i=0;i<itemsinlist(instances);i+=1)
 				string otherInstance=stringfromlist(i,instances)	
 				//string otherInstanceControls=ControlNameList(info.win,";","*"+otherInstance+"*")
