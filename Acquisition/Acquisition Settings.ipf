@@ -264,8 +264,9 @@ Function SelectPackageInstance(package,instance[,special])
 			endswitch
 			break
 		case "channelConfigs":
-			Core#SetStrPackageSetting(module,package,name,"DAQ",DAQ) // Set the DAQ for the current channel, e.g. ch0.
 			InitChan(chan)
+			Core#CopyInstance(module,package,instance,name)
+			Core#SetStrPackageSetting(module,package,name,"DAQ",DAQ) // Set the DAQ for the current channel, e.g. ch0.
 //			do // Use the default channel label, or a pick a new one if it is already taken.  
 //				string label_ = Core#StrPackageSetting(module,"channelConfigs",name,"label_")
 //				duplicate /free/t GetChanLabels() labels
@@ -280,6 +281,8 @@ Function SelectPackageInstance(package,instance[,special])
 //			if(!DataFolderExists(GetChannelFolder(label_))) // If there is no channel folder corresponding to this label...
 //				InitChanContainer(chan) // ... create one.  
 //			endif  
+			//string adc = Core#StrPackageSetting(module,package,instance,"adc")
+			//string dac = Core#StrPackageSetting(module,package,instance,"dac")
 			acqMode=Core#StrPackageSetting(module,package,instance,"acqMode")
 			SetAcqMode(acqMode,chan)
 			string stimName=GetStimulusName(chan) // Get the stimulus for this channelConfig.  
