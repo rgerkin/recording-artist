@@ -4,7 +4,7 @@
 
 //#ifdef Dev
 strconstant moduleEditor="EditModuleWin"
-strconstant moduleInfo="root:Packages:Profiles"
+strconstant moduleInfo_="root:Packages:Profiles"
 strconstant moduleHome_="root:parameters"
 strconstant defaultInstanceName="Generic"
 
@@ -729,7 +729,7 @@ function /df PackageManifest(module,package[,sub,quiet,load])
 	variable quiet,load
 	
 	sub=selectstring(!paramisdefault(sub),"",sub)
-	string loc=moduleInfo+":"+module+":Manifest:"+package
+	string loc=ModuleInfo_+":"+module+":Manifest:"+package
 	loc=JoinPath({loc,sub})
 	dfref manifest=$loc
 	if(!datafolderrefstatus(manifest))
@@ -1126,7 +1126,7 @@ function /df ModuleManifest(module[,load,quiet])
 	variable quiet
 	
 	load=paramisdefault(load) ? 1 : load
-	string loc=joinpath({moduleInfo,module,"Manifest"})
+	string loc=joinpath({ModuleInfo(),module,"Manifest"})
 	dfref df=$loc
 	if(!datafolderrefstatus(df))
 		string str=""
@@ -1470,7 +1470,7 @@ function AddPackageInstance(module,package,name)
 		duplicatedatafolder source dest:$name // Copy it into its new home in memory.  
 		
 		// If it was scheduled to be deleted in the next save, remove it from the deletion queue.  
-		dfref deleted=$joinpath({moduleInfo,module,"Deleted"})
+		dfref deleted=$joinpath({ModuleInfo(),module,"Deleted"})
 		if(datafolderrefstatus(deleted))
 			svar /z/sdfr=deleted deletedInstances=$package
 			if(svar_exists(deletedInstances))
@@ -1527,7 +1527,7 @@ function DeletePackageInstance(module,package,instance[,ignoreMissing])
 			printf "Could not kill existing package instance %s of the same name.  Make sure it is not in use.\r",instance
 			return -2
 		endif	
-		dfref deleted=NewFolder(joinpath({moduleInfo,module,"Deleted"}))
+		dfref deleted=NewFolder(joinpath({ModuleInfo(),module,"Deleted"}))
 		svar /z/sdfr=deleted deletedInstances=$package
 		if(!svar_exists(deletedInstances))
 			string /g deleted:$package=""
@@ -1586,7 +1586,7 @@ Function SavePackage(module,package[,deleteOld,quiet])
 			string instance=StringFromList(i,instances)
 			err+=SavePackageInstance(module,package,instance)
 		endfor
-		dfref deleted=$joinpath({moduleInfo,module,"Deleted"})
+		dfref deleted=$joinpath({ModuleInfo(),module,"Deleted"})
 		if(datafolderrefstatus(deleted))
 			svar /z/sdfr=deleted deletedInstances=$package
 			if(svar_exists(deletedInstances))
@@ -1851,7 +1851,7 @@ function /df ModuleManifestHome(module[,create,go])
 	string module
 	variable create,go
 	
-	string path = joinpath({moduleinfo,module,"Manifest"})
+	string path = joinpath({Moduleinfo(),module,"Manifest"})
 	if(create)
 		NewFolder(path,go=go)
 	endif
@@ -2490,7 +2490,7 @@ function /df NewInstanceHome(module,package[,sub,scratch,quiet])
 	variable scratch,quiet
 	
 	sub=selectstring(!paramisdefault(sub),"",sub)
-	string loc=joinpath({moduleInfo,module,"New",sub})
+	string loc=joinpath({moduleInfo_,module,"New",sub})
 	if(scratch)
 		killdatafolder /z $loc
 	endif

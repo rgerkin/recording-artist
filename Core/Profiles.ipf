@@ -6,7 +6,6 @@
 // to a directory (Core) containing Symbols.ipf already exists in the Igor Procedures folder.  
 
 static strconstant editor="EditProfilesWin"
-static strconstant moduleInfo_="root:Packages:Profiles"
 strconstant FLAGS_LONG="Developer;Acquisition;Neuralynx"
 constant DEV=0
 constant ACQ=1
@@ -85,7 +84,7 @@ function ShowProfile(profileName,xx)
 	TitleBox $("Title_Orcid"), pos={xMargin,yy-5}, title="ORCID id"
 	Button $Hash32("orcid_expand_"+profileName) pos={xx-25,yy}, size={15,15}, title="+", proc=Core#EditProfilesButtons
 	Button $Hash32("orcid_expand_"+profileName) userData="NAME:"+profileName+";EXPANDED:0;ACTION:Expand;TARGET:"+Hash32("orcid_"+profileName)
-	SetVariable $Hash32("orcid_"+profileName), pos={xx-10,yy}, size={55,20}, value=_STR:"", title=" "
+	SetVariable $Hash32("orcid_"+profileName), pos={xx-10,yy}, size={55,20}, value=_STR:profile.orcid, title=" "
 	yy+=yJump
 	TitleBox $("Title_Modules"), pos={xMargin,yy-5}, title="Modules:"
 	yy+=yJump
