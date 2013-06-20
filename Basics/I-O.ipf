@@ -847,11 +847,11 @@ function ExportHDF5([path_name,file_name])
 	if(!v_flag)
 		string full_path = strvarordefault("root:Packages:HDF:path","")
 		if(strlen(full_path))
-			newpath /o hdf_path,full_path
+			newpath /o/q hdf_path,full_path
 			pathinfo hdf_path
 		endif
 		if(!v_flag)
-			newpath /o hdf_path
+			newpath /o/q hdf_path
 		endif
 		path_name = "hdf_path"
 	endif

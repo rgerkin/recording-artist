@@ -121,7 +121,7 @@ static Function /wave MakePETHfromPanel([dataDF,keepTrials])
 	for(i=0;i<numpnts(counts);i+=1)
 		colLabels+=getdimlabel(counts,0,i)+";"
 	endfor
-	note /nocr NlxPETH, "COLLABELS:"+collabels
+	note /nocr NlxPETH, "COLLABELS="+collabels
 	return NlxPETH
 end
 
@@ -393,9 +393,9 @@ static Function /wave MakePETH(dataDF,eventsDF,pethInstance[,show,mask,keepTrial
 			PETH_sem=PETH*PETH_cv
 			break
 	endswitch
-	Note PETH, replacestringbykey("PETH_INSTANCE",note(PETH),pethInstance)
-	Note PETH, replacestringbykey("NORMALIZE",note(PETH),normalize)
-	//Note PETH, replacestringbykey("INTERVALS",note(PETH),intervals)
+	Note PETH, replacestringbykey("PETH_INSTANCE",note(PETH),pethInstance,"=")
+	Note PETH, replacestringbykey("NORMALIZE",note(PETH),normalize,"=")
+	//Note PETH, replacestringbykey("INTERVALS",note(PETH),intervals,"=")
 	if(!keepTrials)
 		killwaves /z Trials
 	endif
@@ -3743,7 +3743,7 @@ static Function ChopWinButtons(ctrlName)
 			Variable i
 			for(i=0;i<numSegments;i+=1)
 				dfref Segment=df:$("E"+num2str(i))
-				SaveBinaryFile(Segment,fileName=getdatafolder(0,df)+"_E"+num2str(i),path="NeuralynxSavePath")
+				SaveBinaryFile(Segment,fileName=getdatafolder(0,df)+"_E"+num2str(i),pathName="NeuralynxSavePath")
 			endfor
 			break
 	endswitch
@@ -3819,10 +3819,11 @@ static Function /df GetChopEpochs()
 	return ChopEpochs
 End
 
-static Function ChopData(dataDF[,epochsDF,type,killSource])
+static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 	dfref dataDF,epochsDF
 	string type
 	variable killSource // To save memory, redimension to zero the data waves from the original folders after chopping.  
+	variable quiet
 	
 	if(paramisdefault(type))
 		type=Nlx#DataType(dataDF)
@@ -3879,7 +3880,9 @@ static Function ChopData(dataDF[,epochsDF,type,killSource])
 			endif
 			count=finish-start+1
 		endif
-		printf "Epoch %d: Start (%d), Finish (%d), # Frames (%d)\r", i,start,finish,count
+		if(!quiet)
+			printf "Epoch %d: Start (%d), Finish (%d), # Frames (%d)\r", i,start,finish,count
+		endif
 		epochDuration[i]=ChopTimes[i+1]-ChopTimes[i]
 		epochEventCount[i]=count
 		Variable rows=dimsize(Data,0)
@@ -4153,12 +4156,14 @@ Function /WAVE ExtractMoreEpochs([df])
 End
 
 // Extract events with a particular stimulation message.   
-static Function /df ExtractEvents(eventType[,df,epoch])
+static Function /df ExtractEvents(eventType[,df,epoch,message,offset])
 	string eventType
 	dfref df
 	variable epoch // - Leave unspecified for to operate on the Events folder
 				  // - epoch>=0 to operate on that epoch.  
 				  // - epoch=-1 to operate on each epoch.  
+	string message // Value of the 'desc' wave indicating an event.  
+	variable offset // Offset the index of the event occurence from the index of the message.  
 	
 	variable i,j
 	if(paramisdefault(df))
@@ -4168,12 +4173,16 @@ static Function /df ExtractEvents(eventType[,df,epoch])
 		case "stimulus":
 			eventType="stims"
 		case "stim":
-			string message=STIMULUS_MESSAGE
+			if(paramisdefault(message))
+				message = STIMULUS_MESSAGE
+			endif
 			break
 		case "epoch": // Extract events corresponding to the start of recording.  
 		case "epochs":
 			eventType="epochs"
-			message=START_MESSAGE
+			if(paramisdefault(message))
+				message = START_MESSAGE
+			endif
 			break
 		default:
 			if(stringmatch(eventType,"TTL=*"))
@@ -4187,7 +4196,9 @@ static Function /df ExtractEvents(eventType[,df,epoch])
 					return NULL
 				else
 					wave /sdfr=df /t desc
-					message=desc[v_value]
+					if(paramisdefault(message))
+						message = desc[v_value]
+					endif
 				endif
 			else
 				DoAlert 0,"Unknown event type: "+eventType
@@ -4238,7 +4249,7 @@ static Function /df ExtractEvents(eventType[,df,epoch])
 			string name=stringfromlist(i,waves)
 			wave /z w=df:$name
 			if(waveexists(w))
-				extract /o w,eventDF:$name, stringmatch(Desc,message)
+				extract /o w,eventDF:$name, stringmatch(Desc[p+offset],message)
 				string /g eventDF:type=type
 			endif
 		endfor
@@ -4296,7 +4307,7 @@ static Function ChopEvents([events])
 	endif
 	svar /sdfr=events type
 	dfref epochs=events:epochs
-	if(datafolderrefstatus(epochs))
+	if(!datafolderrefstatus(epochs))
 		ExtractEvents("epoch",df=events)
 		dfref epochs=events:epochs
 	endif

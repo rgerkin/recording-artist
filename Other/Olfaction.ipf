@@ -265,13 +265,13 @@ function /wave GetMu(df,mode,num,model)
 		if(!v_flag)
 			loadwave /o/q/p=Correlation name+".ibw"
 			wave mu = df:$name
-			note /k/nocr mu replacestringbykey("delete",note(mu),"1")
+			note /k/nocr mu replacestringbykey("delete",note(mu),"1","=")
 		else
 			make /o/d/n=(100,10,10) df:$name /wave=mu
-			note /k/nocr mu replacestringbykey("delete",note(mu),"0")
+			note /k/nocr mu replacestringbykey("delete",note(mu),"0","=")
 		endif
 	else
-		note /k/nocr mu replacestringbykey("delete",note(mu),"0")
+		note /k/nocr mu replacestringbykey("delete",note(mu),"0","=")
 	endif
 	setdatafolder currDF
 	return mu
