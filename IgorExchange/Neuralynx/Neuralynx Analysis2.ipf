@@ -4322,7 +4322,7 @@ static Function ChopEvents([events])
 			string name=stringfromlist(i,waves)
 			wave /z w=events:$name
 			if(waveexists(w))
-				extract /o w,epochDF:$name, (Times>epochTimes[epoch] && (Times<epochTimes[epoch+1] || (epoch+1)>=numpnts(epochTimes)))
+				extract /o w,epochDF:$name, (Times>=epochTimes[epoch] && (Times<epochTimes[epoch+1] || (epoch+1)>=numpnts(epochTimes)))
 				string /g epochDF:type=type
 			endif
 		endfor
