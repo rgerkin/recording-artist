@@ -1,14 +1,16 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
 strconstant pathName = "PaulPath"
-constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list.  
+strconstant animalPathName = "AnimalPath"
+constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list. 
+constant n_shuffles = 10
 
 function All([i,j,k])
 	variable i,j,k
 	
-	string animals = "bee;"
-	string odors = "hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me"
-	string stimuli = "bb"
+	string animals = "ticl;bee;"
+	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	string stimuli = "ff;bb"
 	
 	for(i=i;i<itemsinlist(animals);i+=1)
 		Prog("Animal",i,itemsinlist(animals))
@@ -19,15 +21,17 @@ function All([i,j,k])
 			for(k=0;k<itemsinlist(stimuli);k+=1)
 				Prog("Stimulus",k,itemsinlist(animals))
 				string stimulus = stringfromlist(k,stimuli)
-				Init(animal,stimulus,odor)
+				if(Init(animal,stimulus,odor))
+					printf "Could not initialize.\r"
+					return -1
+				endif
 				LoadAllEpochs()
 				string files_missing = CheckFileList() 
 				if(strlen(files_missing))
 					printf "Missing these files %s",files_missing
-					return -1
+					return -2
 				endif
-				abort
-				Go()
+				//Go()
 			endfor
 			k=0
 		endfor
@@ -36,30 +40,48 @@ function All([i,j,k])
 end
 
 function Go()
+	string dfs = GetDFs()
+	if(!strlen(dfs))
+		print "No data folders found.\r"
+		return -1
+	endif
 	CleanData()
-	//MakeAllVTAs()
-	svar /sdfr=root: stimulus
 	FormatData()
+	MakeAllVTAs()
+	svar /sdfr=root: stimulus,animal
 	MakeAllPeriodograms()
 	MakeAllSpectrograms()
 	if(stringmatch(stimulus,"BB"))
-		wave eag_bb = MergeBBs(subtract=1)
-		MergeBBs(subtract=0)
-		wave ticl_bb = root:bb:ticl_bb:x:data
-		EAG_TiCl_Coherence(EAG_bb,TiCl_bb)
+		wave eag_bb = MergeBBs(subtract=0)
+		if(!stringmatch(animal,"TiCl"))
+			wave eag_bb = MergeBBs(subtract=1)
+		endif
+		wave ticl_bb = root:bb:ticl_bb_:x:bb
+		EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
+		EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
 		EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 	endif
 end
 
-function Init(animal,stimulus,odor)
+function Init(animal,stimulus,odor[,set_path])
 	string animal // e.g. "bee"
 	string stimulus // e.g. "FF" or "BB"
 	string odor // e.g. "hpn" or "hpn0.1"
+	variable set_path
 	
 	cd root:
 	pathinfo $pathName
-	if(!strlen(s_path))
+	if(!strlen(s_path) || set_path)
 		newpath /o/q/m="Choose the data path" $pathName
+	endif
+	newpath /o/q/z $animalPathName s_path+animal
+	if(v_flag)
+		if(!set_path)
+			Init(animal,stimulus,odor,set_path=1)
+		else
+			printf "Could not find path %s%s\r",s_path,animal
+			return -1
+		endif
 	endif
 	
 	wave /t/sdfr=root: w=all_experiments_list
@@ -101,7 +123,9 @@ function Init(animal,stimulus,odor)
 				break // Ignore other matching epochs.  
 			endif
 		endfor
-		if(strlen(active_experiments_list[i][1])==0) // If there were no epochs matching these conditions.  
+		variable odorFound = strlen(active_experiments_list[i][1])
+		variable airFound = strlen(active_experiments_list[i][2])
+		if(!odorFound || (!stringmatch(animal,"TiCl") && !airFound)) // If there were no epochs matching these conditions.  
 			n-=1
 			redimension /n=(n,3) active_experiments_list // Remove this experiment from the list.  
 		endif
@@ -120,13 +144,13 @@ function DownsampleAllNCS(downSamp[,force])
 	
 	variable i
 	do
-		string fileName = IndexedFile($pathName,i,".ncs")
+		string fileName = IndexedFile($animalPathName,i,".ncs")
 		fileName = removeending(fileName,".ncs")
 		if(!strlen(fileName))
 			break
 		elseif(!stringmatch(fileName,"*ds"))
 			string ds_name = fileName + "ds.ncs"
-			GetFileFolderInfo /P=$pathName /Q /Z=1 ds_name
+			GetFileFolderInfo /P=$animalPathName /Q /Z=1 ds_name
 			if(v_flag || force) // No downsampled version.  
 				dfref df = DownsampleNCS(fileName,downSamp)
 				KillDataFolder /z df
@@ -140,9 +164,9 @@ function /df DownsampleNCS(fileName,downSamp)
 	string fileName
 	variable downSamp
 	
-	string folder = LoadBinaryFile("ncs",fileName,pathName=pathName,downSamp=downSamp)
+	string folder = LoadBinaryFile("ncs",fileName,pathName=animalPathName,downSamp=downSamp)
 	dfref df = $folder
-	SaveBinaryFile(df,pathName=pathName,fileName=fileName + "ds",force=1)
+	SaveBinaryFile(df,pathName=animalPathName,fileName=fileName + "ds",force=1)
 	return df
 end
 
@@ -157,7 +181,7 @@ function /s CheckFileList()
 			string suffix = stringfromlist(0,kind,",")
 			string type = stringfromlist(1,kind,",")
 			string fileName = list[i][0]+suffix+"."+type
-			GetFileFolderInfo /P=$pathName /Q /Z fileName
+			GetFileFolderInfo /P=$animalPathName /Q /Z fileName
 			if(v_flag)
 				files += fileName+";"
 			endif
@@ -166,67 +190,89 @@ function /s CheckFileList()
 	return files
 end
 
-function LoadAllEpochs()
-	cd root:
-	variable i,j,k
-	wave /t/sdfr=root: all_list = all_experiments_list
-	wave /t/sdfr=root: list = active_experiments_list
-	string kinds = "_EAGds,ncs;_Events,nev"
-	for(i=0;i<dimsize(list,0);i+=1)
-		Prog("Load",i,dimsize(list,0))
-		if(!stringmatch(list[i][0],"ps121125d"))
-			//continue
-		endif
+function /df LoadEpochs(experiment[sparse])
+		string experiment
+		variable sparse // Delete unneeded epochs.  
+		
+		wave /t/sdfr=root: all_list = all_experiments_list
+		wave /t/sdfr=root: active_list = active_experiments_list
+		duplicate /free/r=[][0,0] all_list,all_experiment_names
+		duplicate /free/r=[][0,0] active_list,active_experiment_names
+		findvalue /text=(experiment)/txop=4 all_experiment_names
+		variable all_index = v_value
+		findvalue /text=(experiment)/txop=4 active_experiment_names
+		variable active_index = v_value
+								
+		string kinds = "_EAGds,ncs;_Events,nev"
+		variable j
 		for(j=0;j<itemsinlist(kinds);j+=1)
 			string kind = stringfromlist(j,kinds)
 			string suffix = stringfromlist(0,kind,",")
 			string type = stringfromlist(1,kind,",")
-			string fileName = list[i][0]+suffix
+			string fileName = experiment+suffix
 			printf "Loading %s\r",fileName
-			//string folder = removeending("root:"+fileName,"ds")
-			string folder = LoadBinaryFile(type,fileName,baseName=removeending(fileName,"ds"),pathName=pathName,downSamp=1,quiet=1)
+			string folder = LoadBinaryFile(type,fileName,baseName=removeending(fileName,"ds"),pathName=animalPathName,downSamp=1,quiet=1)
 		endfor
-		dfref df = $list[i][0]
-		printf "Chopping %s\r",list[i][0]
+		dfref df = $experiment
+		printf "Chopping %s\r",experiment
 		Chop(df,quiet=1)
-		for(j=0;j<itemsinlist(kinds);j+=1)
-			kind = stringfromlist(j,kinds)
-			suffix = stringfromlist(0,kind,",")
-			printf "Cleaning %s\r",list[i]+suffix
-			dfref df_ = df:$removeending(suffix[1,strlen(suffix)-1],"ds")
-			killwaves /z df_:data,df_:times,df_:TTL // Delete the whole experiment data since we have already extracted the data by epoch.  
-			k=0
-			do
-				string epoch = getindexedobjnamedfr(df_,4,k)
-				if(!strlen(epoch))
-					break
-				elseif(stringmatch(epoch,"epochs"))
-					k+=1
-				else
-					dfref dfi = df_:$epoch
-					if(stringmatch(type,"nev"))
-						wave /sdfr=dfi times
-						if(numpnts(times)<100)
-							string df_name = getdatafolder(1,dfi)
-							printf "%s probably has no usable data.\r", df_name
-							duplicate /o/r=[][0,0] all_experiments_list,experiment_names
-							findvalue /text=(list[i][0])/txop=4 experiment_names
-							variable epochNum = str2num(epoch[1,strlen(epoch)-1])-epoch_offset
-							if(!stringmatch(all_list[v_value][epochNum],"!!*"))
-								string msg
-								sprintf msg,"Epoch %d in experiment %s found to be unusable but not marked has such.\r",epochNum,list[i][0]
-								doalert 0,msg
+		
+		if(sparse)	
+			for(j=0;j<itemsinlist(kinds);j+=1)
+				kind = stringfromlist(j,kinds)
+				suffix = stringfromlist(0,kind,",")
+				printf "Sparsening %s\r",experiment+suffix
+				dfref df_ = df:$removeending(suffix[1,strlen(suffix)-1],"ds")
+				killwaves /z df_:data,df_:times,df_:TTL // Delete the whole experiment data since we have already extracted the data by epoch.  
+				variable k=0
+					do
+						string epoch = getindexedobjnamedfr(df_,4,k)
+						if(!strlen(epoch))
+							break
+						elseif(stringmatch(epoch,"epochs"))
+							k+=1
+						else
+							dfref dfi = df_:$epoch
+							if(stringmatch(type,"nev"))
+								wave /sdfr=dfi times
+								if(numpnts(times)<100)
+									string df_name = getdatafolder(1,dfi)
+									printf "%s probably has no usable data.\r", df_name
+									variable epochNum = str2num(epoch[1,strlen(epoch)-1])//+epoch_offset
+									if(!stringmatch("x"+all_list[all_index][epochNum+epoch_offset],"x!!*"))
+										string msg
+										print all_index,epochNum,epoch_offset,"x"+all_list[all_index][epochNum+epoch_offset],"x!!*"
+										sprintf msg,"WARNING: Epoch %d in experiment %s found to be unusable but not marked as such.\r",epochNum,experiment
+										print msg
+										doalert 0,msg
+									endif
+								endif
+							endif 
+							findvalue /text=(experiment)/txop=4 experiment_names
+							if(stringmatch(epoch,active_list[active_index][1]) || stringmatch(epoch,active_list[active_index][2])) // Match the odor epoch or the corresponding blank epoch.  
+								k+=1
+							else
+								killdatafolder /z dfi // Otherwise delete since we don't need it right now.  
 							endif
 						endif
-					endif 
-					if(stringmatch(epoch,list[i][1]) || stringmatch(epoch,list[i][2])) // Match the odor epoch or the corresponding blank epoch.  
-						k+=1
-					else
-						killdatafolder /z dfi // Otherwise delete since we don't need it right now.  
-					endif
-				endif
-			while(1)
-		endfor
+					while(1)
+			endfor
+		endif
+		
+		return df
+end
+
+function LoadAllEpochs([no_sparse])
+	variable no_sparse // Don't delete unneeded epochs.  
+	
+	cd root:
+	variable i,j,k
+	wave /t/sdfr=root: list = active_experiments_list
+	//string kinds = "_EAGds,ncs;_Events,nev"
+	for(i=0;i<dimsize(list,0);i+=1)
+		Prog("Load",i,dimsize(list,0))
+		string experiment = list[i][0]
+		dfref df = LoadEpochs(experiment,sparse=!no_sparse)
 	endfor
 	Prog("Load",0,0)
 end
@@ -236,7 +282,7 @@ function CleanData()
 	variable i,j,k
 	wave /t/sdfr=root: list = active_experiments_list
 	for(i=0;i<dimsize(list,0);i+=1)
-		Prog("Cleam",i,dimsize(list,0))
+		Prog("Clean",i,dimsize(list,0))
 		dfref df = root:$list[i][0]
 		string odorEpoch = list[i][1]
 		string airEpoch = list[i][2]
@@ -254,15 +300,18 @@ function CleanData()
 			if(stringmatch(desc[numpnts(desc)-1],"50ms"))
 				redimension /n=(numpnts(desc)-1) desc,times,TTL
 			endif
+			if(stringmatch(desc[0],"cont"))
+				deletepoints 0,2,desc,times,TTL
+			endif
 		endfor
 	endfor
-	Prog("Cleam",0,0)
+	Prog("Clean",0,0)
 end
 
 function MakeAllVTAs()
 	variable i,j,k
 	wave /t/sdfr=root: list = active_experiments_list
-	svar /sdfr=root: stimulus
+	svar /sdfr=root: stimulus, animal
 	strswitch(stimulus)
 		case "ff":
 			string conditions = "100ms;30ms;15ms;6ms"
@@ -286,8 +335,10 @@ function MakeAllVTAs()
 			string condition = stringfromlist(j,conditions)
 			for(k=0;k<itemsinlist(nths);k+=1)
 				variable nth = str2num(stringfromlist(k,nths))
-				//wave vta = MakeVTA(df,odorEpoch_,subtractEpoch=airEpoch_,condition=condition,nth=nth,invert=0)
-				//wave vta = MakeVTA(df,odorEpoch_,condition=condition,nth=nth,invert=0)
+				if(!stringmatch(animal,"TiCl"))
+					wave vta = MakeVTA(df,odorEpoch_,subtractEpoch=airEpoch_,condition=condition,nth=nth,invert=0)
+				endif
+				wave vta = MakeVTA(df,odorEpoch_,condition=condition,nth=nth,invert=0)
 			endfor
 		endfor
 	endfor
@@ -297,8 +348,10 @@ function MakeAllVTAs()
 			condition = stringfromlist(j,conditions)
 			for(k=0;k<itemsinlist(nths);k+=1)
 				nth = str2num(stringfromlist(k,nths))
-				wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=1,pool_errors=1)
-				VTAStats(vta)
+				if(!stringmatch(animal,"TiCl"))
+					wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=1,pool_errors=1)
+					VTAStats(vta)
+				endif
 				wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=0,pool_errors=1)
 				VTAStats(vta)
 			endfor
@@ -325,10 +378,14 @@ function /wave FormatFF(df,epoch)
 	wave /sdfr=eagDF data_times = times, data
 	variable x_scale = dimdelta(data,0)
 	variable n_pnts = ceil(1/x_scale)
-	variable n_freqs = 10
+	if(stringmatch(desc[1],"cont")) // For TiCl there is a continuous trial at the beginning and another at the end.  
+		variable n_freqs = 11
+	else
+		n_freqs = 10
+	endif
 	if(numpnts(starts)!=n_freqs)
 		string msg
-		sprintf msg,"Number of starts not equal to number of frequencies for %s, epoch %d",getdatafolder(1,df),epoch
+		sprintf msg,"Number of starts (%d) not equal to number of frequencies (%d) for %s, epoch %d",numpnts(starts),n_freqs,getdatafolder(1,df),epoch
 		DoAlert 0,msg
 	endif
 	make /free/n=(n_pnts,n_freqs) indices,data_,times_
@@ -347,7 +404,7 @@ function /wave FormatFF(df,epoch)
 end
 
 function FormatData()
-	svar /sdfr=root: stimulus
+	svar /sdfr=root: stimulus,animal
 	variable i,n = GetNumExperiments()
 	for(i=0;i<n;i+=1)
 		Prog("Format",i,dimsize(list,0))
@@ -358,15 +415,19 @@ function FormatData()
 		strswitch(stimulus)
 			case "FF":
 				FormatFF(df,odorEpoch)
-				FormatFF(df,airEpoch)
+				if(!stringmatch(animal,"TiCl"))
+					FormatFF(df,airEpoch)
+				endif
 				break
 			case "BB":
 				FormatBB(df,odorEpoch)
-				FormatBB(df,airEpoch)
+				if(!stringmatch(animal,"TiCl"))
+					FormatBB(df,airEpoch)
+				endif
 				break
 		endswitch
 	endfor
-	Prog("Matrix",0,0)
+	Prog("Format",0,0)
 end
 
 // FormatData() must be run first.  
@@ -402,19 +463,13 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 		copyscales /p w_periodogram,periodograms
 		periodograms[][i] = log(w_periodogram[p])
 	endfor
+	prog("Freq",0,0)
 	killwaves /z w_periodogram
 	redimension /n=(200/dimdelta(periodograms,0),-1,-1) periodograms
 	
 	if(!paramisdefault(subtractEpoch))
 		wave air_periodograms = MakePeriodograms(df,subtractEpoch)
 		periodograms -= air_periodograms // Periodograms are already log-transformed so subtraction is correct here.  	
-//		for(i=0;i<n_freqs;i+=1)
-//			for(j=0;j<n_odors;j+=1)
-//				duplicate /free/r=[][i,i][j,j] periodograms one_periodogram
-//				wavestats /q/m=1 one_periodogram
-//				periodograms[][i,i][j,j] -= v_max // Normalize so that 0 is the maximum.  
-//			endfor
-//		endfor
 	endif
 	
 	return periodograms
@@ -491,7 +546,7 @@ end
 
 function MakeAllPeriodograms()
 	wave /t/sdfr=root: list = active_experiments_list
-	svar /sdfr=root: stimulus
+	svar /sdfr=root: stimulus, animal
 	strswitch(stimulus)
 		case "ff":
 			string conditions = "100ms;30ms;15ms;6ms"
@@ -511,19 +566,24 @@ function MakeAllPeriodograms()
 		string airEpoch = list[i][2]
 		variable airEpoch_ = str2num(airEpoch[1,strlen(airEpoch)-1])
 		printf "Making periodogram for %s\r",list[i][0]
-		MakePeriodograms(df,odorEpoch_,subtractEpoch=airEpoch_)
+		if(!stringmatch(animal,"TiCl"))
+			MakePeriodograms(df,odorEpoch_,subtractEpoch=airEpoch_)
+		endif
 		MakePeriodograms(df,odorEpoch_)
 	endfor
 	Prog("Periodograms",0,0)
 	string dfs = GetDFs()
-	wave periodogram = MergePeriodograms(dfs,subtracted=1)
-	PeriodogramStats(periodogram)
+	if(!stringmatch(animal,"TiCl"))
+		wave periodogram = MergePeriodograms(dfs,subtracted=1)
+		PeriodogramStats(periodogram)
+	endif
 	wave periodogram = MergePeriodograms(dfs,subtracted=0)
+	PeriodogramStats(periodogram)
 end
 
 function MakeAllSpectrograms()
 	wave /t/sdfr=root: list = active_experiments_list
-	svar /sdfr=root: stimulus
+	svar /sdfr=root: stimulus, animal
 	strswitch(stimulus)
 		case "ff":
 			string conditions = "100ms;30ms;15ms;6ms"
@@ -543,12 +603,16 @@ function MakeAllSpectrograms()
 		string airEpoch = list[i][2]
 		variable airEpoch_ = str2num(airEpoch[1,strlen(airEpoch)-1])
 		printf "Making spectrogram for %s\r",list[i][0]
-		//MakeSpectrogram(df,odorEpoch_,subtractEpoch=airEpoch_)
-		//MakeSpectrogram(df,odorEpoch_)
+		if(!stringmatch(animal,"TiCl"))
+			MakeSpectrogram(df,odorEpoch_,subtractEpoch=airEpoch_)
+		endif
+		MakeSpectrogram(df,odorEpoch_)
 	endfor
 	Prog("Spectrograms",0,0)
 	string dfs = GetDFs()
-	wave spectrogram = MergeSpectrograms(dfs,subtracted=1)
+	if(!stringmatch(animal,"TiCl"))
+		wave spectrogram = MergeSpectrograms(dfs,subtracted=1)
+	endif
 	wave spectrogram = MergeSpectrograms(dfs,subtracted=0)
 end
 
@@ -674,7 +738,7 @@ function Chop(df[,quiet])
 	dfref epochsDF = eventsDF:epochs
 	wave /sdfr=epochsDF times
 	if(numpnts(times)<=1) // Epoch extraction failed, recording was probably continuous.  
-		NlxA#ExtractEvents("epochs",message="100ms",offset=2,df=eventsDF)
+		NlxA#ExtractEvents("epochs",message="100ms",offset=0,df=eventsDF)
 	endif
 	NlxA#ChopData(df:EAG,epochsDF=epochsDF,quiet=quiet)
 	NlxA#ChopEvents(events=eventsDF) // Uses the epochs folder automatically.  
@@ -804,7 +868,7 @@ function /wave MakeVTA(df,epoch[,subtractEpoch,t_min,t_max,e_min,e_max,condition
 	
 	// Make final output waves.  
 	string suffix1 = "", suffix2 = ""
-	if(!paramisdefault(condition))
+	if(!paramisdefault(condition) && strlen(condition))
 		suffix1 = "_"+condition
 	endif
 	if(!paramisdefault(nth) && nth>=0)
@@ -889,7 +953,7 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 		concatenate {vta_sd__},vta_sd
 		concatenate {vta_sem__},vta_sem
 	endfor
-	copyscales vtai,vta,vta_sd,vta_sem
+	copyscales /p vtai,vta,vta_sd,vta_sem
 	if(paramisdefault(merge_num))
 		printf "Merged into vta%s\r",suffix
 	else
@@ -905,13 +969,13 @@ function FormatBB(df,epoch)
 	variable epoch
 	
 	dfref eagDF_ = df:EAG
-	dfref eagDF = eagDF:$("E"+num2str(epoch))
+	dfref eagDF = eagDF_:$("E"+num2str(epoch))
 	dfref eventsDF_ = df:Events
-	dfref eventsDF = eventsDF:$("E"+num2str(epoch))
+	dfref eventsDF = eventsDF_:$("E"+num2str(epoch))
 	
-	wave /sdfr=eag_df data,data_times=times
-	wave /t/sdfr=events_df desc
-	wave /sdfr=events_df TTL,events_times=times
+	wave /sdfr=eagDF data,data_times=times
+	wave /t/sdfr=eventsDF desc
+	wave /sdfr=eventsDF TTL,events_times=times
 	extract /free events_times,stim_times,(TTL & 32768)>0 && (stringmatch(desc[p],"o*") || stringmatch(desc[p-1],"o*"))
 	variable start = stim_times[0]
 	variable finish = stim_times[numpnts(stim_times)-1]
@@ -931,7 +995,6 @@ function /wave MergeBBs([subtract,merge_num])
 	variable merge_num
 	
 	string dfs = GetDFs()
-	
 	dfref currDF = getdatafolderdfr()
 	string suffix1 = "", suffix2 = "", suffix3 = ""
 	if(paramisdefault(subtract))
@@ -972,11 +1035,11 @@ function /wave MergeBBs([subtract,merge_num])
 			endif
 		endif
 		concatenate {bbi},bb
-		matrixop /o bb_sd = sqrt(varcols(bb^t)^t)
-		matrixop /o bb_sem = bb_sd/sqrt(i)
 	endfor
-	matrixop /free bb = meancols(bb^t)
-	copyscales bbi,bb,bb_sd,bb_sem
+	matrixop /o bb_sd = sqrt(varcols(bb^t)^t)
+	matrixop /o bb_sem = bb_sd/sqrt(i)
+	matrixop /o bb = meancols(bb^t)
+	copyscales /p bbi,bb,bb_sd,bb_sem
 	if(paramisdefault(merge_num))
 		printf "Merged into bb%s\r",suffix
 	else
@@ -1097,7 +1160,7 @@ function /wave MergePeriodograms(dfs[,condition,subtracted,merge_num])
 	matrixop /o periodogram_sd = sqrt(sumbeams(periodogram2_)/i - powR(sumbeams(periodogram_)/i,2))
 	matrixop /o periodogram_sem = periodogram_sd/sqrt(i)
 	matrixop /o periodogram = sumbeams(periodogram_)/i
-	copyscales periodogrami,periodogram,periodogram_sd,periodogram_sem
+	copyscales /p periodogrami,periodogram,periodogram_sd,periodogram_sem
 	if(paramisdefault(merge_num))
 		printf "Merged into x%s\r",suffix
 	else
@@ -1148,7 +1211,7 @@ function /wave MergeSpectrograms(dfs[,condition,subtracted,merge_num])
 	matrixop /o spectrogram_sd = sqrt(sumbeams(spectrogram2_)/i - powR(sumbeams(spectrogram_)/i,2))
 	matrixop /o spectrogram_sem = spectrogram_sd/sqrt(i)
 	matrixop /o spectrogram = sumbeams(spectrogram_)/i
-	copyscales spectrogrami,spectrogram,spectrogram_sd,spectrogram_sem
+	copyscales /p spectrogrami,spectrogram,spectrogram_sd,spectrogram_sem
 	if(paramisdefault(merge_num))
 		printf "Merged into x%s\r",suffix
 	else
@@ -1212,6 +1275,7 @@ function VTAStats(vta)
 	wave vta
 	
 	dfref df = getwavesdatafolderdfr(vta)
+	killstrings /z df:$(nameofwave(vta)+"_stats")
 	make /o/t/n=0 df:$(nameofwave(vta)+"_stats") /wave=stats
 	variable i
 	for(i=0;i<max(1,dimsize(vta,1));i+=1)
@@ -1399,15 +1463,19 @@ function EventTimes2EAGSegment(df,epoch)
 	setscale /p x,times(start),deltax(data),segment
 end
 
-function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb)
+function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT])
 	wave EAG_bb,TiCl_bb
+	variable startT,endT
 	
-	variable n_shuffles = 100
+	startT = paramisdefault(startT) ? 0 : startT
+	endT = paramisdefault(endT) ? Inf : endT
+	
 	variable seg_length = 1000
 	variable seg_overlap = 500
 	
 	dfref currDF = getdatafolderdfr()
 	newdatafolder /o/s root:coherence
+	newdatafolder /o/s $cleanupname(num2str(startT)+"_"+num2str(endT),0)
 	newdatafolder /o/s $Environment()
 	
 	duplicate /free EAG_bb,eag
@@ -1415,25 +1483,36 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb)
 	
 	variable points = min(numpnts(eag),numpnts(ticl))
 	redimension /n=(points) eag,ticl
-	dspperiodogram /cohr /r=[10000,(points)] /segn={(seg_length),(seg_overlap)} eag,ticl
+	variable scale = dimdelta(eag,0)/dimdelta(ticl,0)
+	if(scale != 1 && (scale-1)<1e-12)
+		printf "Small differences in wave scaling observed. Setting scales to be equal.\r"
+		copyscales /p eag,ticl
+	endif
+	
+	variable delta_x = dimdelta(eag,0)
+	variable startP = round(startT/delta_X)
+	variable endP = min(points,round(endT/delta_X))
+	
+	dspperiodogram /cohr /r=[(startP),(endP)] /segn={(seg_length),(seg_overlap)} eag,ticl
 	wave w_periodogram
 	matrixop /o coherence_mag = abs(w_periodogram)
 	smooth 101,coherence_mag
-	copyscales w_periodogram,coherence_mag
+	copyscales /p w_periodogram,coherence_mag
 	variable i
 	make /free/n=(numpnts(coherence_mag),n_shuffles) shuffles
 	for(i=0;i<n_shuffles;i+=1)
 		prog("Shuffle",i,n_shuffles)
 		wave eag_shuffled = eag
 		wave ticl_shuffled = RandomPhases(ticl)
-		dspperiodogram /q/cohr /r=[10000,(points)] /segn={(seg_length),(seg_overlap)} eag_shuffled,ticl_shuffled
+		dspperiodogram /q/cohr /r=[(startP),(endP)] /segn={(seg_length),(seg_overlap)} eag_shuffled,ticl_shuffled
 		matrixop /free coherence_mag_shuffle = abs(w_periodogram)
 		smooth 101,coherence_mag_shuffle
 		shuffles[][i] = coherence_mag_shuffle[p]
 	endfor
+	prog("Shuffle",0,0)
 	matrixop /o coherence_mag_shuffled = meancols(shuffles^t)
 	matrixop /o coherence_mag_shuffled_sd = sqrt(varcols(shuffles^t)^t)
-	copyscales w_periodogram,coherence_mag,coherence_mag_shuffled,coherence_mag_shuffled_sd
+	copyscales /p w_periodogram,coherence_mag,coherence_mag_shuffled,coherence_mag_shuffled_sd
 	killwaves /z w_periodogram
 	setdatafolder currDF
 	
@@ -1443,7 +1522,6 @@ end
 function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 	wave EAG_bb,TiCl_bb
 	
-	variable n_shuffles = 100
 	variable seg_length = 1000
 	variable seg_overlap = 500
 	
@@ -1459,7 +1537,7 @@ function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 	wave coherogram = SlidingCoherence(eag,ticl,0.2,0.95)
 	matrixop /o coherogram_mag = abs(coherogram)
 	smooth /dim=0 101,coherogram_mag
-	copyscales coherogram,coherogram_mag
+	copyscales /p coherogram,coherogram_mag
 	variable i
 	make /free/n=(dimsize(coherogram_mag,0),dimsize(coherogram_mag,1),n_shuffles) shuffles
 	for(i=0;i<n_shuffles;i+=1)
@@ -1471,9 +1549,12 @@ function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 		smooth /dim=0 101,coherogram_mag_shuffle
 		shuffles[][][i] = coherogram_mag_shuffle[p][q]
 	endfor
+	prog("Shuffle",0,0)
 	matrixop /o coherogram_mag_shuffled = sumbeams(shuffles)/n_shuffles
-	matrixop /o coherogram_mag_shuffled_sd = sqrt(sumbeams(shuffles*shuffles)/n_shuffles - powR(sumbeams(shuffles)/n_shuffles,2))
-	copyscales coherogram,coherogram_mag,coherogram_mag_shuffled,coherogram_mag_shuffled_sd
+	//duplicate /o shuffles $"shuffles"
+	matrixop /free temp = shuffles*shuffles
+	matrixop /o coherogram_mag_shuffled_sd = sqrt(sumbeams(temp)/n_shuffles - powR(sumbeams(shuffles)/n_shuffles,2))
+	copyscales /p coherogram,coherogram_mag,coherogram_mag_shuffled,coherogram_mag_shuffled_sd
 	killwaves /z coherogram
 	setdatafolder currDF
 	
