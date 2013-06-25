@@ -54,7 +54,7 @@ function IhAnalysis(chan)
 	make/o/n=0 VmFinal
 
 	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
-		if(SelWave[sweepNum][chan] & 16)
+		if(SelWave[sweepNum][chan+1] & 16)
 			variable ampl = GetEffectiveAmpl(chan,sweepNum=sweepNum)
 			wave w = GetChanSweep(chan,sweepNum)
 			string name = "Ih_average_"+num2str(ampl)
@@ -3082,11 +3082,11 @@ Function TestPulseAnalysis(chan)
 	TPtext[3] = "transient"; TPtext[4] = "holding"
 	
 	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
-		if(SelWave[sweepNum][chan] & 16)
+		if(SelWave[sweepNum][chan+1] & 16)
 			wave w = GetChanSweep(chan,sweepNum)
 			string name = "TP_avg"
 			wave /z avg = $CleanupName(name,0)
-			if(!waveexists(avg))
+			if(!waveexists(avg) || numpnts(avg)==0)
 				make /o/n=(numpnts(w)) $CleanupName(name,0) /wave=avg=0
 			endif
 			if(whichlistitem(name,list)<0)
@@ -3831,7 +3831,7 @@ End
 //Note, sampling rate for fast spikes is a bit of an issue- spike times aren't exactly at the peak of each spike.
 Function GraphRate([win_name])
 	string win_name
-	variable threshold =-20
+	variable threshold =100//-20
 	string RateDisplayName, TimeDisplayName
 	string Name
 	
@@ -3872,7 +3872,7 @@ Function SpikeShapeAnalysis([win_name])
 	variable APPeak, halfMaxPoint1, halfMaxPoint2, halfMax, halfheight, Apht
 	variable deltaOne, SampleRate
 	variable pnt1, pnt2, numSpikes, AvgRate
-	variable ThreshPnt, APThresh
+	variable ThreshPnt, APThresh, halfLevel
 	variable APwidth, FirstCrossing, SecondCrossing, NumberOfSpikes
 	string SpkName, RateString, CVString, SpikeParametersName, SpikeParamOutputName, avgSpkWvName
 	string SpkTotalName, SpikeTimesName, SpikeRatesName, avgNameWave, nSpikesString
@@ -4010,7 +4010,7 @@ Function SpikeShapeAnalysis([win_name])
 			//width
 			findlevel/q/r=(-0.0076, -0.0001)/Edge=1 avgSpike, APThresh
 				FirstCrossing= v_LevelX
-			findlevel/q/r=(0.00026, 0.01)/Edge=2 avgSpike, APThresh
+			findlevel/q/r=(0.00015, 0.0018)/Edge=2 avgSpike, APThresh		//was 0.0076? and 0.01
 				SecondCrossing= v_LevelX
 			APwidth = SecondCrossing-FirstCrossing
 				APwidth*=1000 //convert to ms
@@ -4022,12 +4022,15 @@ Function SpikeShapeAnalysis([win_name])
 				SpikeParamOutput[5] = APpeak	//assign spike peak
 					APht = APpeak - APThresh	//calculate spike height from threshold
 					SpikeParamOutput[6] = APht
-			halfheight =  (APThresh  - APPeak)/2
-			findlevel/q/r=(FirstCrossing, 0) avgSpike, halfheight
+	//	print APThresh, firstcrossing, secondcrossing, APPeak
+			halfheight =  (APThresh  - APPeak)/2*-1; print halfheight, APThresh
+				halfLevel = APThresh+halfheight; print halfLevel
+			findlevel/q/r=(FirstCrossing, 0) avgSpike, halfLevel
 				halfMaxPoint1 = v_levelX
-			findlevel/q/r=(0, SecondCrossing) avgSpike, halfheight
+			findlevel/q/r=(0, SecondCrossing) avgSpike, halfLevel
 				halfMaxPoint2 = v_levelX
 			halfMax = halfMaxPoint2- halfMaxPoint1
+		//	print halfMaxPoint1, halfMaxPoint2
 				halfMAx*=1000 //convert to ms
 			SpikeParamOutput[2]=halfMax
 				
@@ -6045,12 +6048,14 @@ Function AttachedFR([win_name])
 	variable i
 	variable startTime = 0.5
 	variable endTime = 5
-	variable attFR, attCV
+	variable attFR, attCV, recordMode
 	prompt threshold, "threshold"
+	prompt RecordMode, "0=Cell attached; 1=Whole Cell"
 	prompt startTime, "start time"
 	prompt endTime, "end time"
+
 	
-	doprompt "", threshold, startTime, EndTime
+	doprompt "", threshold, RecordMode, startTime, EndTime
 	
 	make/o/n=0 attFRWave
 	make/o/n=0 attCVwave
@@ -6065,7 +6070,9 @@ Function AttachedFR([win_name])
 		Wave TraceWave=TraceNameToWaveRef(win_name,trace)
 		
 		duplicate/o TraceWave TempWave
-			TempWave*=-1
+			If (RecordMode==0)
+				TempWave*=-1
+			endif
 		
 		FindSpikeTimesAG(TempWave, startTime, endTime, Threshold)
 		wave spikeRates, spikeIntervals;// edit spikeRates, SpikeTimes
@@ -6090,5 +6097,22 @@ Function AttachedFR([win_name])
 			
 	
 End
+
+
+
+Function WilcoxStat()
+	wave group1
+	wave group2
+	wave  W_WilcoxonTest 
+	
+	statswilcoxonranktest/q/T=0/tail = 4 group1, group2
+	
+	print "p = ", W_wilcoxontest[5]
+	
+	
+	
+
+End
+
 
 #endif
