@@ -340,7 +340,7 @@ static Function SpeakAndListen([DAQ])
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=type),DAQ)
 	dfref df=GetDaqDF(DAQ)
 	dfref statusDF=GetStatusDF()
-	nvar /sdfr=df inPoints,acqPoints,duration,continuous,realTime,lastDAQSweepT
+	nvar /sdfr=df inPoints,acqPoints,duration,continuous,realTime,sweepsLeft,lastDAQSweepT
 	variable sealTestOn=IsSealTestOn()
 	variable dynamic=InDynamicClamp() && !sealtestOn
 	
@@ -381,7 +381,9 @@ static Function SpeakAndListen([DAQ])
 						Speak(1,outputWaves,32) // Update the stimulus for the next sweep.  
 					endif
 				endif
-				Stim(DAQ,append_=1)
+				if(sweepsLeft!=1) // Don't add a stimulus to the buffer if there is only one sweep left.  
+					Stim(DAQ,append_=1)
+				endif
 			endif
 			if(realTime && !sealTestOn)
 				InDemultiplex(inputWaves,DAQ=DAQ)
