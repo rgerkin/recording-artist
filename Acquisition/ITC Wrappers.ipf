@@ -381,7 +381,7 @@ static Function SpeakAndListen([DAQ])
 						Speak(1,outputWaves,32) // Update the stimulus for the next sweep.  
 					endif
 				endif
-				if(sweepsLeft!=1) // Don't add a stimulus to the buffer if there is only one sweep left.  
+				if(sweepsLeft!=1 && sweepsLeft!=2) // Don't add a stimulus to the buffer if there is only one sweep left.  
 					Stim(DAQ,append_=1)
 				endif
 			endif
@@ -871,7 +871,7 @@ static Function StartClock(isi[,DAQ])
 	dfref statusDF=GetStatusDF()
 	Variable /g statusDF:first=1
 	dfref df=GetDaqDF(DAQ)
-	nvar /sdfr=df period
+	nvar /sdfr=df period,sweepsLeft
 	variable sealtestOn=IsSealTestOn()
 	variable i
 	// Consider only ITC inputs.  
@@ -903,7 +903,9 @@ static Function StartClock(isi[,DAQ])
 				SetOutputWaves(sweepNum=currSweep+1,DAQ=DAQ)
 			endif
 			Speak(1,outputWaves,32,DAQ=DAQ) // Update the stimulus for the next sweep.  
-			Stim(DAQ,append_=1) // Need to pad the buffer with an extra stimulus wave so we never stop the stimulus waves.   
+			if(sweepsLeft!=1)
+				Stim(DAQ,append_=1) // Need to pad the buffer with an extra stimulus wave so we never stop the stimulus waves.   
+			endif
 			if(sealTestOn) // Pad even more if it is a sealtest.  
 				for(i=0;i<3;i+=1)
 					Stim(DAQ,append_=1)
