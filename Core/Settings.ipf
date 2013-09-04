@@ -2905,6 +2905,7 @@ Function SavePackageInstance(module,package,instance[,special])
 
 	string path
 	sprintf path,"%sprofiles:%s:%s",SpecialDirPath("Packages",0,0,0),CurrProfileName(),module
+	NewPath /O/Q/C modulePath,path // In case the module directory does not exist yet.  
 	variable generic=IsGenericPackage(module,package)
 	dfref instanceDF=InstanceHome(module,package,instance)
 	if(!generic)

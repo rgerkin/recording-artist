@@ -8,10 +8,11 @@ constant n_shuffles = 10
 function All([i,j,k])
 	variable i,j,k
 	
-	string animals = "ticl;bee;"
+	string animals = "ticl;bee;ant;locust;cockroach;moth;orangeroach;laser;"
 	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
-	string stimuli = "ff;bb"
+	string stimuli = "ff;bb;"
 	
+	variable m
 	for(i=i;i<itemsinlist(animals);i+=1)
 		Prog("Animal",i,itemsinlist(animals))
 		string animal = stringfromlist(i,animals)
@@ -25,18 +26,36 @@ function All([i,j,k])
 					printf "Could not initialize.\r"
 					return -1
 				endif
-				LoadAllEpochs()
 				string files_missing = CheckFileList() 
 				if(strlen(files_missing))
-					printf "Missing these files %s",files_missing
-					return -2
+					string msg
+					sprintf msg,"WARNING: Missing these files %s",files_missing
+					print msg
+					// Remove missing experiments from active_list so they are not analyzed.  
+					for(m=0;m<itemsinlist(files_missing);m+=1)
+						string file = stringfromlist(m,files_missing)
+						file = removeending(file,"_EAGds.ncs")
+						file = removeending(file,"_Events.nev")
+						wave /t/sdfr=root: active_list = active_experiments_list
+						findvalue /text=(file)/txop=4 active_list
+						if(v_value>=0)
+							deletepoints /m=0 v_value,1,active_list
+						endif
+					endfor
+					//DoAlert 0,msg
+					//return -2
 				endif
-				//Go()
+				LoadAllEpochs()
+				Go()
 			endfor
 			k=0
 		endfor
 		j=0
+		cd root:
+		KillRecurse("ps*")
 	endfor
+	print "Done"
+	DoAlert 0,"Done!"
 end
 
 function Go()
@@ -52,14 +71,22 @@ function Go()
 	MakeAllPeriodograms()
 	MakeAllSpectrograms()
 	if(stringmatch(stimulus,"BB"))
-		wave eag_bb = MergeBBs(subtract=0)
+		wave eag_bb = MergeBBs(subtract=0) // Odor epochs.  
 		if(!stringmatch(animal,"TiCl"))
-			wave eag_bb = MergeBBs(subtract=1)
+			wave eag_bb = MergeBBs(subtract=-1) // Air epochs.  
+			wave eag_bb = MergeBBs(subtract=1) // Air-subtracted odor epochs.  
 		endif
 		wave ticl_bb = root:bb:ticl_bb_:x:bb
 		EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
 		EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
 		EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
+	endif
+	if(stringmatch(stimulus,"BB"))
+		wave eag_bb = MergeFFs(subtract=0) // Odor epochs.  
+		if(!stringmatch(animal,"TiCl"))
+			wave eag_bb = MergeFFs(subtract=-1) // Air epochs.  
+			wave eag_bb = MergeFFs(subtract=1) // Air-subtracted odor epochs.  
+		endif
 	endif
 end
 
@@ -90,7 +117,7 @@ function Init(animal,stimulus,odor[,set_path])
 	string /g root:$"stimulus" = stimulus
 	string /g root:$"odor" = odor
 	
-	string species_list = "bee:MS_Apis mellifera;TiCl:MS_photodetector + TiCl;"
+	string species_list = "bee:MS_Apis mellifera;ant:MS_Camponotus;cockroach:MS_Cockroach;moth:MS_Manduca sexta;locust:MS_Locust;orangeroach:MS_orange spotted roach;TiCl:MS_photodetector + TiCl;laser:valve+laser"
 	string stimulus_list = "FF:;BB:BB"
 	variable i,j,k,n=0
 	for(i=0;i<dimsize(w,0);i+=1)
@@ -241,18 +268,19 @@ function /df LoadEpochs(experiment[sparse])
 									variable epochNum = str2num(epoch[1,strlen(epoch)-1])//+epoch_offset
 									if(!stringmatch("x"+all_list[all_index][epochNum+epoch_offset],"x!!*"))
 										string msg
-										print all_index,epochNum,epoch_offset,"x"+all_list[all_index][epochNum+epoch_offset],"x!!*"
 										sprintf msg,"WARNING: Epoch %d in experiment %s found to be unusable but not marked as such.\r",epochNum,experiment
 										print msg
-										doalert 0,msg
+										//doalert 0,msg
 									endif
 								endif
 							endif 
-							findvalue /text=(experiment)/txop=4 experiment_names
 							if(stringmatch(epoch,active_list[active_index][1]) || stringmatch(epoch,active_list[active_index][2])) // Match the odor epoch or the corresponding blank epoch.  
 								k+=1
 							else
 								killdatafolder /z dfi // Otherwise delete since we don't need it right now.  
+								if(v_flag) // Couldn't kill, probably because data is in use (graph or table).  
+									k+=1
+								endif
 							endif
 						endif
 					while(1)
@@ -280,28 +308,43 @@ end
 // Some data have errors that need to be removed.  
 function CleanData()
 	variable i,j,k
-	wave /t/sdfr=root: list = active_experiments_list
-	for(i=0;i<dimsize(list,0);i+=1)
-		Prog("Clean",i,dimsize(list,0))
-		dfref df = root:$list[i][0]
-		string odorEpoch = list[i][1]
-		string airEpoch = list[i][2]
+	wave /t/sdfr=root: all_list = all_experiments_list
+	wave /t/sdfr=root: active_list = active_experiments_list
+	for(i=0;i<dimsize(active_list,0);i+=1)
+		Prog("Clean",i,dimsize(active_list,0))
+		string name = active_list[i][0]
+		dfref df = root:$name
+		string odorEpoch = active_list[i][1]
+		string airEpoch = active_list[i][2]
+		dfref eagDF_ = df:EAG
 		dfref eventsDF_ = df:Events
-		
+		findvalue /text=name/txop=4 all_experiments_list
+		string notes = all_list[v_value][2]
 		string epochs = odorEpoch+";"+airEpoch
 		for(j=0;j<itemsinlist(epochs);j+=1)
 			string epoch = stringfromlist(j,epochs)
+			dfref eagDF = eagDF_:$epoch
 			dfref eventsDF = eventsDF_:$epoch
 			wave /t/sdfr=eventsDF desc
 			wave /t/sdfr=eventsDF times,TTL
-			if(stringmatch(desc[12],"6ms"))
-				deletepoints 0,15,desc,times,TTL
-			endif
 			if(stringmatch(desc[numpnts(desc)-1],"50ms"))
 				redimension /n=(numpnts(desc)-1) desc,times,TTL
 			endif
-			if(stringmatch(desc[0],"cont"))
-				deletepoints 0,2,desc,times,TTL
+			if(stringmatch(desc[numpnts(desc)-2],"50ms"))
+				redimension /n=(numpnts(desc)-2) desc,times,TTL
+			endif
+			string ff_strs = "cont;50ms;6ms";
+			for(k=0;k<itemsinlist(ff_strs);k+=1)
+				string ff_str = stringfromlist(k,ff_strs)
+				findvalue /text=(ff_str) /txop=4 desc
+				if(v_value>=0 && v_value<15)
+					deletepoints 0,v_value+2,desc,times,TTL
+				endif
+			endfor
+			if(stringmatch(notes,"inverted!"))
+				wave /sdfr=eagDF data
+				data *= -1
+				printf "Inverted epoch %s in experiment %s.\r",epoch,name
 			endif
 		endfor
 	endfor
@@ -351,6 +394,8 @@ function MakeAllVTAs()
 				if(!stringmatch(animal,"TiCl"))
 					wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=1,pool_errors=1)
 					VTAStats(vta)
+					wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=-1,pool_errors=1)
+					VTAStats(vta)
 				endif
 				wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=0,pool_errors=1)
 				VTAStats(vta)
@@ -385,8 +430,9 @@ function /wave FormatFF(df,epoch)
 	endif
 	if(numpnts(starts)!=n_freqs)
 		string msg
-		sprintf msg,"Number of starts (%d) not equal to number of frequencies (%d) for %s, epoch %d",numpnts(starts),n_freqs,getdatafolder(1,df),epoch
-		DoAlert 0,msg
+		sprintf msg,"WARNING: Number of starts (%d) not equal to number of frequencies (%d) for %s, epoch %d",numpnts(starts),n_freqs,getdatafolder(1,df),epoch
+		print msg
+		//DoAlert 0,msg
 	endif
 	make /free/n=(n_pnts,n_freqs) indices,data_,times_
 	setscale /p x,0,x_scale,data_,times_
@@ -449,7 +495,11 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 	variable i,j
 	string suffix = ""
 	if(!paramisdefault(subtractEpoch))
-		suffix = "_sub"
+		if(subtractEpoch >= 0)
+			suffix = "_sub"
+		else
+			suffix = "_air"
+		endif
 	endif
 	make /o/n=(1,n_freqs) eagDF:$("periodograms"+suffix) /wave=periodograms
 	
@@ -467,8 +517,8 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 	killwaves /z w_periodogram
 	redimension /n=(200/dimdelta(periodograms,0),-1,-1) periodograms
 	
-	if(!paramisdefault(subtractEpoch))
-		wave air_periodograms = MakePeriodograms(df,subtractEpoch)
+	if(!paramisdefault(subtractEpoch) && subtractEpoch>=0)
+		wave air_periodograms = MakePeriodograms(df,subtractEpoch,subtractEpoch=-1)
 		periodograms -= air_periodograms // Periodograms are already log-transformed so subtraction is correct here.  	
 	endif
 	
@@ -494,7 +544,11 @@ function /wave MakeSpectrogram(df,epoch[,subtractEpoch])
 	variable i,j
 	string suffix = ""
 	if(!paramisdefault(subtractEpoch))
-		suffix = "_sub"
+		if(subtractEpoch >= 0)
+			suffix = "_sub"
+		else
+			suffix = "_air"
+		endif
 	endif
 	
 	duplicate /free data data1D
@@ -502,8 +556,8 @@ function /wave MakeSpectrogram(df,epoch[,subtractEpoch])
 	setscale /p x,0,dimdelta(data,0),data1D
 	duplicate /o timefrequency(data1D,0.2,0.95,maxfreq=200,logg=1) eagDF:$("spectrogram"+suffix) /wave=spectrogram
 	
-	if(!paramisdefault(subtractEpoch))
-		wave air_spectrogram = MakeSpectrogram(df,subtractEpoch)
+	if(!paramisdefault(subtractEpoch) && subtractEpoch>=0)
+		wave air_spectrogram = MakeSpectrogram(df,subtractEpoch,subtractEpoch=-1)
 		spectrogram -= air_spectrogram // Periodograms are already log-transformed so subtraction is correct here.  	
 	endif
 	
@@ -526,7 +580,11 @@ function /wave MakeBBPeriodogram(df,epoch[,subtractEpoch])
 	variable i,j
 	string suffix = ""
 	if(!paramisdefault(subtractEpoch))
-		suffix = "_sub"
+		if(subtractEpoch >= 0)
+			suffix = "_sub"
+		else
+			suffix = "_air"
+		endif
 	endif
 	
 	DSPPeriodogram /NODC=1 /Q /SEGN={(seg_length),(seg_overlap)} /R=[(start),(n_pnts)] /WIN=Hanning trial 
@@ -536,8 +594,8 @@ function /wave MakeBBPeriodogram(df,epoch[,subtractEpoch])
 	duplicate /o w_periodogram eagDF:$("periodogram"+suffix) /wave=periodogram
 	killwaves /z w_periodogram
 	
-	if(!paramisdefault(subtractEpoch))
-		wave air_periodogram = MakeBBPeriodogram(df,subtractEpoch)
+	if(!paramisdefault(subtractEpoch) && subtractEpoch>=0)
+		wave air_periodogram = MakeBBPeriodogram(df,subtractEpoch,subtractEpoch=-1)
 		periodogram -= air_periodogram // Periodograms are already log-transformed so subtraction is correct here.  	
 	endif
 	
@@ -576,6 +634,8 @@ function MakeAllPeriodograms()
 	if(!stringmatch(animal,"TiCl"))
 		wave periodogram = MergePeriodograms(dfs,subtracted=1)
 		PeriodogramStats(periodogram)
+		wave periodogram = MergePeriodograms(dfs,subtracted=-1)
+		PeriodogramStats(periodogram)
 	endif
 	wave periodogram = MergePeriodograms(dfs,subtracted=0)
 	PeriodogramStats(periodogram)
@@ -612,6 +672,7 @@ function MakeAllSpectrograms()
 	string dfs = GetDFs()
 	if(!stringmatch(animal,"TiCl"))
 		wave spectrogram = MergeSpectrograms(dfs,subtracted=1)
+		wave spectrogram = MergeSpectrograms(dfs,subtracted=-1)
 	endif
 	wave spectrogram = MergeSpectrograms(dfs,subtracted=0)
 end
@@ -716,7 +777,7 @@ function DisplayData(df)
 			variable start_index = binarysearch(times,event_times[0]) // Time of first epoch event (usually the beginning of the stimulus).    
 			variable x_scale = dimdelta(data,0)
 			display /k=1 data[start_index,start_index+10/x_scale] as "Signal for Epoch "+num2str(epoch) // Display 10 seconds of data.  
-			dspperiodogram /db/nodc=1/segn={1000,900}/r=[(start_index+0.1/x_scale),(start_index+10/x_scale)]/win=Hanning data
+			dspperiodogram /db/nodc=1/segn={1000,900}/q/r=[(start_index+0.1/x_scale),(start_index+10/x_scale)]/win=Hanning data
 			duplicate /o w_periodogram eagEpochDF:periodogram /wave=periodogram
 			variable f_scale = dimdelta(periodogram,0)
 			redimension /n=(200/f_scale) periodogram
@@ -876,9 +937,13 @@ function /wave MakeVTA(df,epoch[,subtractEpoch,t_min,t_max,e_min,e_max,condition
 	endif
 	string suffix = suffix1 + suffix2
 	if(!paramisdefault(subtractEpoch))
-		wave background = MakeVTA(df,subtractEpoch,condition=condition,nth=nth,resampled=resampled,invert=invert,no_save=1)
-		vta -= background
-		suffix += "_sub"
+		if(subtractEpoch >= 0)
+			wave background = MakeVTA(df,subtractEpoch,subtractEpoch=-1,condition=condition,nth=nth,resampled=resampled,invert=invert)
+			vta -= background
+			suffix += "_sub"
+		else
+			suffix += "_air"
+		endif
 	endif
 	if(!no_save)
 		duplicate /o vta,eagDF:$cleanupname("vta"+suffix,0)
@@ -892,7 +957,8 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 	string dfs
 	string conditions
 	variable nth
-	variable subtracted // 1 if they are air subtracted (they should have "_subtracted" in the name).  
+	variable subtracted // 1 if they are air subtracted (they should have "_subtracted" in the name). 
+											// -1 if they are just air.  0 otherwise.   
 	variable pool_errors // Compute sd and sem as mean across sd/sem's rather than sd/sem across means.   
 	variable merge_num
 	
@@ -901,8 +967,10 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 	if(!paramisdefault(nth) && nth>=0)
 		suffix2 = "_"+num2str(nth)+"th"
 	endif
-	if(subtracted)
+	if(subtracted > 0)
 		suffix3 = "_sub"
+	elseif(subtracted < 0)
+		suffix3 = "_air"
 	endif
 	string suffix = suffix2 + suffix3
 	variable i,j
@@ -931,7 +999,12 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 		for(i=0;i<itemsinlist(dfs);i+=1)
 			string df_names = stringfromlist(i,dfs)
 			string odor_df_name = stringfromlist(0,df_names,",")
-			dfref df = $odor_df_name
+			string air_df_name = stringfromlist(1,df_names,",")
+			if(subtracted >= 0)
+				dfref df = $odor_df_name
+			else
+				dfref df = $air_df_name
+			endif
 			wave /sdfr=df vtai = $("vta"+suffix)
 			wave /sdfr=df vtai_sd = $("vta"+suffix+"_sd")
 			wave /sdfr=df vtai_sem = $("vta"+suffix+"_sem")
@@ -983,9 +1056,10 @@ function FormatBB(df,epoch)
 	variable last_sample = binarysearch(data_times,finish)
 	duplicate /free/r=[first_sample,last_sample] data,data_
 	duplicate /free/r=[first_sample,last_sample] data_times,times_
+	setscale /p x,0,dimdelta(data,0),data_
 	
-	duplicate /o data_ eagDF:data_ // Overwrite data with formatted data.  
-	duplicate /o times_ eagDF:times_ // Overwrite data with formatted data.  
+	duplicate /o data_ eagDF:data // Overwrite data with formatted data.  
+	duplicate /o times_ eagDF:times // Overwrite data with formatted data.  
 	
 	return data
 end
@@ -997,8 +1071,10 @@ function /wave MergeBBs([subtract,merge_num])
 	string dfs = GetDFs()
 	dfref currDF = getdatafolderdfr()
 	string suffix1 = "", suffix2 = "", suffix3 = ""
-	if(paramisdefault(subtract))
+	if(subtract > 0)
 		suffix1 = "_sub"
+	elseif(subtract < 0)
+		suffix1 = "_air"
 	endif
 	string suffix = suffix1 + suffix2 + suffix3
 	newdatafolder /o/s root:BB
@@ -1019,13 +1095,21 @@ function /wave MergeBBs([subtract,merge_num])
 		if(stringmatch(odor_df_name[0],":"))
 			odor_df_name = getdatafolder(1,currDF)+odor_df_name[1,strlen(odor_df_name)-1]
 		endif
+		if(stringmatch(air_df_name[0],":"))
+			air_df_name = getdatafolder(1,currDF)+air_df_name[1,strlen(air_df_name)-1]
+		endif
 		dfref odorDF = $odor_df_name
-		wave /sdfr=odorDF data
-		duplicate /free data,bbi
-		if(subtract)
-			dfref airDF = $air_df_name		
-			wave /sdfr=airDF data
-			bbi -= data
+		dfref airDF = $air_df_name
+		wave /z/sdfr=odorDF odor_data = data
+		wave /z/sdfr=airDF air_data = data
+		if(subtract >= 0)
+			duplicate /free odor_data,bbi
+			if(subtract > 0)
+				bbi -= air_data
+			endif
+		endif
+		if(subtract < 0)
+			duplicate /free air_data,bbi		
 		endif
 		if(i>0)
 			if(numpnts(bbi)<dimsize(bb,0))
@@ -1048,6 +1132,78 @@ function /wave MergeBBs([subtract,merge_num])
 	setdatafolder currDF
 	
 	return bb
+end
+
+function /wave MergeFFs([subtract,merge_num])
+	variable subtract // Subtract air epochs.  
+	variable merge_num
+	
+	string dfs = GetDFs()
+	dfref currDF = getdatafolderdfr()
+	string suffix1 = "", suffix2 = "", suffix3 = ""
+	if(subtract > 0)
+		suffix1 = "_sub"
+	elseif(subtract < 0)
+		suffix1 = "_air"
+	endif
+	string suffix = suffix1 + suffix2 + suffix3
+	newdatafolder /o/s root:FF
+	newdatafolder /o/s $Environment()
+	if(paramisdefault(merge_num))
+		newdatafolder /o/s $("x"+suffix)
+	else
+		newdatafolder /o/s $("N"+num2str(merge_num))
+	endif
+	
+	string /g sources = dfs
+	make /o/n=0 ff,ff_sd,ff_sem
+	variable i
+	for(i=0;i<itemsinlist(dfs);i+=1)
+		string df_names = stringfromlist(i,dfs)
+		string odor_df_name = stringfromlist(0,df_names,",")
+		string air_df_name = stringfromlist(1,df_names,",")
+		if(stringmatch(odor_df_name[0],":"))
+			odor_df_name = getdatafolder(1,currDF)+odor_df_name[1,strlen(odor_df_name)-1]
+		endif
+		if(stringmatch(air_df_name[0],":"))
+			air_df_name = getdatafolder(1,currDF)+air_df_name[1,strlen(air_df_name)-1]
+		endif
+		dfref odorDF = $odor_df_name
+		dfref airDF = $air_df_name
+		wave /z/sdfr=odorDF odor_data = data
+		wave /z/sdfr=airDF air_data = data
+		if(subtract >= 0)
+			duplicate /free odor_data,ffi
+			if(subtract > 0)
+				ffi -= air_data
+			endif
+		endif
+		if(subtract < 0)
+			duplicate /free air_data,ffi		
+		endif
+		redimension /n=(numpnts(ffi)) ffi
+		if(i>0)
+			if(dimsize(ffi,0)<dimsize(ff,0))
+				redimension /n=(dimsize(ffi,0),dimsize(ff,1),-1) ff
+			elseif(dimsize(ffi,0)>dimsize(ff,0))
+				redimension /n=(dimsize(ff,0),-1) ffi
+			endif
+		endif
+		concatenate {ffi}, ff
+	endfor
+	matrixop /o ff_sd = sqrt(varcols(ff^t)^t)
+	matrixop /o ff_sem = ff_sd/sqrt(i)
+	matrixop /o ff = meancols(ff^t)
+	redimension /n=(numpnts(ff)/10,10) ff,ff_sd,ff_sem
+	copyscales /p ffi,ff,ff_sd,ff_sem
+	if(paramisdefault(merge_num))
+		printf "Merged into ff%s\r",suffix
+	else
+		printf "Merged into number %d\r" merge_num
+	endif
+	setdatafolder currDF
+	
+	return ff
 end
 
 // Get list of data folders for the current animal, stimulus, and odor.  
@@ -1129,8 +1285,10 @@ function /wave MergePeriodograms(dfs[,condition,subtracted,merge_num])
 	if(!paramisdefault(condition))
 		suffix1 = "_"+condition
 	endif
-	if(subtracted)
+	if(subtracted > 0)
 		suffix2 = "_sub"
+	elseif(subtracted < 0)
+		suffix2 = "_air"
 	endif
 	string suffix = suffix1 + suffix2 + suffix3
 	newdatafolder /o/s root:periodograms
@@ -1146,7 +1304,12 @@ function /wave MergePeriodograms(dfs[,condition,subtracted,merge_num])
 	for(i=0;i<itemsinlist(dfs);i+=1)
 		string df_names = stringfromlist(i,dfs)
 		string odor_df_name = stringfromlist(0,df_names,",")
-		dfref df = $odor_df_name
+		string air_df_name = stringfromlist(1,df_names,",")
+		if(subtracted >= 0)
+			dfref df = $odor_df_name
+		else
+			dfref df = $air_df_name
+		endif
 		wave /sdfr=df periodogrami = $("periodograms"+suffix)
 		if(i==0)
 			duplicate /free periodogrami,periodogram_
@@ -1180,8 +1343,10 @@ function /wave MergeSpectrograms(dfs[,condition,subtracted,merge_num])
 	if(!paramisdefault(condition))
 		suffix1 = "_"+condition
 	endif
-	if(subtracted)
+	if(subtracted > 0)
 		suffix2 = "_sub"
+	elseif(subtracted < 0)
+		suffix2 = "_air"
 	endif
 	string suffix = suffix1 + suffix2 + suffix3
 	newdatafolder /o/s root:spectrograms
@@ -1197,15 +1362,21 @@ function /wave MergeSpectrograms(dfs[,condition,subtracted,merge_num])
 	for(i=0;i<itemsinlist(dfs);i+=1)
 		string df_names = stringfromlist(i,dfs)
 		string odor_df_name = stringfromlist(0,df_names,",")
-		dfref df = $odor_df_name
+		string air_df_name = stringfromlist(1,df_names,",")
+		if(subtracted >= 0)
+			dfref df = $odor_df_name
+		else
+			dfref df = $air_df_name
+		endif
 		wave /sdfr=df spectrogrami = $("spectrogram"+suffix)
 		if(i==0)
 			duplicate /free spectrogrami,spectrogram_
 		else
+			redimension /n=(dimsize(spectrogram_,0),-1) spectrogrami // Hopefully this does not misalign spectrograms.  
 			concatenate {spectrogrami},spectrogram_
 		endif	
 	endfor	
-	// periodogram should be M x N x trials at this point. 
+	// spectrogram should be M x N x trials at this point. 
 	duplicate /free spectrogram_ spectrogram2_
 	spectrogram2_ = spectrogram_ * spectrogram_
 	matrixop /o spectrogram_sd = sqrt(sumbeams(spectrogram2_)/i - powR(sumbeams(spectrogram_)/i,2))
@@ -1484,16 +1655,20 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT])
 	variable points = min(numpnts(eag),numpnts(ticl))
 	redimension /n=(points) eag,ticl
 	variable scale = dimdelta(eag,0)/dimdelta(ticl,0)
-	if(scale != 1 && (scale-1)<1e-12)
-		printf "Small differences in wave scaling observed. Setting scales to be equal.\r"
-		copyscales /p eag,ticl
+	if(scale != 1)
+		if(abs(scale-1)<1e-10)
+			printf "Small differences in wave scaling observed. Setting scales to be equal.\r"
+		else
+			printf "WARNING: Scales appear to be unequal for %s and %s.\r",getwavesdatafolder(eag,2),getwavesdatafolder(ticl,2)
+		endif
 	endif
+	copyscales /p eag,ticl
 	
 	variable delta_x = dimdelta(eag,0)
 	variable startP = round(startT/delta_X)
 	variable endP = min(points,round(endT/delta_X))
 	
-	dspperiodogram /cohr /r=[(startP),(endP)] /segn={(seg_length),(seg_overlap)} eag,ticl
+	dspperiodogram /cohr /q /r=[(startP),(endP)] /segn={(seg_length),(seg_overlap)} eag,ticl
 	wave w_periodogram
 	matrixop /o coherence_mag = abs(w_periodogram)
 	smooth 101,coherence_mag

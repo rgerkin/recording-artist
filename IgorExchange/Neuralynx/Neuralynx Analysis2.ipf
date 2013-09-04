@@ -2,7 +2,7 @@
 #pragma ModuleName=NlxA
 
 //strconstant KLUSTAKWIK_PATH="C:\Program Files\Neuralynx\SpikeSort 3D\Klustakwik.exe"
-strconstant KLUSTAKWIK_PATH="/Users/rgerkin/Desktop/KlustaKwik"
+strconstant KLUSTAKWIK_PATH="/Users/rgerkin/Desktop/G-Unit/klustakwik-master/MaskedKlustaKwik"
 strconstant STIMULUS_MESSAGE="Cheetah 160 Digital Input Port TTL (0xFFFF8000)"
 strconstant START_MESSAGE="Starting Recording"
 strconstant EVENT_WAVES="desc;times;ttl;odors"
@@ -987,6 +987,16 @@ Function ClusterAllData([df,method,match,except,dataLoad,dataChop,dataSave,noKlu
 		while(1)
 	else
 		files=core#dir2("folders",df=df,match=match,except=except)
+		i=0
+		do // Remove non-ntt folders from the list.  
+			file = stringfromlist(i,files)
+			dfref fileDF = df:$file
+			if(stringmatch(Nlx#DataType(fileDF),"ntt"))
+				i+=1
+			else
+					files = removefromlist(file,files)
+			endif
+		while(i<itemsinlist(files))
 	endif
 	variable numFiles=itemsinlist(files)
 	
@@ -3166,7 +3176,7 @@ function ISIHistogramCheckboxes(info)
 	endswitch
 end
 
-function ClusterDistances(df)
+function ComputeClusterDistances(df)
 	dfref df
 	
 	string epoch=getdatafolder(0,df)
@@ -3631,9 +3641,9 @@ End
 // ----------- Neuralynx Chopper -------------------------------
 // Chops data into subsets.  
 
-Function ChopAllData([df,epochs,match,except,killSource])
+Function ChopAllData([df,epochsDF,match,except,killSource])
 	dfref df
-	dfref epochs
+	dfref epochsDF
 	string match,except
 	variable killSource // To save memory, redimension to zero the data waves from the original folders after chopping.  
 	
@@ -3651,10 +3661,10 @@ Function ChopAllData([df,epochs,match,except,killSource])
 		if(!waveexists(w) || !stringmatch(folder,match) || stringmatch(folder,except))
 			continue
 		endif
-		if(paramisdefault(epochs))
+		if(paramisdefault(epochsDF))
 			NlxA#ChopData(subDF,killSource=killSource)
 		else
-			NlxA#ChopData(subDF,epochsDF=epochs,killSource=killSource)
+			NlxA#ChopData(subDF,epochsDF=epochsDF,killSource=killSource)
 		endif
 	endfor
 End
@@ -3815,7 +3825,15 @@ End
 
 static Function /df GetChopEpochs()
 	ControlInfo /W=NlxChopWin Times
-	dfref ChopEpochs=$("root:"+s_value)
+	if(v_flag == 3)
+		dfref ChopEpochs=$("root:"+s_value)
+	else
+		dfref ChopEpochs = root:Events:epochs
+		if(!datafolderrefstatus(ChopEpochs))
+			NlxA#ChopEvents()
+			dfref ChopEpochs = root:Events:epochs
+		endif
+	endif
 	return ChopEpochs
 End
 
@@ -3832,7 +3850,6 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 		return -1
 	endif
 	wave /z/sdfr=dataDF Data,Times,Clusters,Features,Header,Metadata
-	
 	
 	variable i
 	if(ParamIsDefault(epochsDF) && stringmatch(WinName(0,1),"NlxChopWin*"))
@@ -3855,6 +3872,9 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 		endif
 	endif
 	if(!waveexists(ChopTimes) || !paramisdefault(epochsDF))
+		if(datafolderrefstatus(epochsDF)==0)
+			dfref epochsDF=GetChopEpochs()
+		endif
 		wave /z epochTimes=epochsDF:times
 		if(waveexists(epochTimes))
 			Duplicate /FREE epochTimes ChopTimes
@@ -3908,9 +3928,9 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 					strswitch(type)
 						case "ntt":
 							if(count)
-								make /o/n=(rows,count,layers)/w newDF:$name=w[p][q+start][r]
+								make /o/n=(rows,count,layers) newDF:$name /wave=w1 = w[p][q+start][r]
 							else
-								make /o/n=0/w newDF:$name
+								make /o/n=0 newDF:$name
 							endif
 							break
 						case "ncs":
