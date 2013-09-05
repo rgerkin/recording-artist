@@ -8,9 +8,9 @@ constant n_shuffles = 10
 function All([i,j,k])
 	variable i,j,k
 	
-	string animals = "ticl;bee;ant;locust;cockroach;moth;orangeroach;laser;"
+	string animals = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
 	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
-	string stimuli = "ff;bb;"
+	string stimuli = "bb;ff"
 	
 	variable m
 	for(i=i;i<itemsinlist(animals);i+=1)
@@ -73,19 +73,27 @@ function Go()
 	if(stringmatch(stimulus,"BB"))
 		wave eag_bb = MergeBBs(subtract=0) // Odor epochs.  
 		if(!stringmatch(animal,"TiCl"))
+			wave ticl_bb = root:bb:ticl_bb_:x:bb
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
+			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
+			
 			wave eag_bb = MergeBBs(subtract=-1) // Air epochs.  
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=-1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=-1)
+			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=-1)
+			
 			wave eag_bb = MergeBBs(subtract=1) // Air-subtracted odor epochs.  
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=1)
+			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=1)
 		endif
-		wave ticl_bb = root:bb:ticl_bb_:x:bb
-		EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
-		EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
-		EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 	endif
-	if(stringmatch(stimulus,"BB"))
-		wave eag_bb = MergeFFs(subtract=0) // Odor epochs.  
+	if(stringmatch(stimulus,"FF"))
+		wave eag_ff = MergeFFs(subtract=0) // Odor epochs.  
 		if(!stringmatch(animal,"TiCl"))
-			wave eag_bb = MergeFFs(subtract=-1) // Air epochs.  
-			wave eag_bb = MergeFFs(subtract=1) // Air-subtracted odor epochs.  
+			wave eag_ff = MergeFFs(subtract=-1) // Air epochs.  
+			wave eag_ff = MergeFFs(subtract=1) // Air-subtracted odor epochs.  
 		endif
 	endif
 end
@@ -487,7 +495,7 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 	
 	wave /sdfr=eagDF data
 	variable n_pnts = dimsize(data,0)
-	variable n_freqs = dimsize(data,1)
+	variable n_freqs = max(1,dimsize(data,1))
 	variable seg_length = round(n_pnts/5)
 	seg_length -= mod(seg_length,2)==0 ? 0 : 1
 	variable seg_overlap = round(seg_length*0.99)
@@ -515,7 +523,7 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 	endfor
 	prog("Freq",0,0)
 	killwaves /z w_periodogram
-	redimension /n=(200/dimdelta(periodograms,0),-1,-1) periodograms
+	redimension /n=(round(200/dimdelta(periodograms,0)),-1,-1) periodograms
 	
 	if(!paramisdefault(subtractEpoch) && subtractEpoch>=0)
 		wave air_periodograms = MakePeriodograms(df,subtractEpoch,subtractEpoch=-1)
@@ -589,7 +597,7 @@ function /wave MakeBBPeriodogram(df,epoch[,subtractEpoch])
 	
 	DSPPeriodogram /NODC=1 /Q /SEGN={(seg_length),(seg_overlap)} /R=[(start),(n_pnts)] /WIN=Hanning trial 
 	wave w_periodogram
-	redimension /n=(200/dimdelta(w_periodogram,0),1) w_periodogram
+	redimension /n=(round(200/dimdelta(w_periodogram,0)),1) w_periodogram
 	w_periodogram = log(w_periodogram[p])
 	duplicate /o w_periodogram eagDF:$("periodogram"+suffix) /wave=periodogram
 	killwaves /z w_periodogram
@@ -1314,15 +1322,29 @@ function /wave MergePeriodograms(dfs[,condition,subtracted,merge_num])
 		if(i==0)
 			duplicate /free periodogrami,periodogram_
 		else
+			if(dimsize(periodogrami,0)<dimsize(periodogram_,0))
+				redimension /n=(dimsize(periodogrami,0),-1,-1) periodogram_
+			elseif(dimsize(periodogrami,0)>dimsize(periodogram_,0))
+				redimension /n=(dimsize(periodogram_,0),-1,-1) periodogrami
+			endif
 			concatenate {periodogrami},periodogram_
 		endif
 	endfor	
+	
+	string environment_ = Environment()
+	string stimulus = stringfromlist(1,environment_,"_")
+	
+	matrixop /free periodogram2_ = periodogram_ * periodogram_
 	// periodogram should be M x N x trials at this point. 
-	duplicate /free periodogram_ periodogram2_
-	periodogram2_ = periodogram_ * periodogram_
-	matrixop /o periodogram_sd = sqrt(sumbeams(periodogram2_)/i - powR(sumbeams(periodogram_)/i,2))
-	matrixop /o periodogram_sem = periodogram_sd/sqrt(i)
-	matrixop /o periodogram = sumbeams(periodogram_)/i
+	if(1)//stringmatch(stimulus,"FF")) // For FF trials = 10.  
+		matrixop /o periodogram_sd = sqrt(sumbeams(periodogram2_)/i - powR(sumbeams(periodogram_)/i,2))
+		matrixop /o periodogram_sem = periodogram_sd/sqrt(i)
+		matrixop /o periodogram = sumbeams(periodogram_)/i
+	else // For BB trials = 1 (or 0, i.e. just M x N).  
+		matrixop /o periodogram_sd = sqrt(meancols(periodogram2_^t) - powR(meancols(periodogram_^t),2))
+		matrixop /o periodogram_sem = periodogram_sd/sqrt(i)
+		matrixop /o periodogram = meancols(periodogram_^t)
+	endif
 	copyscales /p periodogrami,periodogram,periodogram_sd,periodogram_sem
 	if(paramisdefault(merge_num))
 		printf "Merged into x%s\r",suffix
@@ -1372,11 +1394,16 @@ function /wave MergeSpectrograms(dfs[,condition,subtracted,merge_num])
 		if(i==0)
 			duplicate /free spectrogrami,spectrogram_
 		else
-			redimension /n=(dimsize(spectrogram_,0),-1) spectrogrami // Hopefully this does not misalign spectrograms.  
+			if(dimsize(spectrogrami,0)<dimsize(spectrogram_,0))
+				redimension /n=(dimsize(spectrogrami,0),-1,-1) spectrogram_
+			elseif(dimsize(spectrogrami,0)>dimsize(spectrogram_,0))
+				redimension /n=(dimsize(spectrogram_,0),-1,-1) spectrogrami
+			endif
 			concatenate {spectrogrami},spectrogram_
 		endif	
 	endfor	
-	// spectrogram should be M x N x trials at this point. 
+	
+	// spectrogram should be (time x valve intervals) x frequencies for FF and BB. 
 	duplicate /free spectrogram_ spectrogram2_
 	spectrogram2_ = spectrogram_ * spectrogram_
 	matrixop /o spectrogram_sd = sqrt(sumbeams(spectrogram2_)/i - powR(sumbeams(spectrogram_)/i,2))
@@ -1634,9 +1661,9 @@ function EventTimes2EAGSegment(df,epoch)
 	setscale /p x,times(start),deltax(data),segment
 end
 
-function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT])
+function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT,subtracted])
 	wave EAG_bb,TiCl_bb
-	variable startT,endT
+	variable startT,endT,subtracted
 	
 	startT = paramisdefault(startT) ? 0 : startT
 	endT = paramisdefault(endT) ? Inf : endT
@@ -1644,10 +1671,18 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT])
 	variable seg_length = 1000
 	variable seg_overlap = 500
 	
+	string suffix = ""
+	if(subtracted > 0)
+		suffix += "_sub"
+	elseif(subtracted < 0)
+		suffix += "_air"
+	endif
+	
 	dfref currDF = getdatafolderdfr()
 	newdatafolder /o/s root:coherence
 	newdatafolder /o/s $cleanupname(num2str(startT)+"_"+num2str(endT),0)
 	newdatafolder /o/s $Environment()
+	newdatafolder /o/s $("x"+suffix)
 	
 	duplicate /free EAG_bb,eag
 	duplicate /free TiCl_bb,ticl
@@ -1694,15 +1729,24 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT])
 	return coherence_mag
 end
 
-function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
+function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
 	wave EAG_bb,TiCl_bb
+	variable subtracted
 	
 	variable seg_length = 1000
 	variable seg_overlap = 500
 	
+	string suffix = ""
+	if(subtracted > 0)
+		suffix += "_sub"
+	elseif(subtracted < 0)
+		suffix += "_air"
+	endif
+	
 	dfref currDF = getdatafolderdfr()
 	newdatafolder /o/s root:coherogram
 	newdatafolder /o/s $Environment()
+	newdatafolder /o/s $("x"+suffix)
 	
 	duplicate /free EAG_bb,eag
 	duplicate /free TiCl_bb,ticl
@@ -1719,7 +1763,7 @@ function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 		prog("Shuffle",i,n_shuffles)
 		wave eag_shuffled = eag
 		wave ticl_shuffled = RandomPhases(ticl)
-		wave coherogram = SlidingCoherence(eag,ticl,0.2,0.95)
+		wave coherogram = SlidingCoherence(eag_shuffled,ticl_shuffled,0.2,0.95)
 		matrixop /free coherogram_mag_shuffle = abs(coherogram)
 		smooth /dim=0 101,coherogram_mag_shuffle
 		shuffles[][][i] = coherogram_mag_shuffle[p][q]
