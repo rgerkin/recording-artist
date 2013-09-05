@@ -1164,6 +1164,7 @@ Function SwitchMiniView(mode)
 	Button Reject disable=0, pos={xx,yy}, proc=ShowMinisButtons, title="Reject:"
 	Button RejectBelow disable=!browse, size={20,20}, proc=ShowMinisButtons, title="<="
 	Button RejectAbove disable=!browse, size={20,20}, proc=ShowMinisButtons, title=">="
+	Button Locate disable=!browse, size={50,20}, pos+={25,0}, proc=ShowMinisButtons, title="Locate"
 	
 	ControlBar /T 69
 	strswitch(mode)
@@ -1233,6 +1234,9 @@ Function ShowMinisButtons(ctrlName)
 			break
 		case "UpdateAnalysis":
 			UpdateMiniAnalysis()
+			break
+		case "Locate":
+			ShowMinisOnSweep()
 			break
 		case "Template":
 			PickTemplate()
@@ -1409,6 +1413,43 @@ Function PickTemplate()
 	endif
 End
 
+function ShowMinisOnSweep()
+	if(!WinType("SweepsWin"))
+		return -1
+	endif
+	dfref df=GetMinisDF()
+	nvar /sdfr=df currMini
+	svar /sdfr=df channel=currChannel
+	dfref chanDF=GetMinisChannelDF(channel)
+	wave /t/sdfr=chanDF MiniNames
+	wave /sdfr=chanDF index
+	string mini_name = MiniNames[index[currMini]]
+	variable thisSweepNum,thisMiniNum
+	sscanf mini_name,"Sweep%d_Mini%d",thisSweepNum,thisMiniNum
+	extract /free index, sweepIndex, stringmatch(MiniNames[index[p]],"Sweep"+num2str(thisSweepNum)+"_*") // Minis in the current sweep.  
+	dfref sweepDF = GetMinisSweepDF(channel,thisSweepNum)
+	wave /sdfr=sweepDF Locs,Vals
+	make /o/n=(numpnts(Locs)) chanDF:sweepMinisMask /wave=mask=0, chanDF:sweepMinisMarkers /wave=markers=10 // Marker 10 is a vertical line.  
+	variable i
+	for(i=0;i<numpnts(sweepIndex);i+=1)
+		mini_name = MiniNames[sweepIndex[i]]
+		variable sweepNum,miniNum
+		sscanf mini_name,"Sweep%d_Mini%d",sweepNum,miniNum
+		mask[miniNum] = 1
+		if(miniNum == thisMiniNum)
+			markers[miniNum] = 23 // Marker 23 is an upside-down filled triangle.  
+		endif
+	endfor
+	string left_axes=AxisList2("left",win="SweepsWin")
+	string left_axis = stringfromlist(0,left_axes)
+	MoveCursor("A",thisSweepNum)
+	removefromgraph /z/w=SweepsWin vals
+	appendtograph /w=SweepsWin /l=$(left_axis) /b=time_axis /c=(0,0,0) vals vs locs
+	modifygraph /w=SweepsWin mode(vals)=3, lsize(vals)=3
+	modifygraph /w=SweepsWin mask(vals)={mask,0,0}
+	modifygraph /w=SweepsWin zmrknum(vals)={markers}
+end
+
 // Updates the values for mini amplitude and frequency in the Amplitude Analysis window to reflect Minis that have been removed in the Mini Browser.  
 Function UpdateMiniAnalysis()
 	ControlInfo /W=ShowMinisWin Channel
@@ -1434,7 +1475,8 @@ Function UpdateMiniAnalysis()
 	for(j=0;j<=ItemsInList(sweeps);j+=1)
 		string sweep=StringFromList(j,sweeps)
 		variable sweepNum=str2num(sweep)
-		wave /z/sdfr=GetMinisSweepDF(channel,sweepNum) Locs,Vals,Index,Event_Size
+		wave /z/sdfr=GetMinisSweepDF(channel,sweepNum) Locs,Vals
+		wave /z/sdfr=df Index,Event_Size
 		if(waveexists(Locs))
 			variable net_duration=str2num(note(Locs))
 			for(i=0;i<numpnts(Vals);i+=1)
@@ -1751,6 +1793,30 @@ Function FitMini(num[,channel])//trace)
 				case 2: 
 					fitType="Synapse"
 					break
+				case 3: // Now do the same 3 tries with the fit region moved in by 1 ms on each side.    
+					fitType="Synapse3"
+					v_fitoptions=4 // Minimize the squared error. 
+					first_point = peak_point-max(1,fit_before-1)*kHz
+					last_point = peak_point+max(1,fit_after-1)*kHz
+					break
+				case 4: 
+					v_fitoptions=6 // Minimize the absolute error.  
+					break
+				case 5: 
+					fitType="Synapse"
+					break
+				case 6: // Now do the same 3 tries with the fit region moved in by 2 ms on each side.  
+					fitType="Synapse3"
+					v_fitoptions=4 // Minimize the squared error. 
+					first_point = peak_point-max(1,fit_before-2)*kHz
+					last_point = peak_point+max(1,fit_after-2)*kHz
+					break
+				case 7: 
+					v_fitoptions=6 // Minimize the absolute error.  
+					break
+				case 8: 
+					fitType="Synapse"
+					break
 			endswitch
 			//if(proxy)
 			//	fitType+="_Reversed"
@@ -1778,6 +1844,10 @@ Function FitMini(num[,channel])//trace)
 				err = GetRTError(1)						// Clear error state
 			endif
 			tries+=1
+			wavestats /q/m=1 Fit
+			if(v_fiterror == 0 && v_max == v_min) // If no error was reported but fit is still a flat line.  
+				v_fiterror = -1 // Consider it an error so that a new fit is attempted.   
+			endif
 		while(v_fiterror && tries<2)
 		if(winIsTop)
 			AppendToGraph /c=(0,0,0) Fit
@@ -1872,7 +1942,11 @@ Function FitMini(num[,channel])//trace)
 				break
 			case "Event Size":
 				wavestats /q/m=1 Fit
-				w[index_]=abs(V_max-V_min)
+				if(v_max == v_min) // If the fit is a flat line.  
+					w[index_] = peak_val // Then use the original estimate of the amplitude.  
+				else // Otherwise use the estimate from the fit.  
+					w[index_]=abs(V_max-V_min)
+				endif
 				break
 			case "Plausability":
 				wave /sdfr=chanDF Cumul_Error=$cleanupname("Cumul Error",0),Mean_Error=$cleanupname("Mean Error",0),MSE=$cleanupname("MSE",0)
