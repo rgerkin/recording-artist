@@ -16,8 +16,8 @@ strconstant miniFitCoefs="Rise Time;Decay Time;Offset Time;Baseline;Amplitude;" 
 strconstant miniRankStats="Chi-Squared;Event Size;Event Time;R2;Log(1-R2);Cumul Error;Mean Error;MSE;Score;Rise 10%-90%;Interval;Plausability;pFalse;"
 strconstant miniOtherStats="Fit Time Before;Fit_Time_After;"
 //strconstant miniFitCoefs="Decay_Time;Offset_Time;y0;Amplitude"
-constant miniFitBefore=6 // In ms.  
-constant miniFitAfter=9 // In ms.  
+constant miniFitBefore=3 // In ms. Set to approximately the rise time constant.  
+constant miniFitAfter=9 // In ms. Set to approximately twice the decay time constant.   
 
 #ifdef SQL
 	override constant SQL_=1
@@ -1796,8 +1796,8 @@ Function FitMini(num[,channel])//trace)
 				case 3: // Now do the same 3 tries with the fit region moved in by 1 ms on each side.    
 					fitType="Synapse3"
 					v_fitoptions=4 // Minimize the squared error. 
-					first_point = peak_point-max(1,fit_before-1)*kHz
-					last_point = peak_point+max(1,fit_after-1)*kHz
+					first_point = peak_point-max(1,min(fit_before-1,round(fit_before/2)))*kHz
+					last_point = peak_point+max(1,min(fit_after-1,round(fit_after/2)))*kHz
 					break
 				case 4: 
 					v_fitoptions=6 // Minimize the absolute error.  
@@ -1808,8 +1808,8 @@ Function FitMini(num[,channel])//trace)
 				case 6: // Now do the same 3 tries with the fit region moved in by 2 ms on each side.  
 					fitType="Synapse3"
 					v_fitoptions=4 // Minimize the squared error. 
-					first_point = peak_point-max(1,fit_before-2)*kHz
-					last_point = peak_point+max(1,fit_after-2)*kHz
+					first_point = peak_point-max(1,min(fit_before-2,round(fit_before/3)))*kHz
+					last_point = peak_point+max(1,min(fit_after-2,round(fit_after/3)))*kHz
 					break
 				case 7: 
 					v_fitoptions=6 // Minimize the absolute error.  
@@ -1848,7 +1848,7 @@ Function FitMini(num[,channel])//trace)
 			if(v_fiterror == 0 && v_max == v_min) // If no error was reported but fit is still a flat line.  
 				v_fiterror = -1 // Consider it an error so that a new fit is attempted.   
 			endif
-		while(v_fiterror && tries<2)
+		while(v_fiterror && tries<9)
 		if(winIsTop)
 			AppendToGraph /c=(0,0,0) Fit
 			ModifyGraph offset($fit_name)={,0+offset_fits*fitOffset}
