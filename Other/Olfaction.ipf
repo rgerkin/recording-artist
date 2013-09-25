@@ -1897,7 +1897,6 @@ Function /WAVE RespiratoryPhaseSimple(signalDF[,lo,hi,minAmpl])
 	hi=paramisdefault(hi) ? 0 : hi
 	minAmpl=paramisdefault(minAmpl) ? 100 : minAmpl
 	wave filtered=FilterResp(signalDF)
-	duplicate /o filtered root:crap
 	duplicate /free PeakFinder(filtered,minAmpl) peaks
 
 	// Compute phase from level crossings.  

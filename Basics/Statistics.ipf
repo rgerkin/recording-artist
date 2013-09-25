@@ -4370,7 +4370,6 @@ Function /wave MahalInvCovMatrix(data)
 	//abort
 	//extract /o crap,crap2,abs(crap[p][q])>0.99 && p!=q
 	matrixop /free invcovs=inv((numrows(data)-0)*synccorrelation(data)/numrows(data)) // inverse of the covariance matrix.  
-	matrixop /o crap=invcovs//synccorrelation(data)
 	//abort
 	//duplicate /o invCov,crap
 	return invcovs
@@ -4488,7 +4487,7 @@ Function /WAVE MahalDistance(data,clusters,[doClusters])
 	variable dims=dimsize(data,1)
 	wavestats /q/m=1 clusters
 	variable i
-	make /o/n=(points,1) mahaldists=0
+	make /free/n=(points,1) mahaldists=0
 	for(i=0;i<numpnts(doClusters);i+=1)
 		variable cluster=doClusters[i]
 		wave mahalVectors=MahalVectorsOneCluster(data,clusters,cluster) // Each row is a normalized distance in one dimension.  

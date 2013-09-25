@@ -523,6 +523,10 @@ Function /s LoadBinaryFile(type,fileName[,pathName,baseName,downSamp])
 	strswitch(type)
 		case "nev":
 			variable numSamples = numpnts(Data)
+#if exists("NlxA#ExtractEpochs")
+			dfref eventsDF = getdatafolderdfr()
+			NlxA#ExtractEpochs(df=eventsDF)
+#endif
 			break
 		default: 
 			//Redimension/S Data												// Change to floating point so we can represent data in volts.
@@ -1000,7 +1004,8 @@ static Function PanelButtons(ctrlName)
 		case "Load":
 			ControlInfo Type; string types=S_Value
 			if(stringmatch(types,"All"))
-				types="ntt;ncs;nev;"
+				types="nev;ncs;ntt;"
+				variable all = 1
 			endif
 			controlinfo Sources_settings; string instance=s_value
 			ControlInfo fileName; string fileNameList=S_Value
@@ -1028,6 +1033,11 @@ static Function PanelButtons(ctrlName)
 					endif
 				endfor
 			endfor
+#if exists("NlxA#Chop")
+			if(all)
+				NlxA#Chop()
+			endif
+#endif
 			break
 		case "Save":
 			ControlInfo fileName; fileName=S_Value
