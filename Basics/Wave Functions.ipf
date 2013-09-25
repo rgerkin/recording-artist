@@ -337,7 +337,7 @@ threadsafe Function /wave W2matrix(waves)
 		name+=nameofwave(w)+"_"
 	endfor
 	copyscales w,matrix
-	Note matrix,"NAME:"+name
+	Note matrix,"NAME="+name
 	return matrix
 End
 

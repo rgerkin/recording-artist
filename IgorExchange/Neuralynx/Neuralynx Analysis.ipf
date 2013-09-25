@@ -282,9 +282,9 @@ Function /wave ConcatPiece(channel,wave_list,epoch,piece,cumul_duration,timestam
 		Concat-=offset // Must do this to prevent filtering from producing a ringing transient.  
 		FilterIIR /HI=(hi) Concat
 		Concat+=offset
-		Note Concat, "FilterIIR:"+num2str(hi/dimdelta(Concat,0))
+		Note Concat, "FilterIIR="+num2str(hi/dimdelta(Concat,0))
 	endif
-	Note Concat, "Timestamp:"+num2str(timestamp-cumul_duration)
+	Note Concat, "Timestamp="+num2str(timestamp-cumul_duration)
 	if(sayv)
 		Save /P=SaveLocation Concat as concat_name+".ibw"
 	endif
@@ -1517,7 +1517,7 @@ static Function /wave PhaseCrossings(phase,value,sign_)
 		wave /sdfr=df times
 		crossings=times[crossings[p]]
 	endif
-	note /nocr crossings "PHASE:"+num2str(value)
+	note /nocr crossings "PHASE="+num2str(value)
 	return crossings
 End
 

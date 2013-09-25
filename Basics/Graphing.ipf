@@ -2103,7 +2103,7 @@ Function AxisAutoscale(axis[,win])
 	if(ParamIsDefault(win))
 		win=WinName(0,1)
 	endif
-	return StringMatch(StringByKey("SETAXISFLAGS",AxisInfo("","CC_axis")),"*/A*")
+	return StringMatch(StringByKey("SETAXISFLAGS",AxisInfo(win,axis)),"*/A*")
 End
 
 // Returns a string with rgb values for each color used in a graph

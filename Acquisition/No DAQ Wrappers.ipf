@@ -270,6 +270,7 @@ static function Waiting(s)
 	lastDAQSweepT=StopMSTimer(-2)
 	
 	nvar /sdfr=$noDAQ_path t_init,t_update
+	variable first_sweep = t_update==0
 	variable then = (t_update - t_init)/1e6
 	variable now = (lastDAQSweepT - t_init)/1e6
 	variable elapsed = now - then
@@ -298,7 +299,9 @@ static function Waiting(s)
 	
 	//printf "Waiting executed once...\r"
 	t_update = now*1e6 + t_init
-	CollectSweep(DAQ)
+	if(!first_sweep)
+		CollectSweep(DAQ)
+	endif
 	return 0
 end
 

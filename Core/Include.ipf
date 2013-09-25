@@ -27,6 +27,10 @@
 #include "Neuralynx Analysis2"
 #endif
 
+#ifdef UL
+#include "UrbanLegend"
+#endif
+
 #endif
 
 #if exists("Core#SetProfile")

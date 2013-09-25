@@ -106,14 +106,14 @@ function PossiblyEditSettingsPM(info)
 		mode=numtype(mode) ? 1 : min(1,mode)
 	endif
 	if(editing)
-		popupmenu $(info.ctrlName) mode=mode, win=$(info.win) // Update mode.  
+		string cmd = "popupmenu /z "+info.ctrlName+" mode="+num2str(mode)+", win="+info.win   
 		string module=stringbykey("MODULE",info.userData)
 		string package=stringfromlist(0,info.ctrlName,"_")
 		EditModule(module,package=package)
 	else
-		string cmd="popupmenu /z "+info.ctrlName+" userData=ReplaceStringByKey(\"MODE\",\""+info.userData+"\",\""+num2str(info.popNum)+"\"), win="+info.win // Update user data. 
-		Execute /Q/P cmd // Must go into operation queue because control will because this function returns control to the normal control handler, which will block updates of user data.   
+		cmd="popupmenu /z "+info.ctrlName+" userData=ReplaceStringByKey(\"MODE\",\""+info.userData+"\",\""+num2str(info.popNum)+"\"), win="+info.win // Update user data. 
 	endif
+	Execute /Q/P cmd // Must go into operation queue because this function returns control to the normal control handler, which will block updates of user data.   
 	return editing
 end
 
@@ -2905,6 +2905,7 @@ Function SavePackageInstance(module,package,instance[,special])
 
 	string path
 	sprintf path,"%sprofiles:%s:%s",SpecialDirPath("Packages",0,0,0),CurrProfileName(),module
+	NewPath /O/Q/C modulePath,path // In case the module directory does not exist yet.  
 	variable generic=IsGenericPackage(module,package)
 	dfref instanceDF=InstanceHome(module,package,instance)
 	if(!generic)

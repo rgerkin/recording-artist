@@ -265,13 +265,13 @@ function /wave GetMu(df,mode,num,model)
 		if(!v_flag)
 			loadwave /o/q/p=Correlation name+".ibw"
 			wave mu = df:$name
-			note /k/nocr mu replacestringbykey("delete",note(mu),"1")
+			note /k/nocr mu replacestringbykey("delete",note(mu),"1","=")
 		else
 			make /o/d/n=(100,10,10) df:$name /wave=mu
-			note /k/nocr mu replacestringbykey("delete",note(mu),"0")
+			note /k/nocr mu replacestringbykey("delete",note(mu),"0","=")
 		endif
 	else
-		note /k/nocr mu replacestringbykey("delete",note(mu),"0")
+		note /k/nocr mu replacestringbykey("delete",note(mu),"0","=")
 	endif
 	setdatafolder currDF
 	return mu
@@ -434,10 +434,10 @@ function VarianceExplained(df,models)
 	endfor
 end
 
-function ModelROC(df,models[,permute])
+function ModelROC(df,models[,permute,j_start])
 	dfref df
 	wave models
-	variable permute
+	variable permute,j_start
 	
 	setdatafolder df
 	wave /sdfr=df spikeExists
@@ -459,12 +459,14 @@ function ModelROC(df,models[,permute])
 		variable model=models[i]
 		wave /z/d/sdfr=df muExists1=$("muExists1_"+num2str(model))
 		wave /z/d/sdfr=df muExists2=$("muExists2_"+num2str(model))
-		if(!waveexists(muExists1) || !waveexists(muExists2))
-			loadwave /o/p=Correlation "muExists1_"+num2str(model)+".ibw"
+		variable delete = 0
+		if(!waveexists(muExists1))
+			//loadwave /o/p=Correlation "muExists1_"+num2str(model)+".ibw"
+			delete += 1
+		endif
+		if(!waveexists(muExists2))
 			loadwave /o/p=Correlation "muExists2_"+num2str(model)+".ibw"
-			variable delete=1
-		else
-			delete=0
+			delete += 2
 		endif
 		
 		//if(i==0)
@@ -478,7 +480,7 @@ function ModelROC(df,models[,permute])
 		wave muExists_consensus = m_yProjection // Average across models, each using some other cell as a covariate.  New wave is observations x cells, like spikeExists.  
 		variable j
 		//setscale /I x,0,1,roc_mean
-		for(j=0;j<numUnits;j+=1)
+		for(j=j_start;j<numUnits;j+=1)
 			Prog("Unit",j,numUnits)
 			make /free/n=(numObservations) randos=gnoise(1),index=p
 			if(permute)
@@ -488,6 +490,17 @@ function ModelROC(df,models[,permute])
 			extract /o muExists_consensus,muExists_noSpikes,spikeExists[index[p]][q]==0 && q==j
 			ecdf(muExists_spikes) // Sorted.  x-value is a quantile and y-value is a mu.  
 			ecdf(muExists_noSpikes)
+			if(numpnts(muExists_spikes)>1000)
+				make /o/n=50 muExists_spikes_hist
+				make /o/n=50 muExists_nospikes_hist
+				histogram /b={0,0.02,50}/p muExists_spikes, muExists_spikes_hist
+				histogram /b={0,0.02,50}/p muExists_nospikes, muExists_nospikes_hist
+				print j
+				doupdate
+				sleep /s 2
+				//print "Stopping to get a good muExists_spikes and muExists_noSpikes for a supplemental figure."  
+				//return 0
+			endif
 			wave inverted_spikes = Invert(muExists_spikes,lo=0,hi=1,points=1000) // Now x-value is a mu and y-value is a quantile.  
 			wave inverted_noSpikes = Invert(muExists_noSpikes,lo=0,hi=1,points=1000)
 			inverted_spikes = 1 - inverted_spikes // Now this is true positive rate.  
@@ -529,8 +542,11 @@ function ModelROC(df,models[,permute])
 			killwaves inverted_coincidences,inverted_noCoincidences,muCoincidences_coincs,muCoincidences_noCoincs
 		endif
 			
-		if(delete)
-			killwaves $("muExists1_"+num2str(model)),$("muExists2_"+num2str(model))
+		if(delete & 1)
+			killwaves /z $("muExists1_"+num2str(model))
+		endif
+		if(delete & 2)
+			killwaves /z $("muExists2_"+num2str(model))
 		endif
 	endfor
 	

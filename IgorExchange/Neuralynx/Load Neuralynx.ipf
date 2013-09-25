@@ -85,19 +85,21 @@ EndStructure
 // Things we want to read out of each file's text header.  
 static constant NlxHeaderSize = 16384			// Size of header in version 1.25 and later files
 Structure NlxMetaData // Metadata in the header.  
-	double SampleFreq 
+	double sampleFreq 
 	double bitVolts
 	double fileOpenT[2]
 	double fileCloseT[2]
 	Struct NlxFeature feature[8]
-	double reserved[100]
+	uint32 numRecords
+	uint32 reserved2
+	double reserved[99]
 EndStructure
 
 constant NlxTimestampScale=1000000 // The timestamp units are in microseconds.  
 
 // --------------------------- Neuralynx Menus -------------------------------------
 
-// Add an item to Igor's Load Waves submenu (Data menu)
+// Add an item to Igor's Load Waves submenu (Data menu).
 Menu "Load Waves"
 	SubMenu "Load Neuralynx"
 		"Load Neuralynx Binary Continuous File...", LoadBinaryFile("ncs","")
@@ -111,7 +113,127 @@ End
 
 // ----------------------------------- Neuralynx Loading/Saving -------------------------------------
 
-// Loads the header of a neuralynx file.  Fills the NlxMetaData structure for use by other functions, creates a Name_h wave containing the binary header.  
+// Load a Neuralynx file.  
+Function /s LoadBinaryFile(type,fileName[,pathName,baseName,downSamp,quiet])
+	String type					// File type: continuous "ncs" or tetrode "ntt".   
+	String fileName				// file name, partial path and file name, or full path or "" for dialog.
+	String pathName				// Igor symbolic path name or "" for dialog.
+	String baseName				// Base name for the wave for this channel .  
+	Variable downSamp,quiet
+	
+	downSamp = downsamp>1 ? downsamp : 1
+	
+	strswitch(type)
+		case "ncs":
+			break
+		case "ntt":
+			break
+		case "nev":
+			break
+		default:
+			DoAlert 0, "Unknown format: "+type
+			return "-100" // Exit now so we don't have to deal with the default case again.  
+			break
+	endswitch
+	
+	if(ParamIsDefault(pathName))
+		PathInfo NlxPath
+		if(V_flag)
+			pathName="NlxPath"
+		else
+			pathName="home"
+		endif
+	endif
+
+	if(ParamIsDefault(baseName))
+		baseName=StrVarOrDefault(NlxFolder+"baseNameDefault",fileName)
+	endif
+	
+	String message = "Select a Nlx binary ."+type+" file"
+	Variable refNum
+	Open/R/Z=2/P=$pathName/M=message/T=("."+type) refNum as fileName+"."+type
+	// Save outputs from Open in a safe place.
+	if (V_flag != 0)
+		return num2str(V_flag)			// -1 means user canceled.
+	endif
+	String fullPath = S_fileName
+	String path=RemoveListItem(ItemsInList(fullPath,":")-1,fullPath,":")
+	fileName=StringFromList(ItemsInList(fullPath,":")-1,fullPath,":")
+	fileName=StringFromList(0,fileName,".")
+	if(!strlen(baseName))
+		baseName=fileName
+	endif
+	
+	// Loaded files with names like "TTA_E8.ntt" into data folders like "TTA:E8" relative to the current folder (usually root).  
+	variable i
+	string folder = "root"
+	for(i=0;i<itemsinlist(baseName,"_");i+=1)
+		folder += ":"+stringfromlist(i,baseName,"_")
+		NewDataFolder /O $folder
+	endfor
+	dfref df = $folder
+	string /g df:$"type"=type
+	
+	NewPath /O/Q/Z NlxPath path
+	
+	struct NlxMetaData NlxMetaData
+	duplicate /o LoadHeader(refNum,type,NlxMetaData) df:header
+	string /g df:headerValues=KeyValueHeader(refNum,type)
+	make /o/b/u df:metadata /wave=metadata // Metadata from the header.  
+	StructPut NlxMetaData MetaData // Save the header file in case we need to export a modified Nlx file.  
+	
+	fstatus refNum
+	if(V_logEOF<=16384) // Has only the header or even less.  
+		printf "%s has no data\r",fullPath
+		close refNum
+		return "-200"
+	else
+		wave data = LoadNlxData(refNum, df)	// Load the sample data
+	endif
+	
+	if(StringMatch(type,"ncs"))
+		variable loadedPoints=numpnts(data)
+		variable delta=deltax(data)
+		if(downSamp>1)
+			delta*=downSamp
+			if(loadedPoints>100000000) // Do it this way if the wave is large so we don't run out of memory.  
+				variable offset=leftx(data)
+				data[0,dimsize(data,0)/downSamp]=mean(data,offset+p*delta,offset+(p+1)*delta)
+				Redimension /n=(loadedPoints/downSamp,-1) Data
+				SetScale /P x,leftx(data),delta,data
+			else // Otherwise, do it the normal way.  
+				Resample /DOWN=(downSamp) data
+			endif
+		endif
+		// Fix time wave for continous data so it is a monotonic representation of the time records.  
+		wave /sdfr=df times
+		duplicate /free/d times,temp
+		variable factor=NCSSamples/downsamp
+		redimension /d/n=(numpnts(times)*factor) times
+		times=temp[floor(p/factor)]+(temp[floor(p/factor)+1]-temp[floor(p/factor)])*(mod(p,factor)/factor)
+	endif
+	
+	strswitch(type)
+		case "nev":
+			variable numSamples = numpnts(Data)
+			break
+		case "ncs":
+			numSamples = numpnts(Data)
+			break
+		case "ntt":
+			numSamples=dimsize(Data,1)
+			break
+	endswitch
+	if(!quiet)
+		printf "Loaded data for %s (%d samples).\r", GetDataFolder(0,df), numSamples
+	endif
+	
+	Close refNum
+	return folder
+End
+
+// Returns the header of a neuralynx file.  
+// Fills the NlxMetaData structure for with parsed information from the header.  
 Function /WAVE LoadHeader(refNum, type, NlxMetaData)
 	Variable refNum
 	String type
@@ -199,135 +321,117 @@ static Function /S KeyValueHeader(refNum,type)
 End
 
 // Loads the data (everything after the header) from a Neuralynx file.  
-static Function /wave LoadNlxData(refNum, type, baseName, NlxMetaData)
-	Variable refNum
-	String type,baseName
-	Struct NlxMetaData &NlxMetaData
+static Function /wave LoadNlxData(refNum, df)
+	variable refNum
+	dfref df
+	
+	struct NlxMetaData NlxMetaData
+	wave /b/u/sdfr=df metadata
+	structget NlxMetaData metadata
 		
-	FSetPos refNum, NlxHeaderSize													// Go to the end of the header (start of the data).  
+	FSetPos refNum, NlxHeaderSize // Go to the end of the header (start of the data).  
 	FStatus refNum
-	Variable i,j,bytes=V_logEOF-V_filePos
+	variable i,j,bytes=V_logEOF-V_filePos
+	svar /sdfr=df type
 	strswitch(type)
 		case "ncs":
-			Variable numRecords=bytes/(NCSInfoLength+NCSDataLength) // Number of 'NCSSamples' point frames of continuous data plus associated meta-information.  
-			Struct NlxNCSInfo NCSInfo
-			FBinRead/B=3 refNum, NCSInfo						// Read the info for the first frame of this continuous event.  
-			Variable firstFrameT=(NCSInfo.timestamp_low+(2^32)*NCSInfo.timestamp_high)/NlxTimestampScale // Only useful if there are no interruptions in acquisition.  
-			Variable chan=NCSInfo.ChannelNumber
-			FSetPos refNum, NlxHeaderSize+NCSInfoLength+NCSDataLength
-			FBinRead/B=3 refNum, NCSInfo						// Read the info for the second frame of this continuous event.  
-			variable secondFrameT=(NCSInfo.timestamp_low+(2^32)*NCSInfo.timestamp_high)/NlxTimestampScale
-			variable startT=firstFrameT
-			variable deltaT=(secondFrameT-firstFrameT)/NCSSamples
+			variable frameLength = NCSInfoLength+NCSDataLength
+			NlxMetaData.numRecords = bytes/frameLength // Number of 'NCSSamples' point frames of continuous data plus associated meta-information.  
 			break
 		case "ntt":
-			numRecords = bytes/(NTTInfoLength+NTTDataLength) // Number of distinct tetrode records.  
-			Struct NlxNTTInfo NTTInfo
-			FBinRead/B=3 refNum, NTTInfo						// Read the info for the first frame of this tetrode event.  
-			startT=0 										// Each event has its own timestamp.  
-			chan=NTTInfo.SpikeAcqNumber
-			deltaT=1/NlxMetaData.SampleFreq // Sampling frequency given in the header but not in the frame info for tetrode data.  
+			frameLength = NTTInfoLength+NTTDataLength
+			NlxMetaData.numRecords = bytes/frameLength // Number of distinct tetrode records.  
 			break
 		case "nev":
-			numRecords = bytes/(NEVInfoLength) // Number of distinct event records.  
-			Struct NlxNEVInfo NEVInfo
-			FBinRead/B=3 refNum, NEVInfo						// Read the info for the first frame of this tetrode event.  
-			startT=0
-			break
-	endswitch
-
-	if(!strlen(baseName))
-		baseName=type
-	endif
-	String wave_name= CleanupName(baseName,0)
-	Make/o/n=(bytes/numRecords,numRecords) /B/U data // uint8 wave (byte wave).  
-	FSetPos refNum,NlxHeaderSize 								// Go back to the beginning of the data.  
-	FBinRead/B=3 refNum, Data								// Read the rest of the file.  	
-	
-	// Now sort the wheat from the chaff (clean up the data wave to remove bytes containing metainformation, and resize/redimension it.)  
-	IgorizeData(:,type,numRecords)
-	
-	Note Data, "TYPE:"+type+";"
-	strswitch(type)
-		case "ncs":
-			SetScale/P x, startT, deltaT, "s", Data
-			break
-		case "ntt":
-			SetScale/P x, 0, deltaT, "s", Data
+			frameLength = NEVInfoLength
+			NlxMetaData.numRecords = bytes/frameLength // Number of distinct event records.  
 			break
 	endswitch
 	
-	return Data
+	structput NlxMetaData metadata
+	make/o/n=(frameLength,NlxMetaData.numRecords)/b/u df:raw /wave=raw // uint8 wave (byte wave).  
+	FSetPos refNum,NlxHeaderSize 								// Go back to the beginning of the data (end of the header).  
+	FBinRead/B=3 refNum, raw								// Read the rest of the file.  	
+	
+	// Now sort the wheat from the chaff:
+	// -- Clean up the data wave to remove bytes containing metainformation
+	// -- Resize/redimension it.
+	// -- Set all scales.  
+	IgorizeData(df) // Creates "data" among other objects.  
+	wave /sdfr=df data
+	Note data, "TYPE="+type+";"
+	
+	return data
 End
 
-// Takes Igor waves of data and times, created by LoadNlxData, and saves it back into a Neuralynx file.  Assumes there will be already be an intact header in the file that will be overwritten.  
-// Use this if you have done some processing on the data in Igor, like removing bogus spikes or extracting a subset of the data, and now want to re-export it for analysis with Neuralynx tools.  
-static Function /S SaveNlxData(refNum,df)
-	Variable refNum
-	dfref df
-	
-	string type=Nlx#DataType(df)
-	wave /sdfr=df Times,Header
-	
-	strswitch(type)
-		case "ncs":
-			break
-		case "ntt":
-			Variable numRecords = numpnts(Times) // Number of distinct tetrode records.  
-	endswitch
-	
-	wave NlxFormatted=DeIgorizeData(df)
-	FSetPos refNum,0
-	FBinWrite /B=3 refNum, Header
-	FSetPos refNum,NlxHeaderSize 								// Go back to the beginning of the data.  
-	FBinWrite/B=3 refNum, NlxFormatted						// Write the new data.  
-End
-
-// All the Neuralynx data after the header consists of a series of frames.  Each frame contains data and metadata.  This converts the old metadata+data (Raw) into just the data (Raw) as well 
+// All the Neuralynx data after the header consists of a series of frames.  
+// Each frame contains data and metadata.  
+// This converts the old metadata+data (Raw) into just the data (Raw) as well 
 // as a wave of cluster numbers (_c suffix) and a wave of times (_t suffix).  
-Function IgorizeData(df,type,numRecords)
+Function IgorizeData(df)
 	dfref df
-	String type
-	Variable numRecords
+	
+	svar /sdfr=df type
+	wave /b/u/sdfr=df metadata
+	struct NlxMetaData NlxMetaData
+	StructGet NlxMetaData metadata
 		
-	Variable i
-	//Make /o/n=(numRecords)/I NumValidSamples // Always 512 according to Brian at Nlx.  
+	wave /B/U/sdfr=df raw // The raw data (without the header).  	
+	variable deltaT = 1/NlxMetaData.sampleFreq // Can't trust this because data may have been downsampled and then saved.  
+	variable numRecords = NlxMetaData.numRecords 
+	variable i	
+	duplicate /o raw,df:data /wave=data		
+	
 	strswitch(type)
 		case "ncs":
-			Make /o/D/U/n=(numRecords) df:times /wave=Times
+			Make /o/D/U/n=(numRecords) df:times /wave=Times	// This will later be upsampled by a factor of NCSSamples.  
+			Struct NlxNCSInfo NCSInfo
+			StructGet /B=3 NCSInfo raw[0] // Read the info for the first frame of this continuous event.  
+			variable startT=(NCSInfo.timestamp_low+(2^32)*NCSInfo.timestamp_high)/NlxTimestampScale
+			StructGet /B=3 NCSInfo raw[1] // Read the info for the second frame of this continuous event.  
+			variable nextT = (NCSInfo.timestamp_low+(2^32)*NCSInfo.timestamp_high)/NlxTimestampScale
+			deltaT=(nextT - startT)/NCSSamples
+			for(i=0;i<numRecords;i+=1)
+				StructGet /B=3 NCSInfo, raw[i]
+				variable timestamp=NCSInfo.timestamp_low+(2^32)*NCSInfo.timestamp_high
+				Times[i]=timestamp/NlxTimestampScale
+			endfor
+			DeletePoints /M=0 0,NCSInfoLength,data // Delete the metainformation. 
+			redimension /n=(numRecords*NCSSamples)/w/e=1 data // Convert into one long wave with the appropriate point size.    	
+			Redimension/s data // Change to floating point so we can represent data in volts.
+			data*=NlxMetaData.bitVolts // Convert to volts.  
+			SetScale/P x, startT, deltaT, "s", data // Time scale is useful only if there are no interruptions in acquisition.  
+			SetScale d, -2^(NTTDataSize*8-1), 2^(NTTDataSize*8-1), "V", data	// Note that the data units are volts with minimum and maximum given by bit depth of sampling.  
 			break
 		case "ntt":
 			Make /o/D/U/n=(numRecords) df:times /wave=Times
 			Make /o/W/U/n=(numRecords) df:clusters /wave=Clusters
 			Make /o/I/U/n=(numRecords,8) df:features /wave=Features 
-			break
-		case "nev":
-			Make /o/T/n=(numRecords) df:desc /wave=Events
-			Make /o/W/U/n=(numRecords) df:TTL /wave=TTL
-			Make /o/D/U/n=(numRecords) df:times /wave=Times
-			break
-	endswitch
-	
-	wave Raw=df:Data
-	for(i=0;i<numRecords;i+=1)
-		Variable timestamp=0
-		strswitch(type)
-			case "ncs":
-				Struct NlxNCSInfo NCSInfo
-				StructGet /B=3 NCSInfo, Raw[i]
-				timestamp=NCSInfo.timestamp_low+(2^32)*NCSInfo.timestamp_high
-				Times[i]=timestamp/NlxTimestampScale
-				//NumValidSamples[i]=NCSInfo.NumValidSamples
-				break
-			case "ntt":
+			startT=0 // Each event has its own timestamp.  
+			for(i=0;i<numRecords;i+=1)
 				Struct NlxNTTInfo NTTInfo
 				StructGet /B=3 NTTInfo, Raw[i]
 				timestamp=NTTInfo.timestamp_low+(2^32)*NTTInfo.timestamp_high
 				Times[i]=timestamp/NlxTimestampScale
 				Clusters[i]=NTTInfo.ClassCellNumber
 				Features[i][]=NTTInfo.FeatureParams[q]
-				break
-			case "nev":
+			endfor
+			DeletePoints /M=0 0,NTTInfoLength,data // Delete the metainformation.  
+			Redimension /n=(numpnts(data)/NTTDataSize)/E=1/W data // Convert into one long wave with the appropriate point size.    
+			Duplicate /FREE data, NTTTemp
+			Redimension /n=(NTTSamples,numRecords,4) data // Tetrode number (not sample number) is the first index, so redimensioning in one step doesn't work.  
+			data[][][]=NTTTemp[(p*4)+(128*q)+r] // Maybe use MatrixOp with WaveMap to improve speed?  No, it only supports 2 dimensional waves.  
+			Redimension/S data // Change to floating point so we can represent data in volts.
+			data*=NlxMetaData.bitVolts // Convert to volts.  
+			SetScale/P x, 0, deltaT, "s", data
+			SetScale d, -2^(NTTDataSize*8-1), 2^(NTTDataSize*8-1), "V", Data	// Note that the data units are volts with minimum and maximum given by bit depth of sampling.  
+			break
+		case "nev":
+			Make /o/T/n=(numRecords) df:desc /wave=Events
+			Make /o/W/U/n=(numRecords) df:TTL /wave=TTL
+			Make /o/D/U/n=(numRecords) df:times /wave=Times
+			startT=0
+			for(i=0;i<numRecords;i+=1)
 				Struct NlxNEVInfo NEVInfo
 				StructGet /B=3 NEVInfo, Raw[i]
 				String eventStr=NEVInfo.EventString_low+NEVInfo.EventString_high
@@ -335,225 +439,23 @@ Function IgorizeData(df,type,numRecords)
 				Events[i]=eventStr
 				TTL[i]=NEVInfo.nttl
 				Times[i]=timestamp/NlxTimestampScale
-				break
-		endswitch
-	endfor
-	
-	strswitch(type)
-			case "ncs":
-				DeletePoints /M=0 0,NCSInfoLength,Raw // Delete the metainformation.  
-				Redimension /n=(numpnts(Raw)/NCSDataSize)/E=1/W Raw // Convert into one long wave with the appropriate point size.  
-				break
-			case "ntt":
-				DeletePoints /M=0 0,NTTInfoLength,Raw // Delete the metainformation.  
-				Redimension /n=(numpnts(Raw)/NTTDataSize)/E=1/W Raw // Convert into one long wave with the appropriate point size.    
-				Duplicate /FREE Raw, NTTTemp
-				Redimension /n=(NTTSamples,numRecords,4) Raw // Tetrode number (not sample number) is the first index, so redimensioning in one step doesn't work.  
-				Raw[][][]=NTTTemp[(p*4)+(128*q)+r] // Maybe use MatrixOp with WaveMap to improve speed?  No, it only supports 2 dimensional waves.  
-				break
-			case "nev":
-				// Nothing left to do since TTL values and times are already extracted.  If you want to do more with the data you should do it in the previous .nev case.  
-				break
-	endswitch
-	// Raw is now clean!  
-End
-
-// The opposite of IgorizeData.  This puts the Data and the Times (but not the clusters) back into a Neuralynx frame format for use with re-exporting Neuralynx data with SaveNlxData.  
-Function /wave DeIgorizeData(df)
-	dfref df
-	
-	Make/FREE/n=0 /B/U NlxFormatted // uint8 wave (byte wave).  
-	string type=DataType(df)	
-	Wave /sdfr=df Data,Times,MetaData
-	Variable i,j,k,numRecords=numpnts(Times)
-	Struct NlxMetaData NlxMetaData
-	
-	Wave /I/U /sdfr=df Features
-	Wave /W/U /sdfr=df Clusters
-	StructGet NlxMetaData MetaData
-	//Make/O/n=(bytes/numRecords,numRecords) /B/U $(wave_name) /WAVE=NxFormatted // uint8 wave (byte wave).
-	//Make /o/n=(numRecords)/I NumValidSamples // Always 512 according to Brian at Nlx.  
-	for(i=0;i<numRecords;i+=1)
-		Variable timestamp=0
-		strswitch(type)
-			case "ncs":
-				break
-			case "ntt":
-				Struct NlxNTTInfo NTTInfo
-				NTTInfo.timestamp_low=mod(Times[i]*NlxTimestampScale,2^32)
-				NTTInfo.timestamp_high=floor(Times[i]*NlxTimestampScale/(2^32))
-//				NTTInfo.SpikeAcqNumber=0 // Ignore this since it doesn't matter.  
-				NTTInfo.ClassCellNumber=Clusters[i]  
-				for(j=0;j<8;j+=1)
-					if(WaveExists(Features))
-						NTTInfo.FeatureParams[j]=Features[i][j]
-					else
-						NTTInfo.FeatureParams[j]=MetaData
-					endif
-				endfor
-				StructPut /B=3 NTTInfo, NlxFormatted[i]
-				break
-			case "nev":
-				break
-		endswitch
-	endfor
-	strswitch(type)
-			case "ncs":
-				break
-			case "ntt":  
-				Duplicate /FREE Data,NTTTemp
-				Redimension /n=(numpnts(Data))/W NTTTemp
-				NTTTemp=Data[floor(mod(p,128)/4)][floor(p/128)][mod(p,4)]/NlxMetaData.bitVolts
-				Redimension /n=(NTTDataSize*NTTSamples*4,numRecords)/E=1/B/U NTTTemp
-				Redimension /n=(NTTInfoLength+NTTSamples*4*NTTDataSize,numRecords) NlxFormatted
-				NlxFormatted[NTTInfoLength,][]=NTTTemp[p-NTTInfoLength][q] // Maybe use MatrixOp with WaveMap to improve speed?    
-				break
-			case "nev":
-				break
-	endswitch
-	return NlxFormatted // Clean is now raw!  
-End
-
-// Load a Neuralynx file.  
-Function /s LoadBinaryFile(type,fileName[,pathName,baseName,downSamp])
-	String type					// File type: continuous "ncs" or tetrode "ntt".   
-	String fileName				// file name, partial path and file name, or full path or "" for dialog.
-	String pathName				// Igor symbolic path name or "" for dialog.
-	String baseName				// Base name for the wave for this channel .  
-	Variable downSamp
-	
-	dfref currFolder=GetDataFolderDFR()
-	downSamp = downsamp>1 ? downsamp : 1
-	
-	strswitch(type)
-		case "ncs":
-			break
-		case "ntt":
-			break
-		case "nev":
-			break
-		default:
-			DoAlert 0, "Unknown format: "+type
-			return "-100" // Exit now so we don't have to deal with the default case again.  
-			break
-	endswitch
-	
-	if(ParamIsDefault(pathName))
-		PathInfo NlxPath
-		if(V_flag)
-			pathName="NlxPath"
-		else
-			pathName="home"
-		endif
-	endif
-
-	if(ParamIsDefault(baseName))
-		baseName=StrVarOrDefault(NlxFolder+"baseNameDefault",fileName)
-	endif
-	
-	String message = "Select a Nlx binary ."+type+" file"
-	Variable refNum
-	//print fileName+"."+type
-	Open/R/Z=2/P=$pathName/M=message/T=("."+type) refNum as fileName+"."+type
-	// Save outputs from Open in a safe place.
-	if (V_flag != 0)
-		return num2str(V_flag)			// -1 means user canceled.
-	endif
-	String fullPath = S_fileName
-	String path=RemoveListItem(ItemsInList(fullPath,":")-1,fullPath,":")
-	fileName=StringFromList(ItemsInList(fullPath,":")-1,fullPath,":")
-	fileName=StringFromList(0,fileName,".")
-	if(!strlen(baseName))
-		baseName=fileName
-	endif
-	
-	// Loaded files with names like "TTA_E8.ntt" into data folders like "TTA:E8" relative to the current folder (usually root).  
-	variable i
-	for(i=0;i<itemsinlist(baseName,"_");i+=1)
-		string folder=stringfromlist(i,baseName,"_")
-		NewDataFolder /O/S $folder
-	endfor
-	dfref df=GetDataFolderDFR()
-	
-	NewPath /O/Q/Z NlxPath path
-	
-	Struct NlxMetaData NlxMetaData
-	Duplicate /o LoadHeader(refNum,type,NlxMetaData) header
-	
-	FStatus refNum
-	if(V_logEOF<=16384) // Has only the header or even less.  
-		printf "%s has no data\r",fullPath
-		Close refNum
-		SetDataFolder currFolder
-		return "-200"
-	else
-		wave Data=LoadNlxData(refNum, type, baseName, NlxMetaData)	// Load the sample data
-	endif
-	
-	string /g $"type"=type
-	string /g headerValues=KeyValueHeader(refNum,type)
-	Make /o metadata // Metadata from the header.  
-	StructPut NlxMetaData MetaData // Save the header file in case we need to export a modified Nlx file.  
-	
-	if(StringMatch(type,"ncs"))
-		Variable loadedPoints=numpnts(Data)
-		Variable delta=deltax(Data)
-		if(downSamp>1)
-			delta*=downSamp
-			if(loadedPoints>100000000) // Do it this way if the wave is large so we don't run out of memory.  
-				Variable offset=leftx(Data)
-				Data[0,dimsize(Data,0)/downSamp]=mean(Data,offset+p*delta,offset+(p+1)*delta)
-				Redimension /n=(loadedPoints/downSamp,-1) Data
-				SetScale /P x,leftx(Data),delta,Data
-			else // Otherwise, do it the normal way.  
-				Resample /DOWN=(downSamp) Data
-			endif
-		endif
-	
-		// Fix time wave for continous data so it is a monotonic representation of the time records.  
-		if(StringMatch(type,"ncs"))
-			Wave Times // Currently just the times for each block of 512 samples.  
-			Duplicate /FREE/D Times,temp
-			Redimension /D/n=(loadedPoints/downSamp) Times
-			Variable factor=NCSSamples/downsamp
-			Times=temp[floor(p/factor)]+(temp[floor(p/factor)+1]-temp[floor(p/factor)])*(mod(p,factor)/factor)
-		endif
-	endif
-	
-	strswitch(type)
-		case "nev":
-			variable numSamples = numpnts(Data)
+			endfor
+			// Nothing left to do since TTL values and times are already extracted.    
 #if exists("NlxA#ExtractEpochs")
 			dfref eventsDF = getdatafolderdfr()
 			NlxA#ExtractEpochs(df=eventsDF)
 #endif
 			break
-		default: 
-			//Redimension/S Data												// Change to floating point so we can represent data in volts.
-			//Data*=NlxMetaData.bitVolts
-			SetScale d, 0, 0, "V", Data										// Note that the data units are volts
-			strswitch(type)
-				case "ncs":
-					numSamples = numpnts(Data)
-					break
-				case "ntt":
-					numSamples=dimsize(Data,1)
-					break
-			endswitch
-			break
 	endswitch
-	printf "Loaded data for %s (%d samples).\r", GetDataFolder(0), numSamples
 	
-	Close refNum
-	SetDataFolder currFolder
-
-	return getdatafolder(1)
+	KillWaves /z raw
+	// Raw is now clean!  
 End
 
 // Using Igor components, overwrite the data component of a Neuralynx file.  
-Function SaveBinaryFile(df[,path,fileName,force])
+Function SaveBinaryFile(df[,pathName,fileName,force])
 	dfref df						// The folder which contains the data to be written to a file.  
-	String path					// Igor symbolic path name or "" for dialog.
+	String pathName			// Igor symbolic path name or "" for dialog.
 	String fileName				// file name, partial path and file name, or full path or "" for dialog.
 	variable force				// Force overwrite without prompting.  
 	
@@ -573,12 +475,12 @@ Function SaveBinaryFile(df[,path,fileName,force])
 	
 	Variable err
 	
-	if(ParamIsDefault(path))
-		path="NlxPath"
-		pathinfo $path
+	if(ParamIsDefault(pathName))
+		pathName="NlxPath"
+		pathinfo $pathName
 		if(!strlen(s_path))
 			Do
-				NewPath /O/M="Choose a default folder for Nlx files."/Q $path
+				NewPath /O/M="Choose a default folder for Nlx files."/Q $pathName
 			While(V_flag)
 		endif
 	endif
@@ -589,7 +491,7 @@ Function SaveBinaryFile(df[,path,fileName,force])
 	if(ParamIsDefault(fileName))
 		fileName=DF2FileName(df)
 	endif
-	Open /R/Z=1/P=$path/M=message/T=("."+type) refNum as fileName+"."+type
+	Open /R/Z=1/P=$pathName/M=message/T=("."+type) refNum as fileName+"."+type
 	variable fileExists=!V_flag
 	if(fileExists && !force) // File with this name already exists.  
 		DoAlert 1,"Overwrite existing file "+fileName+"?"
@@ -598,7 +500,7 @@ Function SaveBinaryFile(df[,path,fileName,force])
 			return -3
 		endif
 	endif
-	Open /P=$path/M=message/T=("."+type) refNum as fileName+"."+type
+	Open /P=$pathName/M=message/T=("."+type) refNum as fileName+"."+type
 	
 	// Save outputs from Open in a safe place.
 	err = V_Flag
@@ -615,6 +517,106 @@ Function SaveBinaryFile(df[,path,fileName,force])
 	
 	Close refNum
 	return 0			// Zero signifies no error.	
+End
+
+// Takes Igor waves of data and times, created by LoadNlxData, and saves it back into a Neuralynx file.  
+// Assumes there will be already be an intact header in the file that will be overwritten.  
+// Use this if you have done some processing on the data in Igor, like removing bogus spikes or extracting 
+// a subset of the data, and now want to re-export it for analysis with Neuralynx tools.  
+static Function /S SaveNlxData(refNum,df)
+	Variable refNum
+	dfref df
+	
+	string type=Nlx#DataType(df)
+	wave /sdfr=df Times,Header
+	
+	strswitch(type)
+		case "ncs":
+			break
+		case "ntt":
+			break  
+	endswitch
+	
+	wave Raw = DeIgorizeData(df)
+	FSetPos refNum,0
+	FBinWrite /B=3 refNum, Header
+	FSetPos refNum,NlxHeaderSize 								// Go back to the beginning of the data.  
+	FBinWrite/B=3 refNum, Raw						// Write the new data.  
+End
+
+// The opposite of IgorizeData.  
+// This puts the Data and the Times (but not the clusters) back into a Neuralynx frame format 
+// for use with re-exporting Neuralynx data with SaveNlxData.  
+Function /wave DeIgorizeData(df)
+	dfref df
+	
+	Make/FREE/n=0 /B/U raw // uint8 wave (byte wave).  
+	string type=DataType(df)	
+	Wave /W/U/sdfr=df Data // 32-bit float.    
+	wave /D/sdfr=df Times
+	wave /B/U/sdfr=df MetaData
+	wave /B/sdfr=df Header
+	Variable i,j,k
+	Struct NlxMetaData NlxMetaData
+	StructGet NlxMetaData MetaData
+	//Make/O/n=(bytes/numRecords,numRecords) /B/U $(wave_name) /WAVE=NxFormatted // uint8 wave (byte wave).
+	//Make /o/n=(numRecords)/I NumValidSamples // Always 512 according to Brian at Nlx.  
+	
+	Variable timestamp=0
+	strswitch(type)
+		case "ncs":
+			variable numRecords = numpnts(Times)/NCSSamples
+			variable frameLength = NCSInfoLength+NCSDataLength
+			redimension /n=(NCSInfoLength,numRecords) raw
+			Struct NlxNCSInfo NCSInfo
+			for(i=0;i<numRecords;i+=1)
+				NCSInfo.timestamp_low=mod(times[NCSSamples*i]*NlxTimestampScale,2^32)
+				NCSInfo.timestamp_high=floor(times[NCSSamples*i]*NlxTimestampScale/(2^32))
+				NCSInfo.SampleFreq = 1/dimdelta(data,0) // Note that the data may have been downsampled in Igor.  
+				NCSInfo.NumValidSamples = NCSSamples
+				StructPut /B=3 NCSInfo, Raw[i] // Fill NTTInfoLength worth of Raw[i] with information about frame i.  
+			endfor
+			redimension /n=(frameLength,numRecords) raw
+			duplicate /free data,NCSTemp
+			NCSTemp = data/NlxMetaData.bitVolts // Convert back to a 16-bit integer.  
+			redimension /w NCSTemp // Rescale to 16-bit integer wave (rounding off data).  
+			redimension /n=(NCSDataLength,numRecords)/E=1/B/U NCSTemp // Reshape to 2D byte wave. 
+			raw[NCSInfoLength,][]=NCSTemp[p-NCSInfoLength + NCSDataLength*q]
+			break
+		case "ntt":
+			numRecords = NlxMetaData.numRecords // Should also be numpnts(Times)
+			frameLength = NTTInfoLength+NTTDataLength
+			redimension /n=(NTTInfoLength,numRecords) raw
+			wave /I/U /sdfr=df Features
+			wave /W/U /sdfr=df Clusters
+			Struct NlxNTTInfo NTTInfo
+			for(i=0;i<numRecords;i+=1)
+				NTTInfo.timestamp_low=mod(Times[i]*NlxTimestampScale,2^32)
+				NTTInfo.timestamp_high=floor(Times[i]*NlxTimestampScale/(2^32))
+				NTTInfo.ClassCellNumber=Clusters[i] // This appears to set the cluster.  
+				for(j=0;j<8;j+=1)
+					if(WaveExists(Features))
+						NTTInfo.FeatureParams[j]=Features[i][j]
+					else
+						NTTInfo.FeatureParams[j]=MetaData
+					endif
+				endfor
+				StructPut /B=3 NTTInfo, Raw[i] // Fill NTTInfoLength worth of Raw[i] with information about frame i.  
+			endfor
+			redimension /n=(frameLength,numRecords) raw
+			duplicate /free data,NTTTemp
+			Redimension /n=(numpnts(Data))/W NTTTemp
+			NTTTemp=Data[floor(mod(p,128)/4)][floor(p/128)][mod(p,4)]/NlxMetaData.bitVolts
+			Redimension /n=(NTTDataSize*NTTSamples*4,numRecords)/E=1/B/U NTTTemp
+			raw[NTTInfoLength,][]=NTTTemp[p-NTTInfoLength][q] // Maybe use MatrixOp with WaveMap to improve speed?    
+			break
+		case "nev":
+			// Not implemented.  
+			break
+	endswitch
+	
+	// Clean is now raw!  
+	return raw 
 End
 
 // Loads all the neuralynx files of a given type in a directory.  
@@ -1045,7 +1047,7 @@ static Function PanelButtons(ctrlName)
 			dfref df=$DFFromMenu()
 			NewPath /O/Q/C NeuralynxSavePath dirName
 			if(strlen(fileName))
-				SaveBinaryFile(df,fileName=fileName,path="NeuralynxSavePath")
+				SaveBinaryFile(df,fileName=fileName,pathName="NeuralynxSavePath")
 			endif
 			break
 		case "View":

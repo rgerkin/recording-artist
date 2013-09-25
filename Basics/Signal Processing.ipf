@@ -1650,8 +1650,8 @@ Function RemoveWiggleNoise(theWave[,thresh,stim_regions])
 	//KillWaves /Z tempRWN 
 End
 
-Function NewNotchFilter(theWave,freq,harmonics[,QF,IIR])
-	Wave theWave
+Function NewNotchFilter(w,freq,harmonics[,QF,IIR])
+	Wave w
 	Variable freq,harmonics
 	Variable QF // Quality factor, inversely related to width of notch filter.  
 	Variable IIR // Use an infinite impulse response filter instead of just supressing chunks of the spectrogram.  
@@ -1659,35 +1659,36 @@ Function NewNotchFilter(theWave,freq,harmonics[,QF,IIR])
 	QF=ParamIsDefault(QF) ? 25 : QF
 	Variable max_noise=1 // Must be greater than the amplitude of the noise.  
 	
-	Variable points=floor((1/freq)/dimdelta(theWave,0))
+	Variable points=floor((1/freq)/dimdelta(w,0))
 	if(mod(points,2)==0)
 		points+=1
 	endif
-	Duplicate /o theWave,TempSpikes,TempNoSpikes,TempSteps
+	Duplicate /o w,TempSpikes,TempNoSpikes,TempSteps
 	Smooth /M=0 points, TempSteps
 	TempNoSpikes-=TempSteps
 	Smooth /M=(max_noise) points, TempNoSpikes
-	TempSpikes=theWave-TempSteps-TempNoSpikes
+	TempSpikes = w-TempSteps-TempNoSpikes
 	
-	WaveStats /Q theWave; theWave-=V_avg
-	theWave-=(TempSteps+TempSpikes)
+	WaveStats /Q w; w -= V_avg
+	w -= (TempSteps+TempSpikes)
 	if(IIR)
 		Variable i
 		for(i=1;i<=harmonics;i+=1)
 			Variable harmonic=freq*i
-			FilterIIR /N={60*dimdelta(theWave,0),QF} theWave
+			FilterIIR /N={60*dimdelta(w,0),QF} w
 		endfor
 	else
-		FFT theWave
+		FFT w
+		wave /c wc = w
 		for(i=1;i<=harmonics;i+=1)
 			harmonic=freq*i
 			Variable width=harmonic/QF  
-			theWave[x2pnt(theWave,harmonic-width/2),x2pnt(theWave,harmonic+width/2)]=0
+			wc[x2pnt(w,harmonic-width/2),x2pnt(w,harmonic+width/2)]=cmplx(0,0)
 		endfor
-		IFFT theWave
+		IFFT w
 	endif
-	theWave+=(TempSteps+TempSpikes)
-	theWave+=V_avg
+	w += (TempSteps+TempSpikes)
+	w += V_avg
 	KillWaves /Z TempSpikes,TempNoSpikes,TempSteps
 End
 

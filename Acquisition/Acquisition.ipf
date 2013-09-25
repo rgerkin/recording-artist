@@ -114,6 +114,10 @@ Function Initialization([profileName,acqInstance])
 #if exists("AxonTelegraphFindServers") && exists("InitAxon")
 	InitAxon()
 #endif
+// Urban Legend initialization hooks.  	
+#ifdef UL
+	UL#AcqInit()
+#endif
 	Variable /G root:status:acqInit=1
 	string how,init_msg = "Initialized experiment %s @ %s\r"
 	if(defaults)
@@ -561,7 +565,7 @@ Function StartSweep([DAQ])
 	if(currSweep==0)
 		ResetExperimentClock()
 	endif
-#if exists("CameraHome")==6
+#ifdef Img
 	AcquireMovie(now=0)
 #endif
 	if(StartClock(isi,DAQs=DAQ)) // If Start_Clock returns an error.  
@@ -704,8 +708,8 @@ Function CollectSweepIndividual(chan,currSweepNum,DAQ)
 		default:
 			dfref chanDF=GetChanDF(chan)
 			if(parent<0 && !stringmatch(chanSaveMode,"No Save") && !stringmatch(saveMode,"Nothing"))
-				String destName="sweep"+num2str(currSweepNum)
-				Wave /Z Sweep=chanDF:$destName
+				string destName="sweep"+num2str(currSweepNum)
+				wave /Z Sweep=chanDF:$destName
 				if(WaveExists(Sweep) && WhichListItem(DAQ,MasterDAQ())!=0) // If the sweep exists and this is not the master DAQ.  
 					redimension /n=(-1,dimsize(Sweep,1)+1) Sweep // Add a column to the destination wave.  
 					Sweep[][dimsize(Sweep,1)-1]=InputWave[p] // And fill it.  
@@ -715,6 +719,9 @@ Function CollectSweepIndividual(chan,currSweepNum,DAQ)
 				string timeStamp
 				sprintf timeStamp "TIME=%f",StopMSTimer(-2) // Time since boot. 
 				Note Sweep timeStamp
+#ifdef UL
+				UL#AcqBind(Sweep,"scope")
+#endif
 			endif
 			break
 	endswitch
@@ -875,6 +882,10 @@ Function StopAcquisition([DAQ])
 	if(InDynamicClamp())
 		UnloadDynamicClampMode()
 	endif
+// Urban Legend Stop Hooks.
+#ifdef UL
+	UL#AcqStop()
+#endif
 	Button Start title="\\Z10Start", win=$(DAQ+"_Selector")
 	variable /g df:acquiring=0
 End
@@ -968,7 +979,10 @@ Function StartAcquisition([DAQ])
 //		if(Core#IsCurrprofile("Rick"))
 //			SetAcqModeFromTelegraph(0)
 //		endif
-		
+// Urban Legend start hooks.  	
+#ifdef UL
+	UL#AcqStart()
+#endif
 		Button Start title="\\Z10Stop", win=$(DAQ+"_Selector")
 		StartSweep(DAQ=DAQ)
 	else	
@@ -1031,7 +1045,7 @@ Function ResetExperiment()
 	
 	// Reset data for each channel.  Only works for current channels.  
 	variable numChannels=GetNumChannels()
-	make /o/df/n=0 chanDFs
+	make /free/df/n=0 chanDFs
 	for(i=0;i<numChannels;i+=1)
 		DAQ=Chan2DAQ(i)
 		dfref daqDF=GetDaqDF(DAQ)

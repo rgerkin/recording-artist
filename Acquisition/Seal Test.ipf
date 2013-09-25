@@ -1,12 +1,7 @@
 
-// $Author: rick $
-<<<<<<< local
-// $Rev: 633 $
-// $Date: 2013-03-28 15:53:22 -0700 (Thu, 28 Mar 2013) $
-=======
+
 // $Rev: 626 $
 // $Date: 2013-02-07 09:36:23 -0700 (Thu, 07 Feb 2013) $
->>>>>>> other
 
 #pragma rtGlobals=1		// Use modern global access method.
 
@@ -619,18 +614,15 @@ Function SealTestWinSetVariables(info)
 			SealTestTracker(chan,0)
 			break
 		case "Range":
-			dfref chanDF=SealTestChanDF(i)
+			dfref chanDF=SealTestChanDF(chan)
 			wave /sdfr=chanDF Sweep
 			variable center=statsmedian(Sweep)
 			variable range = info.dval
 			variable high = center + range/2
 			variable low = center - range/2
 			string axes=AxisList("SealTestWin")
-			string sweepaxes=listmatch(axes,"chan*")
-			for(i=0;i<itemsinlist(sweepAxes);i+=1)
-				string sweepAxis=stringfromlist(i,sweepAxes)
-				SetAxis $sweepAxis,low,high
-			endfor
+			string sweepAxis="chan"+num2str(chan)+"_axis"
+			SetAxis $sweepAxis,low,high
 			break
 	endswitch
 End
