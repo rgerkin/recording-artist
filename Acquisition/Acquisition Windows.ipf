@@ -2712,7 +2712,7 @@ Function PossiblyShowAnalysis()
 			endif
 		endif
 		ControlInfo /W=SweepsWin $("Synapse_"+num2str(pre)+"_"+num2str(post))
-		Variable synapseOn=V_Value || V_disable
+		Variable synapseOn=!crossChannel || V_Value || V_disable
 		ControlInfo /W=SweepsWin $("Show_"+num2str(post))
 		Variable showOn=V_Value
 		Variable show=synapseOn && showOn && columnOn // If this trace has the same pre- and post-synaptic channel as the checkbox that was checked/unchecked and the value is checked in the analysis window.  
