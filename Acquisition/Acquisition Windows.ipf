@@ -1340,21 +1340,19 @@ Function AnalysisWindow([instance]) : Graph
 	                       if(!waveexists(measurementWave))
 	                       	Make /o/n=(currSweep+1,2,numChannels) postChanDF:$measurementName /wave=measurementWave=NaN
 	                       endif
-	                       if(mod(plotNum,2)==0)
-	                       	AppendToGraph /W=AnalysisWin /L=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][0][layer] vs root:SweepT
-	                 				AppendToGraph /W=AnalysisWin /L=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][1][layer] vs root:SweepT
-	                       else
-	                       	AppendToGraph /W=AnalysisWin /R=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][0][layer] vs root:SweepT
-	                       	AppendToGraph /W=AnalysisWin /R=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][1][layer] vs root:SweepT
-	                       endif
+	                       variable col
+	                       for(col=0;col<2;col+=1)
+	                       	string traceName
+	                       	sprintf traceName,"%s_col%d_lyr%d",measurementName,col,layer
+	                       	if(mod(plotNum,2)==0)
+	                       		AppendToGraph /W=AnalysisWin /L=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][col][layer] /tn=$traceName vs root:SweepT
+	                       	else
+	                       		AppendToGraph /W=AnalysisWin /R=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][col][layer] /tn=$traceName vs root:SweepT
+	                       	endif
+	                       	ModifyGraph /Z /W=AnalysisWin marker($traceName)=marker[col] ? marker[col] : 19-col*11
+	                       	ModifyGraph /Z /W=AnalysisWin msize($traceName)=(WaveExists(msize) && msize[col]) ? msize[col] : 3
+	                       endfor
 	                       appended+=1
-	                  
-	                       String traceName=TopTrace(number=1) // First measurement value (e.g. first pulse).
-	                       ModifyGraph /Z /W=AnalysisWin marker($traceName)=marker[0] ? marker[0] : 19
-	                       ModifyGraph /Z /W=AnalysisWin msize($traceName)=(WaveExists(msize) && msize[0]) ? msize[0] : 3
-	                       traceName=TopTrace(number=0) // Second measurement value (e.g. second pulse).  
-	                       ModifyGraph /Z /W=AnalysisWin marker($traceName)=marker[1] ? marker[1] : 8
-	                       ModifyGraph /Z /W=AnalysisWin msize($traceName)=(WaveExists(msize) && msize[1]) ? msize[1] : 3
 	               endfor
 	      	endfor
 	      	AxisIndex[k]=plotNum
@@ -2686,7 +2684,8 @@ Function PossiblyShowAnalysis()
 	//String activeTraces=YAxisTraces(activeAxis,win="AnalysisWin")
 	for(k=0;k<ItemsInList(traces);k+=1)
 		string trace=StringFromList(k,traces)
-		string analysisMethod=StringFromList(0,trace,"#")	
+		string analysisMethod=StringFromList(0,trace,"#")	// The old way.  
+		analysisMethod=StringFromList(0,analysisMethod,"_col") // The new way (doing both should be safe).  
 			
 		// Get postsynaptic channel for this trace.  
 		Wave TraceWave=TraceNameToWaveRef("AnalysisWin",trace) // Measurement wave that this trace corresponds to.  
