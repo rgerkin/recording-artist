@@ -85,7 +85,6 @@ Function /WAVE SpikeTriggeredAverage(signal_channel,spikes_channel[,sweeps,range
 	
 	if(cumul_spikes>0)	
 		matrixop /free STM2 = subtractmean(STM,1) // Subtract the mean from each column (from each spike-triggered waveform).  
-		duplicate /o STM2 crap
 		matrixop /o signalDF:$("STA_"+spikes_channel)=sumcols(STM2^t)^t/numcols(STM2)
 		wave STA=signalDF:$("STA_"+spikes_channel)
 		matrixop /o signalDF:$("STA_"+spikes_channel+"_sem")=sqrt(varcols(STM2^t)^t/numcols(STM2))

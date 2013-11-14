@@ -1,8 +1,8 @@
 #pragma rtGlobals=1		// Use modern global access method.
 #pragma ModuleName=NlxA
 
-//strconstant KLUSTAKWIK_PATH="C:\Program Files\Neuralynx\SpikeSort 3D\Klustakwik.exe"
-strconstant KLUSTAKWIK_PATH="/Users/rgerkin/Desktop/KlustaKwik"
+strconstant KLUSTAKWIK_PATH="C:\Program Files\Neuralynx\SpikeSort 3D\Klustakwik.exe"
+//strconstant KLUSTAKWIK_PATH="/Users/rgerkin/Desktop/KlustaKwik"
 strconstant STIMULUS_MESSAGE="Cheetah 160 Digital Input Port TTL (0xFFFF8000)"
 strconstant START_MESSAGE="Starting Recording"
 strconstant EVENT_WAVES="desc;times;ttl;odors"
@@ -940,7 +940,7 @@ End
 // ----------------- Clustering -----------------------
 
 // Cluster an entire recording session.  Without optional variables, assumes that data is loaded and split, and that events are loaded and epochs are known.  
-Function ClusterAllData([df,method,match,except,dataLoad,dataChop,dataSave,noKlustakwik])
+Function Cluster([df,method,match,except,dataLoad,dataChop,dataSave,noKlustakwik])
 	dfref df
 	string method // Feature selection method.  
 	string match,except
@@ -987,6 +987,16 @@ Function ClusterAllData([df,method,match,except,dataLoad,dataChop,dataSave,noKlu
 		while(1)
 	else
 		files=core#dir2("folders",df=df,match=match,except=except)
+		i=0
+		do // Remove non-ntt folders from the list.  
+			file = stringfromlist(i,files)
+			dfref fileDF = df:$file
+			if(stringmatch(Nlx#DataType(fileDF),"ntt"))
+				i+=1
+			else
+					files = removefromlist(file,files)
+			endif
+		while(i<itemsinlist(files))
 	endif
 	variable numFiles=itemsinlist(files)
 	
@@ -998,11 +1008,14 @@ Function ClusterAllData([df,method,match,except,dataLoad,dataChop,dataSave,noKlu
 		else
 			dfref dataDF=df:$file
 		endif
-		if(dataChop)
-			Post_("Splitting "+file+" into epochs...")
-			variable numEpochs=NlxA#ChopData(dataDF,epochsDF=epochs)
+		string type = Nlx#DataType(dataDF)
+		if(whichlistitem(type,"ntt;nse") >= 0) // If this is spiking data.  
+			if(dataChop)
+				Post_("Splitting "+file+" into epochs...")
+				variable numEpochs=NlxA#ChopData(dataDF,epochsDF=epochs)
+			endif
+			ClusterEpochs(dataDF,write=dataSave,noKlustakwik=noKlustakwik,method=method)
 		endif
-		ClusterEpochs(dataDF,write=dataSave,noKlustakwik=noKlustakwik,method=method)
 	endfor
 	
 	SetDataFolder df
@@ -3078,8 +3091,8 @@ Function DisplayClusterISI(df,clusterList[,recompute,redraw])
 		//make /o/t/n=7 nlx:logISI_tickLabels /wave=tickLabels={"0.1 ms","1 ms","10 ms","100 ms","1 s","10 s","100 s"}
 		modifygraph /z/w=$name mode(ISIHist)=5,mode(ISIcumHist)=0
 	endif
-	modifygraph /z/w=$name axisEnab(left)={0,0.95},axisEnab(right)={0,0.95},log(left)=1
-	label /w=$name bottom "ISI"
+	modifygraph /z/w=$name axisEnab(left)={0,0.95},axisEnab(right)={0,0.95},log(left)=1,prescaleExp(bottom)=3
+	label /w=$name bottom "ISI (ms)"
 	label /w=$name left "Spike Count"
 	label /z/w=$name right "Cumulative Spike Count"
 	wave /sdfr=df ISI=$("ISI_"+clusterStr)
@@ -3122,7 +3135,7 @@ function ISIHistogramCheckboxes(info)
 				wave /sdfr=df times,clusters
 				extract /o times,df:$("ISI_"+clusterStr) /wave=ISI,(clusterLogic & 2^clusters[p])>0
 				differentiate /meth=2 ISI
-				deletepoints 0,1,ISI // Delete first spike, where ISI is unknown.  
+				deletepoints 0,1,ISI // Delete first spike, where ISI is unknown.
 				variable rescale=0
 				if(rescale)
 					duplicate /free ISI smoothISI
@@ -3142,8 +3155,10 @@ function ISIHistogramCheckboxes(info)
 				else
 					make /o/n=50 nlx:ISIHist /wave=ISIHist
 					make /o/n=1000 nlx:ISIcumHist /wave=ISIcumHist
-					setscale x,0,0.1,ISIHist,ISIcumHist // 0 to 10 seconds.  
+					setscale x,0,0.1,ISIHist,ISIcumHist // 0 to 100 ms  
+					//print numpnts(ISI)
 					histogram /b=2 ISI,ISIHist
+					//print sum(ISIHist),wavemax(ISIHist)
 					histogram /b=2/cum ISI,ISIcumHist
 					//wave ISIcumHist=logISIcumHist
 				endif
@@ -3166,7 +3181,7 @@ function ISIHistogramCheckboxes(info)
 	endswitch
 end
 
-function ClusterDistances(df)
+function ComputeClusterDistances(df)
 	dfref df
 	
 	string epoch=getdatafolder(0,df)
@@ -3631,19 +3646,23 @@ End
 // ----------- Neuralynx Chopper -------------------------------
 // Chops data into subsets.  
 
-Function ChopAllData([df,epochs,match,except,killSource])
+Function Chop([df,epochsDF,match,except,killSource])
 	dfref df
-	dfref epochs
+	dfref epochsDF
 	string match,except
 	variable killSource // To save memory, redimension to zero the data waves from the original folders after chopping.  
 	
 	if(paramisdefault(df))
 		dfref df=root:
 	endif
+	if(paramisdefault(epochsDF))
+		epochsDF = root:Events:epochs
+	endif
 	match=selectstring(paramisdefault(match),match,"*")
 	except=selectstring(paramisdefault(except),except,"")
 	setdatafolder df
 	variable i
+	printf "Chopping all data into epochs...\r"
 	for(i=0;i<CountObjectsDFR(df,4);i+=1)
 		string folder=getindexedobjnamedfr(df,4,i)
 		dfref subDF=df:$folder
@@ -3651,11 +3670,7 @@ Function ChopAllData([df,epochs,match,except,killSource])
 		if(!waveexists(w) || !stringmatch(folder,match) || stringmatch(folder,except))
 			continue
 		endif
-		if(paramisdefault(epochs))
-			NlxA#ChopData(subDF,killSource=killSource)
-		else
-			NlxA#ChopData(subDF,epochsDF=epochs,killSource=killSource)
-		endif
+		NlxA#ChopData(subDF,epochsDF=epochsDF,killSource=killSource)
 	endfor
 End
 
@@ -3815,7 +3830,15 @@ End
 
 static Function /df GetChopEpochs()
 	ControlInfo /W=NlxChopWin Times
-	dfref ChopEpochs=$("root:"+s_value)
+	if(v_flag == 3)
+		dfref ChopEpochs=$("root:"+s_value)
+	else
+		dfref ChopEpochs = root:Events:epochs
+		if(!datafolderrefstatus(ChopEpochs))
+			NlxA#ChopEvents()
+			dfref ChopEpochs = root:Events:epochs
+		endif
+	endif
 	return ChopEpochs
 End
 
@@ -3832,7 +3855,6 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 		return -1
 	endif
 	wave /z/sdfr=dataDF Data,Times,Clusters,Features,Header,Metadata
-	
 	
 	variable i
 	if(ParamIsDefault(epochsDF) && stringmatch(WinName(0,1),"NlxChopWin*"))
@@ -3855,6 +3877,9 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 		endif
 	endif
 	if(!waveexists(ChopTimes) || !paramisdefault(epochsDF))
+		if(datafolderrefstatus(epochsDF)==0)
+			dfref epochsDF=GetChopEpochs()
+		endif
 		wave /z epochTimes=epochsDF:times
 		if(waveexists(epochTimes))
 			Duplicate /FREE epochTimes ChopTimes
@@ -3863,6 +3888,7 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 			return -1
 		endif
 	endif
+	printf "Chopping data for %s...\r",getdatafolder(0,dataDF)
 	variable numEpochs=numpnts(ChopTimes)
 	ChopTimes[numEpochs]={Times[numpnts(Times)-1]+0.001}
 	make /o/n=(numEpochs) dataDF:epochDuration /wave=epochDuration
@@ -3908,9 +3934,9 @@ static Function ChopData(dataDF[,epochsDF,type,killSource,quiet])
 					strswitch(type)
 						case "ntt":
 							if(count)
-								make /o/n=(rows,count,layers)/w newDF:$name=w[p][q+start][r]
+								make /o/n=(rows,count,layers) newDF:$name /wave=w1 = w[p][q+start][r]
 							else
-								make /o/n=0/w newDF:$name
+								make /o/n=0 newDF:$name
 							endif
 							break
 						case "ncs":
@@ -4071,7 +4097,7 @@ static Function MergeData(rootDF,dataList,[epoch,name,mergeWaveforms,mergeFeatur
 	string /g df:merged="sourceElectrodes:"+sourceElectrodes+"sourceClusters:"+sourceClusters
 End
 
-static Function MergeEpochs([df,match,epoch,mergeWaveforms])
+static Function Merge([df,match,epoch,mergeWaveforms])
 	dfref df // Root df.  
 	string match // e.g. "TT*"
 	variable epoch,mergeWaveforms
@@ -4080,7 +4106,7 @@ static Function MergeEpochs([df,match,epoch,mergeWaveforms])
 		dfref df=root:
 	endif
 	match=selectstring(!paramisdefault(match),"*",match)
-	string folders=NTT_NAMES
+	string folders=Core#Dir2("folders",df=df,match=NTT_NAMES)
 	make /free/df/n=0 dataList
 	variable i
 	for(i=0;i<itemsinlist(folders);i+=1)

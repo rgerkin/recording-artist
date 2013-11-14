@@ -7,7 +7,7 @@
 #pragma moduleName=NlxB
 #if 1
 strconstant NeuralynxDataBaseDir="~/Desktop"
-strconstant NTT_NAMES="TTA;TTB;TTC;TTE;TTF;TTG"
+strconstant NTT_NAMES="TT*;"
 strconstant NTT_WAVES="Data;Times;Clusters;Features"
 
 // --------------------------------------------------------------------------------------------------------------
@@ -393,7 +393,7 @@ End
 
 // Compute CSC Epochs (based on timing of CSC wave) from Event Epochs (based on timing of Events wave).  
 // Note: this changes the underlying data and times for the CSC.  
-Function /WAVE NlxCSCEpochs(df,epochs)
+static function /WAVE CSCEpochs(df,epochs)
 	dfref df // Folder containing CSC data.  
 	wave Epochs // Usually root:Events:Events_ep.  
 	
@@ -420,7 +420,7 @@ Function /WAVE NlxCSCEpochs(df,epochs)
 End
 
 // Uses a continuously recorded Neuralynx wave to search for e.g. stimulus artifacts that could indicate stimulus times in the absence of a proper time series.  
-Function NlxStimEpochs2(ContinuousWave,threshold)
+static function StimEpochs2(ContinuousWave,threshold)
 	Wave ContinuousWave // A continuous recording that will have stimulus artifacts that can be identified by a level crossing.  
 	Variable threshold // The level crossing.  
 	
@@ -441,7 +441,7 @@ Function NlxStimEpochs2(ContinuousWave,threshold)
 	KillWaves /Z W_FindLevels
 End
 
-Function NlxChopIgorData(df,guideDF)
+static function ChopIgorData(df,guideDF)
 	dfref df // A folder containing Igor sweeps.  
 	dfref guideDF // A folder containing Neuralynx Data that has already been chopped.  This will be used to make sure the chopped data matches in time.  
 	
@@ -1347,7 +1347,11 @@ Function /WAVE SpikeTriggeredSignal(spDF,sigDF[,range])
 	endif
 	range=paramisdefault(range) ? 0.5 : range
 	
-	Wave SpikeData=spDF:Data, SpikeTimes=spDF:Times
+	Wave SpikeTimes=spDF:Times
+	wave /i/u Clusters=spDF:Clusters
+	if(!waveexists(Clusters)) // If there is no 'Clusters' wave.  
+		make /free /n=(numpnts(SpikeTimes))/i/u Clusters=0
+	endif
 	Wave /z SignalData=sigDF:Data, SignalTimes=sigDF:Times 
 	if(!waveexists(SignalTimes)) // If there is no 'Times' wave.  
 		wave SignalTimes=NlxA#TimesFromData(sigDF)
@@ -1364,8 +1368,8 @@ Function /WAVE SpikeTriggeredSignal(spDF,sigDF[,range])
 			break
 		endif
 	while(1) // Want points to be even for future FFTs.  
-	Make /o/n=(points,numSpikes) spDF:$("st_"+type) /wave=SpikeTriggeredSignal=nan
-	Variable i
+	Make /o/n=(points,numSpikes) spDF:$("st_"+type) /wave=stm=nan // Spike-triggered matrix.  
+	Variable i,j
 	for(i=0;i<numSpikes;i+=1)
 		Variable spikeTime=SpikeTimes[i]
 		Variable signalTimeIndex=BinarySearch(signalTimes,spikeTime) // LFP time index when the spike occurred.  
@@ -1381,16 +1385,32 @@ Function /WAVE SpikeTriggeredSignal(spDF,sigDF[,range])
 		if(signalTimeIndexStop-signalTimeIndexStart>(2*rangeOffset+1)) // If the start and end of the range around this spike are from discontinuous recording segments.  
 			continue // Skip it.  
 		endif
-		SpikeTriggeredSignal[][i]=SignalData[signalTimeIndex+p-rangeOffset] // The range of the LFP that is cotemporal with the spike.  
+		stm[][i]=SignalData[signalTimeIndex+p-rangeOffset] // The range of the LFP that is cotemporal with the spike.  
 	endfor
-	SetScale x,-range,range,SpikeTriggeredSignal
-	matrixop /o SpikeTriggeredSignal=subtractmean(SpikeTriggeredSignal,1) // Subtract the mean from each row (from each spike-triggered waveform).  
-	matrixop /o spDF:$("st_"+type+"_avg")=sumcols(SpikeTriggeredSignal^t)^t/numcols(SpikeTriggeredSignal)
-	wave SpikeTriggeredSignalAvg=spDF:$("st_"+type+"_avg")
-	matrixop /o spDF:$("st_"+type+"_sem")=sqrt(varcols(SpikeTriggeredSignal^t)^t/numcols(SpikeTriggeredSignal))
-	wave SpikeTriggeredSignalSEM=spDF:$("st_"+type+"_sem")
-	setscale x,-range,range,SpikeTriggeredSignalAvg,SpikeTriggeredSignalSEM
-	return SpikeTriggeredSignalAvg
+	SetScale x,-range,range,stm
+	matrixop /o stm=subtractmean(stm,1) // Subtract the mean from each column (from each spike-triggered waveform).  
+	
+	wavestats /q/m=1 clusters
+	variable max_cluster = v_max
+	variable rows = dimsize(stm,0)
+	variable cols = max_cluster+1
+	make /o/n=(rows,cols) spDF:$("st_"+type+"_avg") /wave=sta=nan
+	make /o/n=(rows,cols) spDF:$("st_"+type+"_sd") /wave=stsd=nan
+	make /o/n=(rows,cols) spDF:$("st_"+type+"_sem") /wave=stsem=nan
+	for(j=0;j<=max_cluster;j+=1)
+		extract /free/indx clusters,indices,clusters[p]==j
+		if(numpnts(indices))
+			make /free/n=(rows,numpnts(indices)) stm_cluster = stm[p][indices[q]]
+			matrixop /free sta_cluster = sumcols(stm_cluster^t)^t/numcols(stm_cluster)
+			sta[][j] = sta_cluster[p]
+			matrixop /free stsd_cluster=sqrt(varcols(stm_cluster^t)^t)
+			stsd[][j] = stsd_cluster[p]
+			matrixop /free stsem_cluster=sqrt(varcols(stm_cluster^t)^t/numcols(stm_cluster))
+			stsem[][j] = stsem_cluster[p]
+		endif
+	endfor
+	setscale x,-range,range,sta,stsem
+	return sta
 End
 
 Function /s SpikePhase(df,signalDF[,lo,hi,thresh,phase])

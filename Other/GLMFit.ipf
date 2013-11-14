@@ -404,7 +404,7 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 		if(!quiet)
 			//printf "Old condition number is %d.\r",sqrt(w_eigenvalues[0]/w_eigenvalues[numpnts(w_eigenvalues)-1])
 		endif
-		make /free/n=(dimsize(xx,1)) scaling = wavemax(col(xx,p))//matrixop /free scaling=meancols(abs(xx))
+		make /free/n=(dimsize(xx,1)) scaling = colmax(xx,p)//matrixop /free scaling=meancols(abs(xx))
 		duplicate /free xx,xxScaled
 		xxScaled/=scaling[q]
 		matrixop /free square=xxScaled^t x xxScaled
@@ -1953,6 +1953,15 @@ static Function /wave Col(w,i)
 	matrixop /free col_=col(w,i)
 	return col_
 End
+
+static Function ColMax(w,i)
+	wave w
+	variable i
+	
+	duplicate /free/r=[][i,i] w,col_i
+	wavestats /q/m=1 col_i
+	return v_max
+end
 
 static function product(w)
 	wave w

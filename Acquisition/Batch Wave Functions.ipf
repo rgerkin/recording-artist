@@ -94,7 +94,8 @@ Function KillRecurse(match[,except,curr_depth])
 	for(i=0;i<ItemsInList(folders,",");i+=1)
 		folder=StringFromList(i,folders,",")
 		if(!StringMatch2(folder,except))
-			SetDataFolder $(curr_folder+folder)
+			SetDataFolder $curr_folder
+			SetDataFolder $folder
 			KillRecurse(match,except=except,curr_depth=curr_depth+1)
 		endif
 	endfor

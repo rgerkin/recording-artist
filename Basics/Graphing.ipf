@@ -359,10 +359,10 @@ End
 //#endif
 
 // Makes shaded error bars, given a data wave and a wave containing e.g. standard errors.  
-Function ShadedErrorBars(Data[,Error,kind,append_])
+Function ShadedErrorBars(Data[,Error,kind,append_,column])
 	wave Data,Error
 	string kind
-	variable append_
+	variable append_,column
 	
  	kind = selectstring(!paramisdefault(kind),"sem",kind)
 	string dataName=GetWavesDataFolder(Data,2)
@@ -374,7 +374,10 @@ Function ShadedErrorBars(Data[,Error,kind,append_])
 	string dataLow=dataName+"_"+kind+"_low"+add_quote
   string dataHigh=dataName+"_"+kind+"_high"+add_quote
  	if(paramisdefault(error))
- 		wave error = $(dataName+"_"+kind)+add_quote
+ 		wave /z error = $(dataName+"_"+kind+add_quote)
+ 		if(!waveexists(error))
+ 			wave /z error = $(removeending(dataName,"_avg")+"_"+kind+add_quote)		
+ 		endif
  	endif
  	duplicate /o Error,$dataLow /WAVE=Low
   duplicate /o Error,$dataHigh /WAVE=High
@@ -385,11 +388,11 @@ Function ShadedErrorBars(Data[,Error,kind,append_])
   endif
   string traces = tracenamelist("",";",1)
   variable n = itemsinlist(traces)
-  appendToGraph Low
+  appendToGraph Low[][column]
 	modifyGraph mode[0+n]=7, toMode[0+n]=1, hbFill[0+n]=4
-	appendToGraph Data
+	appendToGraph Data[][column]
 	modifyGraph mode[1+n]=7, toMode[1+n]=1, hbFill[1+n]=4, lsize[1+n]=2
-	appendToGraph High
+	appendToGraph High[][column]
 End
 
 function /s GetAxisLabel(axis[,win])
