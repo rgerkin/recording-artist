@@ -656,7 +656,8 @@ Function STHHook(info)
 			variable unit=round(AxisValFromPixel("","left",info.mouseLoc.v))
 			dfref df=$getuserdata("","","df")
 			wave STH=df:STH
-			if(unit>=0 && unit<dimsize(STH,1))
+			string traces = TraceNameList(info.winname,";",3)
+			if(unit>=0 && unit<dimsize(STH,1) && WhichListItem("OneSTH",traces)>=0)
 				ReplaceWave trace=OneSTH STH[][unit]
 				ColorTab2Wave Rainbow; wave M_Colors
 				setscale x,0,1,M_Colors

@@ -442,7 +442,7 @@ Function IgorizeData(df)
 			endfor
 			// Nothing left to do since TTL values and times are already extracted.    
 #if exists("NlxA#ExtractEpochs")
-			dfref eventsDF = getdatafolderdfr()
+			dfref eventsDF = df//getdatafolderdfr()
 			NlxA#ExtractEpochs(df=eventsDF)
 #endif
 			break
