@@ -1422,7 +1422,11 @@ Function AnalysisWindow([instance]) : Graph
   variable B = GetCursorSweepNum("B")
   if(strlen(CsrWave(A)))
 		Cursor /W=AnalysisWin A, $CsrWave(A), A
-		Cursor /W=AnalysisWin B, $CsrWave(B), B
+		if(strlen(CsrWave(B)))
+			Cursor /W=AnalysisWin B, $CsrWave(B), B
+		else
+			Cursor /W=AnalysisWin B, $CsrWave(A), B
+  	endif
   endif
        
   // What does this do?  
