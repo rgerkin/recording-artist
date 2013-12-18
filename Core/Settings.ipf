@@ -2322,8 +2322,19 @@ function MigrateModules()
 end
 
 function /s RecordingArtistDiskLocation()
-	string path=joinpath({specialdirpath("Igor Pro User Files",0,0,0),"User Procedures","Recording Artist"})
-	return path
+	string user_procedures=joinpath({specialdirpath("Igor Pro User Files",0,0,0),"User Procedures"})
+	newpath /o/q UserProcedures user_procedures
+	string possible_names = "Recording Artist;recording-artist"
+	string location = ""
+	variable i
+	for(i=0;i<itemsinlist(possible_names);i+=1)
+		string possible_name = stringfromlist(i,possible_names)
+		GetFileFolderInfo /P=UserProcedures /Q /Z=1 possible_name
+		if(!v_flag && v_isfolder)
+			location = joinpath({user_procedures,possible_name})
+		endif
+	endfor
+	return location
 end
 
 function /s ModuleManifestsDiskLocation()
