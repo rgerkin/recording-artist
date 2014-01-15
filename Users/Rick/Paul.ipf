@@ -9,8 +9,8 @@ function All([i,j,k])
 	variable i,j,k
 	
 	tic()
-	string animals = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
-	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	string animals = "ticl;"//locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = ";"//hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
 	string stimuli = "bb;ff"
 	
 	wave /t/sdfr=root: active_list = active_experiments_list
@@ -70,26 +70,26 @@ function Go()
 	svar /sdfr=root: stimulus,animal
 	CleanData()
 	FormatData()
-//	MakeAllVTAs()
-//	MakeAllPeriodograms()
-//	MakeAllSpectrograms()
+	MakeAllVTAs()
+	MakeAllPeriodograms()
+	MakeAllSpectrograms()
 	if(stringmatch(stimulus,"BB"))
 		wave eag_bb = MergeBBs(subtract=0) // Odor epochs.  
 		if(!stringmatch(animal,"TiCl"))
 			wave ticl_bb = root:bb:ticl_bb_:x:bb
-//			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
-//			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
-//			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
+			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
 			
 			wave eag_bb = MergeBBs(subtract=-1) // Air epochs.  
-//			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=-1)
-//			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=-1)
-//			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=-1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=-1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=-1)
+			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=-1)
 			
 			wave eag_bb = MergeBBs(subtract=1) // Air-subtracted odor epochs.  
-//			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=1)
-//			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=1)
-//			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=1)
+			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=1)
+			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=1)
 		endif
 	endif
 	if(stringmatch(stimulus,"FF"))
@@ -475,7 +475,7 @@ function /wave FormatFF(df,epoch)
 	
 	duplicate /o data_ eagDF:data // Overwrite 1D data wave with 2D data wave (time x condition).  
 	duplicate /o times_ eagDF:times // Overwrite 1D data wave with 2D data wave (time x condition).  
-	return matrix
+	return eagDF:data
 end
 
 function FormatData()
@@ -1805,3 +1805,4 @@ function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
 	
 	return coherogram_mag
 end
+
