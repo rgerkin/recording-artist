@@ -1465,14 +1465,17 @@ Function UpdateMiniAnalysis()
 	
 	Variable i,j,k
 	String miniMethods=MethodList(methodStr) // Methods that are based on the Minis code.  
-	
+	if(!strlen(miniMethods))
+		miniMethods = "Minis"
+	endif
 	dfref df=GetMinisDF()
 	svar /sdfr=df sweeps	
+	nvar /sdfr=df threshold
 	dfref df=GetMinisChannelDF(channel)
 	wave /t/sdfr=df MiniCounts
 	wave /sdfr=df Use
 	make /free/n=(dimsize(MiniCounts,0)) MiniSweepIndeks=str2num(MiniCounts[p][0])
-	for(j=0;j<=ItemsInList(sweeps);j+=1)
+	for(j=0;j<ItemsInList(sweeps);j+=1)
 		string sweep=StringFromList(j,sweeps)
 		variable sweepNum=str2num(sweep)
 		wave /z/sdfr=GetMinisSweepDF(channel,sweepNum) Locs,Vals
@@ -1484,7 +1487,11 @@ Function UpdateMiniAnalysis()
 				wave /t/sdfr=df MiniNames
 				FindValue /TEXT=mini_name /TXOP=4 MiniNames
 				if(V_Value>=0 && Use[v_value])
-					Vals[i]=Event_Size[V_Value]
+					if(threshold>0)
+						Vals[i]=Event_Size[V_Value]
+					else
+						Vals[i]=-Event_Size[V_Value]
+					endif
 				else
 					Vals[i]=nan
 				endif
@@ -1943,9 +1950,15 @@ Function FitMini(num[,channel])//trace)
 			case "Event Size":
 				wavestats /q/m=1 Fit
 				if(v_max == v_min) // If the fit is a flat line.  
-					w[index_] = peak_val // Then use the original estimate of the amplitude.  
+					w[index_] = abs(peak_val) // Then use the original estimate of the amplitude.  
 				else // Otherwise use the estimate from the fit.  
-					w[index_]=abs(V_max-V_min)
+					w[index_] = abs(V_max-V_min)
+					//nvar /sdfr=GetMinisDF() threshold
+					//if(threshold > 0)
+					//	w[index_] = V_max-V_min
+					//else
+					//  w[index_] = V_min-V_max
+					//endif
 				endif
 				break
 			case "Plausability":
