@@ -1417,15 +1417,17 @@ Function AnalysisWindow([instance]) : Graph
   ModifyGraph /Z /W=AnalysisWin freePos(Time_axis)=0,axisEnab(Time_axis)={axisPaddingLeft,1-axisPaddingLeft},lblpos(Time_axis)=100
   Label /Z /W=AnalysisWin Time_axis "Time (min)"
 
-  Cursors()
+  Cursors(win="AnalysisWin")
   variable A = GetCursorSweepNum("A")
   variable B = GetCursorSweepNum("B")
-  if(strlen(CsrWave(A)))
-		Cursor /W=AnalysisWin A, $CsrWave(A), A
-		if(strlen(CsrWave(B)))
-			Cursor /W=AnalysisWin B, $CsrWave(B), B
+  string A_trace = CsrWave(A,"AnalysisWin",1)
+  string B_trace = CsrWave(B,"AnalysisWin",1)
+  if(strlen(A_trace))
+		Cursor /W=AnalysisWin A, $A_trace, A
+		if(strlen(B_trace))
+			Cursor /W=AnalysisWin B, $B_trace, B
 		else
-			Cursor /W=AnalysisWin B, $CsrWave(A), B
+			Cursor /W=AnalysisWin B, $A_trace, B
   	endif
   endif
        
