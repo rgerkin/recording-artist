@@ -2418,7 +2418,9 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	if(!WaveExists(MinisAnalysisWave))
 		wave /t/sdfr=df MiniCounts
 		variable maxSweep=str2num(MiniCounts[dimsize(MiniCounts,0)-1][0])
-		make /o/n=(maxSweep-1,2) dataDF:$miniMethod /WAVE=MinisAnalysisWave
+		make /o/n=(maxSweep-1,3) dataDF:$miniMethod /WAVE=MinisAnalysisWave
+	else
+		redimension /n=(-1,3) MinisAnalysisWave
 	endif
 	if(!WaveExists(Locs) || !WaveExists(Vals))
 		MinisAnalysisWave[sweepNum][]=NaN
@@ -2435,6 +2437,7 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	endif
 	//ampl[sweep-1] = StatsMedian(Vals) // Median mini amplitude.  
 	MinisAnalysisWave[sweepNum][1] = count/duration // Mini frequency.  
+	MinisAnalysisWave[sweepNum][2] = count // Mini count.  
 	Note /K Locs num2str(duration)
 	
 	//String /G root:Minis:sweeps=sweeps
