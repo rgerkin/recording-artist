@@ -3676,7 +3676,7 @@ End
 //Note, sampling rate for fast spikes is a bit of an issue- spike times aren't exactly at the peak of each spike.
 Function GraphRate([win_name])
 	string win_name
-	variable threshold = -20
+	variable threshold = -240
 	string RateDisplayName, TimeDisplayName
 	string Name
 	
@@ -5559,6 +5559,7 @@ Function FindSpikeTimesSmoothed(w, startTime, endTime, thresh, minSpikeWidth, mi
 			endif
 			//if not in a spike
 		else 
+
 
 			//if was just in a spike and it was wide enough to be real, save it
 			if(inSpike == 1 && ((i-spikeStartTime)>minSpikeWidth) && minAmplitude <= maxAmp -thresh)
