@@ -2330,6 +2330,7 @@ Function RegionMinis([to_append])
 	if(!to_append || !WinExist("Mini_Intervals"))
 		Display /K=1 /N=Mini_Intervals
 	endif
+
 	
 	String mode="Time"
 	strswitch(mode)
