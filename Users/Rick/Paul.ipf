@@ -3,15 +3,17 @@
 strconstant pathName = "PaulPath"
 strconstant animalPathName = "AnimalPath"
 constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list. 
-constant n_shuffles = 10
+constant n_shuffles = 25
 
 function All([i,j,k])
 	variable i,j,k
 	
-	string animals = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
-	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	tic()
+	string animals = "ticl;"//locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = ";"//hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
 	string stimuli = "bb;ff"
 	
+	wave /t/sdfr=root: active_list = active_experiments_list
 	variable m
 	for(i=i;i<itemsinlist(animals);i+=1)
 		Prog("Animal",i,itemsinlist(animals))
@@ -36,7 +38,6 @@ function All([i,j,k])
 						string file = stringfromlist(m,files_missing)
 						file = removeending(file,"_EAGds.ncs")
 						file = removeending(file,"_Events.nev")
-						wave /t/sdfr=root: active_list = active_experiments_list
 						findvalue /text=(file)/txop=4 active_list
 						if(v_value>=0)
 							deletepoints /m=0 v_value,1,active_list
@@ -45,7 +46,8 @@ function All([i,j,k])
 					//DoAlert 0,msg
 					//return -2
 				endif
-				LoadAllEpochs()
+				//printf "%s,%s,%s,%d",animal,stimulus,odor,dimsize(active_list,0)
+				LoadAllEpochs(no_sparse=stringmatch(animal,"TiCl"))
 				Go()
 			endfor
 			k=0
@@ -54,6 +56,7 @@ function All([i,j,k])
 		cd root:
 		KillRecurse("ps*")
 	endfor
+	toc()
 	print "Done"
 	DoAlert 0,"Done!"
 end
@@ -64,10 +67,10 @@ function Go()
 		print "No data folders found.\r"
 		return -1
 	endif
+	svar /sdfr=root: stimulus,animal
 	CleanData()
 	FormatData()
 	MakeAllVTAs()
-	svar /sdfr=root: stimulus,animal
 	MakeAllPeriodograms()
 	MakeAllSpectrograms()
 	if(stringmatch(stimulus,"BB"))
@@ -131,10 +134,26 @@ function Init(animal,stimulus,odor[,set_path])
 	for(i=0;i<dimsize(w,0);i+=1)
 		string species = stringbykey(animal,species_list)
 		if(stringmatch(w[i][1],species)) // If this experiment corresponds to this species.  
-			n+=1
-			redimension /n=(n,3) active_experiments_list // File name, odor epochs, nearest blank epochs.  
-			active_experiments_list[n-1][0] = w[i][0] // File name.  
-			active_experiments_list[n-1][1] = "" // Epoch list.  
+			if(stringmatch(species,"*TiCl*"))
+				duplicate /free/t/r=[i,i][] w, row_
+				redimension /n=(numpnts(row_)) row_
+				extract /free/indx row_,matching_epochs,stringmatch(row_[p],stimulus)
+				matching_epochs -= 3 // Epochs start in the third column.  
+				variable new_epochs = numpnts(matching_epochs)
+				if(new_epochs)
+					n += new_epochs
+					redimension /n=(n,3) active_experiments_list // File name, odor epochs, nearest blank epochs.  
+					active_experiments_list[n-new_epochs,n-1][0] = w[i][0] // File name.  
+					active_experiments_list[n-new_epochs,n-1][1] = "E"+num2str(matching_epochs[p-(n-new_epochs)])  
+					active_experiments_list[n-new_epochs,n-1][2] = ""
+				endif
+				continue  
+			else
+				n += 1
+				redimension /n=(n,3) active_experiments_list // File name, odor epochs, nearest blank epochs.  
+				active_experiments_list[n-1][0] = w[i][0] // File name.  
+				active_experiments_list[n-1][1] = "" // Epoch list.  
+			endif
 		else
 			continue
 		endif
@@ -225,7 +244,7 @@ function /s CheckFileList()
 	return files
 end
 
-function /df LoadEpochs(experiment[sparse])
+function /df LoadEpochs(experiment[,sparse])
 		string experiment
 		variable sparse // Delete unneeded epochs.  
 		
@@ -250,7 +269,7 @@ function /df LoadEpochs(experiment[sparse])
 		endfor
 		dfref df = $experiment
 		printf "Chopping %s\r",experiment
-		Chop(df,quiet=1)
+		ChopAll(df,quiet=1)
 		
 		if(sparse)	
 			for(j=0;j<itemsinlist(kinds);j+=1)
@@ -349,11 +368,13 @@ function CleanData()
 					deletepoints 0,v_value+2,desc,times,TTL
 				endif
 			endfor
+			wave /sdfr=eagDF data
 			if(stringmatch(notes,"inverted!"))
-				wave /sdfr=eagDF data
 				data *= -1
 				printf "Inverted epoch %s in experiment %s.\r",epoch,name
 			endif
+			wavestats /q/r=[0,5] data
+			data -= v_avg // Subtract mean of the first 6 points.  
 		endfor
 	endfor
 	Prog("Clean",0,0)
@@ -454,7 +475,7 @@ function /wave FormatFF(df,epoch)
 	
 	duplicate /o data_ eagDF:data // Overwrite 1D data wave with 2D data wave (time x condition).  
 	duplicate /o times_ eagDF:times // Overwrite 1D data wave with 2D data wave (time x condition).  
-	return matrix
+	return eagDF:data
 end
 
 function FormatData()
@@ -797,7 +818,7 @@ function DisplayData(df)
 	while(epoch<100)
 end
 
-function Chop(df[,quiet])
+function ChopAll(df[,quiet])
 	dfref df
 	variable quiet
 	
@@ -1119,6 +1140,8 @@ function /wave MergeBBs([subtract,merge_num])
 		if(subtract < 0)
 			duplicate /free air_data,bbi		
 		endif
+		variable baseline = bbi[0]
+		bbi -= baseline
 		if(i>0)
 			if(numpnts(bbi)<dimsize(bb,0))
 				redimension /n=(numpnts(bbi),dimsize(bb,1)) bb
@@ -1164,7 +1187,7 @@ function /wave MergeFFs([subtract,merge_num])
 	endif
 	
 	string /g sources = dfs
-	make /o/n=0 ff,ff_sd,ff_sem
+	make /o/n=0 ff_all
 	variable i
 	for(i=0;i<itemsinlist(dfs);i+=1)
 		string df_names = stringfromlist(i,dfs)
@@ -1189,19 +1212,22 @@ function /wave MergeFFs([subtract,merge_num])
 		if(subtract < 0)
 			duplicate /free air_data,ffi		
 		endif
+		make /free/n=(dimsize(ffi,1)) baselines = ffi[0][p]
+		ffi -= baselines[q]
 		redimension /n=(numpnts(ffi)) ffi
 		if(i>0)
-			if(dimsize(ffi,0)<dimsize(ff,0))
-				redimension /n=(dimsize(ffi,0),dimsize(ff,1),-1) ff
-			elseif(dimsize(ffi,0)>dimsize(ff,0))
-				redimension /n=(dimsize(ff,0),-1) ffi
+			if(dimsize(ffi,0)<dimsize(ff_all,0))
+				redimension /n=(dimsize(ffi,0),dimsize(ff_all,1),-1) ff_all
+			elseif(dimsize(ffi,0)>dimsize(ff_all,0))
+				redimension /n=(dimsize(ff_all,0),-1) ffi
 			endif
 		endif
-		concatenate {ffi}, ff
+		variable baseline = ffi[0]
+		concatenate {ffi}, ff_all
 	endfor
-	matrixop /o ff_sd = sqrt(varcols(ff^t)^t)
+	matrixop /o ff_sd = sqrt(varcols(ff_all^t)^t)
 	matrixop /o ff_sem = ff_sd/sqrt(i)
-	matrixop /o ff = meancols(ff^t)
+	matrixop /o ff = meancols(ff_all^t)
 	redimension /n=(numpnts(ff)/10,10) ff,ff_sd,ff_sem
 	copyscales /p ffi,ff,ff_sd,ff_sem
 	if(paramisdefault(merge_num))
@@ -1779,3 +1805,4 @@ function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
 	
 	return coherogram_mag
 end
+
