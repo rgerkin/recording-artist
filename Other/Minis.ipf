@@ -2079,8 +2079,6 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 		printf "miniNum = %d out of range; KillMini().\r",miniNum
 		return -3
 	endif
-	Use[Index[miniNum]]=0
-	deletepoints miniNum,1,Index
 	variable i
 	string stats=miniFitCoefs+miniRankStats+miniOtherStats
 //	for(i=0;i<itemsinlist(stats);i+=1)
@@ -2094,6 +2092,7 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 	
 	// Fix the mini locations and value for the sweep in which this mini occurred.  
 	Variable sweepNum,sweepMiniNum // miniNum2 is the number of the mini for that sweep, as opposed to miniNum, which is the number of the mini overall.  
+	print miniNum,Index[miniNum],miniNames[index[miniNum]]
 	sscanf MiniNames[Index[miniNum]], "Sweep%d_Mini%d", sweepNum,sweepMiniNum
 	dfref sweepDF=GetMinisSweepDF(channel,sweepNum,proxy=proxy)
 //	wave /sdfr=sweepDF Locs,Vals,Index
@@ -2105,6 +2104,9 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 //	endif
 	string fit_name="Fit_"+num2str(sweepMiniNum)
 	KillWaves /Z sweepDF:$fit_name
+	
+	Use[Index[miniNum]]=0
+	deletepoints miniNum,1,Index
 	
 	// Cleanup.  
 	Variable num_minis=numpnts(Index)
