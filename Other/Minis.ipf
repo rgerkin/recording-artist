@@ -2418,7 +2418,7 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	if(!WaveExists(MinisAnalysisWave))
 		wave /t/sdfr=df MiniCounts
 		variable maxSweep=str2num(MiniCounts[dimsize(MiniCounts,0)-1][0])
-		make /o/n=(maxSweep-1,3) dataDF:$miniMethod /WAVE=MinisAnalysisWave
+		make /o/n=(maxSweep+1,3) dataDF:$miniMethod /WAVE=MinisAnalysisWave
 	else
 		redimension /n=(-1,3) MinisAnalysisWave
 	endif
