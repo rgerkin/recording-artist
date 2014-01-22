@@ -402,7 +402,7 @@ Function /S MethodList(method)
 	for(i=0;i<ItemsInList(methods);i+=1)
 		string oneMethod=StringFromList(i,methods)
 		string sourceMethod=Core#StrPackageSetting(module,"analysisMethods",oneMethod,"method")
-		if(stringMatch(oneMethod,method) || strlen(oneMethod))
+		if(stringMatch(oneMethod,method))
 			matchingMethods+=oneMethod+";"
 		endif
 	endfor
