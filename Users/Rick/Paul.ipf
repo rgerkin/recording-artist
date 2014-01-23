@@ -3,14 +3,14 @@
 strconstant pathName = "PaulPath"
 strconstant animalPathName = "AnimalPath"
 constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list. 
-constant n_shuffles = 25
+constant n_shuffles = 125
 
 function All([i,j,k])
 	variable i,j,k
 	
 	tic()
-	string animals = "ticl;"//locust;ant;bee;cockroach;moth;orangeroach;laser;"
-	string odors = ";"//hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	string animals = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
 	string stimuli = "bb;ff"
 	
 	wave /t/sdfr=root: active_list = active_experiments_list
@@ -24,6 +24,17 @@ function All([i,j,k])
 			for(k=0;k<itemsinlist(stimuli);k+=1)
 				Prog("Stimulus",k,itemsinlist(animals))
 				string stimulus = stringfromlist(k,stimuli)
+				variable refNum
+				string current
+				
+				sprintf current,"%s_%s_%s.txt", animal, stimulus, odor
+				Close /A
+				pathinfo $pathName
+				if(!strlen(s_path))
+					newpath /o/q/m="Choose the data path" $pathName
+				endif
+				DeleteFile /P=$pathName /Z current
+				open /p=$pathName refNum as current
 				if(Init(animal,stimulus,odor))
 					printf "Could not initialize.\r"
 					return -1
@@ -49,6 +60,8 @@ function All([i,j,k])
 				//printf "%s,%s,%s,%d",animal,stimulus,odor,dimsize(active_list,0)
 				LoadAllEpochs(no_sparse=stringmatch(animal,"TiCl"))
 				Go()
+				Close refNum
+				DeleteFile /P=$pathName current
 			endfor
 			k=0
 		endfor
@@ -386,7 +399,7 @@ function MakeAllVTAs()
 	svar /sdfr=root: stimulus, animal
 	strswitch(stimulus)
 		case "ff":
-			string conditions = "100ms;30ms;15ms;6ms"
+			string conditions = "100ms;50ms;30ms;20ms;15ms;12ms;10ms;8ms;6ms;cont"
 			break
 		case "bb":
 			conditions = ";"
