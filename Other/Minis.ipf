@@ -233,16 +233,16 @@ Function MiniAnalysisWinButtons(ctrlName)
 			//Wave /T Baseline_Sweeps,Post_Activity_Sweeps
 			//String regions=Baseline_Sweeps[0]+Post_Activity_Sweeps[0]
 			Variable i
-			for(i=0;i<ItemsInList(channelsUsed);i+=1)
-				channel=StringFromList(i,channelsUsed)
-				dfref chanDF=GetMinisChannelDF(channel)
-				wave /t/sdfr=chanDF MiniCounts,MiniNames
-				wave /sdfr=chanDF MC_SelWave
-				MiniCounts[][2]=SelectString(MC_SelWave[p][2] & 16,"Ignore","Use") // Update MiniCounts to reflect the value of the Checkbox.  May not be necessary.  
-				if(!waveexists(miniNames))
-					InitMiniStats(channel)
-				endif
-			endfor
+//			for(i=0;i<ItemsInList(channelsUsed);i+=1)
+//				channel=StringFromList(i,channelsUsed)
+//				dfref chanDF=GetMinisChannelDF(channel)
+//				wave /t/sdfr=chanDF MiniCounts,MiniNames
+//				wave /sdfr=chanDF MC_SelWave
+//				MiniCounts[][2]=SelectString(MC_SelWave[p][2] & 16,"Ignore","Use") // Update MiniCounts to reflect the value of the Checkbox.  May not be necessary.  
+//				if(!waveexists(miniNames))
+//					InitMiniStats(channel)
+//				endif
+//			endfor
 			ShowMinis(channels=channelsUsed)//,regions=regions)
 			break
 		case "Ignore":
@@ -367,29 +367,24 @@ Function MiniAnalysisWinListboxes(info) : ListBoxControl
 			if(numtype(numMinis))
 				MC_SelWave[info.row][2]=MC_SelWave[info.row][2] & ~16
 			endif
-			if(info.col==2)
-				MiniCounts[info.row][2]=SelectString(MC_SelWave[info.row][2] & 16,"Ignore","Use") // Update MiniCounts to reflect the value of the Checkbox.  
-				wave /z/sdfr=df Use,Index
-				if(waveexists(Use) && info.eventCode==2)
-					make /free/n=(numSweeps) counts=str2num(MiniCounts[p][1])
-					insertpoints 0,1,counts
-					counts[0]=0
-					integrate counts
-					variable start=counts[info.row]
-					variable finish=counts[info.row+1]-1
-					if(finish>=start)
-						variable yes=stringmatch(MiniCounts[info.row][2],"Use")
-						Use[start,finish]=yes
-						for(i=start;i<=finish;i+=1)
-							FindValue /V=(i) Index
-							if(yes && v_value<0)
-								insertpoints 0,1,Index
-								Index[0]=i
-							elseif(!yes && v_value>=0)
-								deletepoints i,1,index
-							endif
-						endfor
-					endif
+			if(info.col==2) // Use/Ignore.  
+				variable use = MC_SelWave[info.row][2] & 16
+				MiniCounts[info.row][2]=SelectString(use,"Ignore","Use") // Update text to reflect the value of the Checkbox.  
+				wave /sdfr=df Index
+				wave /t/sdfr=df MiniNames
+				extract /free/indx MiniNames,SweepMiniIndices,stringmatch(MiniNames[p],"Sweep"+num2str(sweepNum)+"_*")
+				variable num_sweep_minis = numpnts(SweepMiniIndices)
+				if(use) // Use
+					insertpoints 0,num_sweep_minis,Index
+					Index[0,num_sweep_minis-1] = SweepMiniIndices[p]
+				else // Ignore
+					for(i=0;i<num_sweep_minis;i+=1)
+						variable indeks = SweepMiniIndices[i]
+						findvalue /i=(indeks) Index
+						if(v_value>=0)
+							deletepoints v_value,1,Index
+						endif
+					endfor
 				endif
 			endif
 			if(info.eventCode==2)
@@ -571,10 +566,10 @@ Function MiniCountReview(channels)
 	Variable num_channels=ItemsInList(channels)
 	dfref df=GetMinisDF()
 	for(i=0;i<num_channels;i+=1)
-		yy=yStart
 		channel=StringFromList(i,channels)
 		dfref chanDF=GetMinisChannelDF(channel,create=1)
 		InitMiniStats(channel)
+		yy=yStart
 		svar /sdfr=df sweeps
 		wave /t/sdfr=chanDF MiniCounts
 		make /o/n=(dimsize(MiniCounts,0),dimsize(MiniCounts,1)) chanDF:MC_SelWave /wave=MC_SelWave
@@ -587,14 +582,14 @@ Function MiniCountReview(channels)
 		ListBox $("MiniCounts_"+channel),widths={35,40,60},size={160,100},pos={xx,yy},listWave=MiniCounts,selWave=MC_SelWave,frame=2,mode=4,proc=MiniAnalysisWinListboxes
 		//String /G ignore_sweeps=""
 		yy+=100
-		Button $("Ignore_"+channel),pos={xx,yy},size={160,20},title=channel+" ignore",proc=MiniAnalysisWinButtons
+		//Button $("Ignore_"+channel),pos={xx,yy},size={160,20},title=channel+" ignore",proc=MiniAnalysisWinButtons
 		xx+=xJump
 	endfor
 	string /g df:channelsUsed=channels
-	xx=xStart; yy+=35
+	xx=xStart; yy+=12
 	Button ShowMinis,pos={xx,yy},size={100,20},proc=MiniAnalysisWinButtons,title="Show Minis"
 	xx+=120; yy+=3
-	Checkbox IgnoreStimulusSweeps,pos={xx,yy},size={100,20},title="Ignore Sweeps with Stimuli",value=0
+	//Checkbox IgnoreStimulusSweeps,pos={xx,yy},size={100,20},title="Ignore Sweeps with Stimuli",value=0
 End
 
 Function MiniTimeCoursePlot(channel)
@@ -936,45 +931,68 @@ function InitMiniStats(channel)
 
 	dfref df=GetMinisChannelDF(channel)
 	wave /z/t/sdfr=df MiniCounts
+	wave SweepT = GetSweepT()
 	if(!waveexists(MiniCounts))
 		printf "No such wave %sMiniCounts.\r",getdatafolder(1,df)
 	endif
+	string /g df:direction="Down"	
 	ControlInfo /W=MiniAnalysisWin IgnoreStimulusSweeps
 	variable ignore_stimulus_sweeps=v_flag>0 ? v_value : 0
 	wave /sdfr=df MC_SelWave // The wave indicating the status of the entries in MiniCountReviewer.  
-	variable i,j,numMinis=0,numSweeps=dimsize(MiniCounts,0)
+	variable i,j,num_minis=0,num_sweeps=dimsize(MiniCounts,0)
 	for(i=0;i<dimsize(MiniCounts,0);i+=1)
-		numMinis+=str2num(MiniCounts[i][1])
+		variable num_sweep_minis = str2num(MiniCounts[i][1])
+		num_minis += num_sweep_minis
 	endfor
-	make /o/n=(numMinis) df:Use /wave=Use, df:Index /wave=Index=p
-	make /o/t/n=(numMinis) df:MiniNames /wave=MiniNames
-	string stats=miniFitCoefs+miniRankStats+miniOtherStats
-	for(i=0;i<ItemsInList(stats);i+=1)
-		string name=stringfromlist(i,stats)
-		make /o/n=(numMinis) df:$cleanupname(name,0) /wave=stat=nan
-	endfor
-	numMinis=0
+	make /o/i/u/n=(num_minis) df:Index /wave=Index=p
+	make /o/t/n=(num_minis) df:MiniNames /wave=MiniNames
+	variable start=0, finish=0, has_stim=0
 	for(i=0;i<dimsize(MiniCounts,0);i+=1)
-		variable hasStim=0
-		variable sweepNum=str2num(MiniCounts[i][0])
-#if exists("HasStimulus")==6
-		
-		hasStim=HasStimulus(sweepNum)
+		variable sweep_num=str2num(MiniCounts[i][0])
+		num_sweep_minis = str2num(MiniCounts[i][1])
+#if exists("HasStimulus")==6		
+		has_stim=HasStimulus(sweep_num)
 #endif
-		variable start=numMinis
-		numMinis+=str2num(MiniCounts[i][1])
-		variable finish=numMinis-1
-		if(finish>=start)
-			if(!(MC_SelWave[i][2] & 16) || (ignore_stimulus_sweeps && hasStim)) // If the box for that stimulus is unchecked or that sweep has a stimulus and is to be ignored.  
-				variable include=0
-			else
-				include=1
-			endif
-			Use[start,finish]=include // Remove that sweep from the sweep list.  
-			MiniNames[start,finish]=GetMiniName(sweepNum,p-start)
-		endif
+		finish=start+num_sweep_minis-1
+		MiniNames[start,finish]=GetMiniName(sweep_num,p-start)
+//		print start,finish
+//		if(finish>=start)
+//			variable use_sweep = MC_SelWave[i][2] & 16
+//			print sweep_num,use_sweep
+//			if(!use_sweep || (ignore_stimulus_sweeps && has_stim)) // If the box for that stimulus is unchecked or that sweep has a stimulus and is to be ignored.  
+//				TempIndex[start,finish]=nan  
+//			endif
+//		endif
+		start += num_sweep_minis
 	endfor
-	string /g df:direction="Down"
+//	extract /o/u TempIndex,df:Index,!numtype(TempIndex[p])
+	string stats=miniFitCoefs+miniRankStats+miniOtherStats
+	wave /t/sdfr=df MiniNames
+	variable sweep_mini_num
+	for(j=0;j<num_minis;j+=1)
+			sscanf MiniNames[j],"Sweep%d_Mini%d",sweep_num,sweep_mini_num
+			dfref sweepDF = GetMinisSweepDF(channel,sweep_num)
+			wave /sdfr=sweepDF Locs,Vals
+			for(i=0;i<ItemsInList(stats);i+=1)
+				string name=stringfromlist(i,stats)
+				if(j==0)
+					make /o/n=(num_minis) df:$cleanupname(name,0) /wave=stat
+				else
+					wave /sdfr=df stat = $cleanupname(name,0)
+				endif		
+				strswitch(name)
+					case "Event Time":
+						stat[j] = sweepT[sweep_num]*60+Locs[sweep_mini_num] // Time since experiments start.  
+						break
+					case "Event Size":
+						stat[j] = Vals[sweep_mini_num]
+						break
+					default:		
+						stat[i]=nan
+				endswitch
+			endfor
+	endfor
+
 end
 
 function /s GetMiniName(sweep,sweepMini)
@@ -1046,12 +1064,19 @@ Function ShowMinisHook(info)
 	endswitch
 End
 
-Function NumMinis(channel)
+Function NumMinis(channel[,raw])
 	string channel
+	variable raw
 	
 	dfref df=GetMinisChannelDF(channel)
-	wave /sdfr=df Index
-	return numpnts(Index)
+	if(raw)
+		wave /t/sdfr=df MiniNames
+		variable n = numpnts(MiniNames)
+	else
+		wave /sdfr=df Index
+		n = numpnts(Index)
+	endif
+	return n
 End
 
 Function SwitchMiniView(mode)
@@ -1164,7 +1189,8 @@ Function SwitchMiniView(mode)
 	Button Reject disable=0, pos={xx,yy}, proc=ShowMinisButtons, title="Reject:"
 	Button RejectBelow disable=!browse, size={20,20}, proc=ShowMinisButtons, title="<="
 	Button RejectAbove disable=!browse, size={20,20}, proc=ShowMinisButtons, title=">="
-	Button Locate disable=!browse, size={50,20}, pos+={25,0}, proc=ShowMinisButtons, title="Locate"
+	xx+=125
+	Button Locate disable=!browse, size={50,20}, pos={xx,yy}, proc=ShowMinisButtons, title="Locate"
 	
 	ControlBar /T 69
 	strswitch(mode)
@@ -1335,7 +1361,7 @@ Function ShowMinisSetVariables(info)
 	svar /sdfr=df channel=currChannel
 	dfref chanDF=GetMinisChannelDF(channel)
 	wave /t/sdfr=chanDF MiniNames
-	wave /sdfr=chanDF Use
+	wave /u/sdfr=chanDF Index
 	strswitch(info.ctrlName)
 		case "CurrMini":
 			GoToMini(currMini)
@@ -1349,6 +1375,8 @@ Function ShowMinisSetVariables(info)
 			strswitch(info.ctrlName)
 				case "SweepNum":
 					variable direction=sign(sweepNum-lastSweepNum)
+					wave /sdfr=GetMinisSweepDF(channel,sweepNum) Locs
+					sweepMiniNum = limit(sweepMiniNum,0,numpnts(Locs)-1) // Mini num cannot exceed number of minis on this sweep.  
 					break
 				case "SweepMiniNum":
 					direction=sign(sweepMiniNum-lastSweepMiniNum)
@@ -1358,16 +1386,21 @@ Function ShowMinisSetVariables(info)
 			if(sweepNum<MinList(sweeps) || sweepNum>MaxList(sweeps))
 				SetVariable SweepNum value=_NUM:lastSweepNum
 			endif
-			FindValue /TEXT="Sweep"+num2str(sweepNum)+"_Mini"+num2str(sweepMiniNum) /TXOP=4 MiniNames
-			variable num_minis=NumMinis(channel)
+			variable num_minis_raw=NumMinis(channel,raw=1)
+			variable indeks = GetMiniIndex(channel,sweepNum,sweepMiniNum)
 			do	
-				if(!Use[V_Value] && currMini>=0 && currMini<num_minis)
-					v_value+=direction
+				if(!MiniNumRetained(channel,indeks))
+					print indeks
+					indeks += direction
+					print indeks,num_minis_raw
+					indeks = mod(indeks+num_minis_raw,num_minis_raw) // Wrap around at 0 and num_minis_raw.  
+					print indeks
 				else
 					break
 				endif
 			while(1)
-			currMini=limit(currMini,0,num_minis-1)
+			FindValue /I=(indeks) Index
+			currMini = v_value
 			GoToMini(currMini)
 			break
 	endswitch
@@ -1451,10 +1484,12 @@ function ShowMinisOnSweep()
 end
 
 // Updates the values for mini amplitude and frequency in the Amplitude Analysis window to reflect Minis that have been removed in the Mini Browser.  
-Function UpdateMiniAnalysis()
+Function UpdateMiniAnalysis([no_display])
+	variable no_display
+	
 	ControlInfo /W=ShowMinisWin Channel
 	String channel=S_Value
-	if(!WinType("AnalysisWin"))
+	if(!WinType("AnalysisWin") && !no_display)
 		DisplayMiniRateAndAmpl(channel) // A simpler version of the same thing.  
 		return -1
 	endif
@@ -1473,7 +1508,6 @@ Function UpdateMiniAnalysis()
 	nvar /sdfr=df threshold
 	dfref df=GetMinisChannelDF(channel)
 	wave /t/sdfr=df MiniCounts
-	wave /sdfr=df Use
 	make /free/n=(dimsize(MiniCounts,0)) MiniSweepIndeks=str2num(MiniCounts[p][0])
 	for(j=0;j<ItemsInList(sweeps);j+=1)
 		string sweep=StringFromList(j,sweeps)
@@ -1483,10 +1517,7 @@ Function UpdateMiniAnalysis()
 		if(waveexists(Locs))
 			variable net_duration=str2num(note(Locs))
 			for(i=0;i<numpnts(Vals);i+=1)
-				string mini_name=GetMiniName(sweepNum,i)
-				wave /t/sdfr=df MiniNames
-				FindValue /TEXT=mini_name /TXOP=4 MiniNames
-				if(V_Value>=0 && Use[v_value])
+				if(MiniRetained(channel,sweepNum,i))
 					if(threshold>0)
 						Vals[i]=Event_Size[V_Value]
 					else
@@ -1504,14 +1535,45 @@ Function UpdateMiniAnalysis()
 	endfor
 End
 
+function MiniRetained(channel,sweepNum,miniNum)
+	string channel
+	variable sweepNum, miniNum
+	
+	variable indeks = GetMiniIndex(channel,sweepNum,miniNum)
+	return MiniNumRetained(channel,indeks)
+end
+
+function GetMiniIndex(channel,sweepNum,miniNum)
+	string channel
+	variable sweepNum, miniNum
+	
+	dfref df=GetMinisChannelDF(channel)
+	string mini_name=GetMiniName(sweepNum,miniNum)
+	wave /t/sdfr=df MiniNames,Index
+	FindValue /TEXT=mini_name /TXOP=4 MiniNames
+	variable indeks = v_value
+	return indeks
+end
+
+function MiniNumRetained(channel,indeks)
+	string channel
+	variable indeks
+	
+	wave /u/i/sdfr=GetMinisChannelDF(channel) Index
+	FindValue /I=(indeks) Index
+	return v_value>=0
+end
+
 Function MiniSummary([channel])
 	string channel
 	
 	channel = selectstring(!paramisdefault(channel),GetMinisChannel(),channel)
 	dfref df=GetMinisChannelDF(channel)
 	wave /sdfr=df index
+	wave /t/sdfr=df MiniNames
 	variable numMinis = numpnts(index)
 	make /o/n=(numMinis) df:Summary /wave=Summary=nan
+	UpdateMiniAnalysis(no_display=1)
 	MoreMiniStats(channel)
 	variable i
 	string stats=miniRankStats+miniOtherStats
@@ -1525,8 +1587,13 @@ Function MiniSummary([channel])
 			//appendtotable w
 		endif
 	endfor
-	DoWindow /K MiniSummaryWin
-	Edit /K=1 /N=MiniSummaryWin Summary.ld as "Mini Summary for channel "+channel
+	for(i=0;i<dimsize(Summary,0);i+=1)
+		SetDimLabel 0,i,$MiniNames[index[i]],Summary 
+	endfor
+	if(!wintype("MiniSummaryWin"))
+		Edit /K=1 /N=MiniSummaryWin Summary.ld as "Mini Summary for channel "+channel
+	endif
+	DoWindow /F MiniSummaryWin
 End
 
 // Builds event times and inter-event intervals.  
@@ -1537,33 +1604,28 @@ Function MoreMiniStats(channel[,proxy])
 	proxy = paramisdefault(proxy) ? GetMinisProxyState() : proxy	
 	dfref df=GetMinisChannelDF(channel,proxy=proxy)
 	wave /t/sdfr=df MiniNames
-	wave /sdfr=df Use,Index
+	wave /sdfr=df Index
 	make /free/n=(numpnts(df:Event_Size)) TempIndex
 	wave /z sweepT=GetSweepT()
 	wave /sdfr=df baseline,event_size,amplitude,Event_Time,Interval,Rise_10_90=$cleanupname("Rise 10%-90%",0)
-	Event_Time=nan; Rise_10_90=nan
+	Rise_10_90=nan
 	variable i,mini_num
 	
 	// Compute absolute event times, and 10%-90% rise times.  
 	for(i=0;i<numpnts(MiniNames);i+=1)
 		String name=MiniNames[i]
-		if(!Use[i])
+		if(!MiniNumRetained(channel,i))
 			continue
 		endif
 		variable sweepNum,miniNum
 		sscanf name,"Sweep%d_Mini%d",sweepNum,miniNum
 		dfref sweepDF=GetMinisSweepDF(channel,sweepNum,proxy=proxy)
-		
-		// Event Time.  
+
+		// Rise 10%-90%.
 		Wave /sdfr=sweepDF Locs,Vals,Index
 		FindValue /V=(miniNum) Index
 		Variable j=V_Value
-		if(WaveExists(sweepT))
-			Variable time_=sweepT[sweepNum]*60+Locs[j] // Time since experiments start.  
-			Event_Time[i]=time_
-		endif
-		
-		// Rise 10%-90%.  
+  
 		wave /z/sdfr=sweepDF Fit=$("Fit_"+num2str(miniNum))
 		variable tenThresh=Baseline[i]+0.1*(Event_Size[i]*sign(Amplitude[i])
 		variable ninetyThresh=Baseline[i]+0.9*(Event_Size[i]*sign(Amplitude[i])
@@ -1584,39 +1646,39 @@ Function MoreMiniStats(channel[,proxy])
 	endfor
 	
 	// Compute intervals.  
-if(0)
-	TempIndex=x
-	Sort Event_Time,Event_Time,TempIndex
-	Interval=Event_Time[p]-Event_Time[p-1]
-	Sort TempIndex,Event_Time,Interval
-	for(i=0;i<numpnts(MiniNames);i+=1)
-		name=MiniNames[i]
-		sscanf name,"Sweep%d_Mini%d",sweepNum,miniNum
-		Wave Index=root:Minis:$(channel):$("Sweep"+num2str(sweepNum)):Index
-		FindValue /V=(miniNum) Index
-		j=V_Value
-		if(j==0) // First mini of the sweep.  
-			Wave Sweep=root:$(channel):$("Sweep"+num2str(sweepNum))
-			variable lastSweepDuration=rightx(Sweep)
-			variable unrecordedDuration=60*(sweepT[sweepNum]-sweepT[sweepNum-1])-lastSweepDuration
-			Interval[i]+=unrecordedDuration
-		endif
-	endfor	
-	
-	KillWaves /Z TempIndex
-	//SetDataFolder $curr_folder
-else
-	duplicate /o Event_Time,Interval
-	//make /free/n=(numpnts(Interval)) TempInterval,TempIndex=p
-	extract /free/indx Interval,TempIndex,Use[p]==1
-	extract /free Interval,TempInterval,Use[p]==1
-	differentiate /meth=2 TempInterval
-	TempInterval[0]=nan
-	Interval=nan
-	for(i=0;i<numpnts(TempIndex);i+=1)
-		Interval[TempIndex[i]]=TempInterval[i]
-	endfor
-endif
+	if(0)
+		TempIndex=x
+		Sort Event_Time,Event_Time,TempIndex
+		Interval=Event_Time[p]-Event_Time[p-1]
+		Sort TempIndex,Event_Time,Interval
+		for(i=0;i<numpnts(MiniNames);i+=1)
+			name=MiniNames[i]
+			sscanf name,"Sweep%d_Mini%d",sweepNum,miniNum
+			Wave Index=root:Minis:$(channel):$("Sweep"+num2str(sweepNum)):Index
+			FindValue /V=(miniNum) Index
+			j=V_Value
+			if(j==0) // First mini of the sweep.  
+				Wave Sweep=root:$(channel):$("Sweep"+num2str(sweepNum))
+				variable lastSweepDuration=rightx(Sweep)
+				variable unrecordedDuration=60*(sweepT[sweepNum]-sweepT[sweepNum-1])-lastSweepDuration
+				Interval[i]+=unrecordedDuration
+			endif
+		endfor	
+		
+		KillWaves /Z TempIndex
+		//SetDataFolder $curr_folder
+	else
+		duplicate /o Event_Time,Interval
+		//make /free/n=(numpnts(Interval)) TempInterval,TempIndex=p
+		extract /free/indx Interval,TempIndex,MiniNumRetained(channel,p)==1
+		extract /free Interval,TempInterval,MiniNumRetained(channel,p)==1
+		differentiate /meth=2 TempInterval
+		TempInterval[0]=nan
+		Interval=nan
+		for(i=0;i<numpnts(TempIndex);i+=1)
+			Interval[TempIndex[i]]=TempInterval[i]
+		endfor
+	endif
 End
 
 function /s GetMinisChannel()
@@ -1744,6 +1806,7 @@ Function FitMini(num[,channel])//trace)
 	variable currMini=GetCurrMini()
 	wave /t/sdfr=chanDF MiniNames
 	wave /sdfr=chanDF Index
+	wave SweepT = GetSweepT()
 	variable index_=Index[num]
 	string mini_name=MiniNames[Index[num]]//currMini]
 	sscanf mini_name,"Sweep%d_Mini%d",sweepNum,miniNum
@@ -1759,7 +1822,7 @@ Function FitMini(num[,channel])//trace)
 	FindValue /V=(miniNum) SweepIndex
 	variable peak_loc=Locs[V_Value]
 	variable peak_val=Vals[V_Value]
-	nvar /sdfr=df fit_before,fit_after
+	nvar /sdfr=df fit_before,fit_after,threshold
 	variable offset_fits=NumVarOrDefault(joinpath({getdatafolder(1,df),"Options","offset_fits"}),0)
 	variable peak_point=x2pnt(Sweep,peak_loc)
 	variable first_point=peak_point-fit_before*kHz // This corresonds to, e.g., 5 ms before the peak.  
@@ -1947,18 +2010,19 @@ Function FitMini(num[,channel])//trace)
 				wave /sdfr=chanDF R2=$cleanupname("R2",0)
 				w[index_]=log(1-R2[index_])
 				break
+			case "Event Time":
+				w[index_] = SweepT[sweepNum]*60 + peak_loc
+				wavestats /q/m=1 Fit
+				if(v_max != v_min) // If the fit is not a flat line.  
+					w[index_] += (threshold>=0 ? v_maxloc : v_minloc) // Update loc according to fit (will be a change of milliseconds at most).  
+				endif
+				break
 			case "Event Size":
 				wavestats /q/m=1 Fit
 				if(v_max == v_min) // If the fit is a flat line.  
 					w[index_] = abs(peak_val) // Then use the original estimate of the amplitude.  
 				else // Otherwise use the estimate from the fit.  
 					w[index_] = abs(V_max-V_min)
-					//nvar /sdfr=GetMinisDF() threshold
-					//if(threshold > 0)
-					//	w[index_] = V_max-V_min
-					//else
-					//  w[index_] = V_min-V_max
-					//endif
 				endif
 				break
 			case "Plausability":
@@ -2074,7 +2138,7 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 		return -2
 	endif
 	wave /t/sdfr=df MiniNames
-	wave /sdfr=df Use,Index
+	wave /sdfr=df Index
 	if(miniNum<0 || miniNum>=numpnts(Index))
 		printf "miniNum = %d out of range; KillMini().\r",miniNum
 		return -3
@@ -2092,7 +2156,6 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 	
 	// Fix the mini locations and value for the sweep in which this mini occurred.  
 	Variable sweepNum,sweepMiniNum // miniNum2 is the number of the mini for that sweep, as opposed to miniNum, which is the number of the mini overall.  
-	print miniNum,Index[miniNum],miniNames[index[miniNum]]
 	sscanf MiniNames[Index[miniNum]], "Sweep%d_Mini%d", sweepNum,sweepMiniNum
 	dfref sweepDF=GetMinisSweepDF(channel,sweepNum,proxy=proxy)
 //	wave /sdfr=sweepDF Locs,Vals,Index
@@ -2105,8 +2168,12 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 	string fit_name="Fit_"+num2str(sweepMiniNum)
 	KillWaves /Z sweepDF:$fit_name
 	
-	Use[Index[miniNum]]=0
 	deletepoints miniNum,1,Index
+	if(numpnts(Index) == 0)
+		DoAlert 0,"All minis from this channel have been rejected"
+		DoWindow /K ShowMinisWin
+		return 0
+	endif
 	
 	// Cleanup.  
 	Variable num_minis=numpnts(Index)
@@ -2754,7 +2821,7 @@ function MiniProbFalse(channel,proxy[,method,stats])
 	wave ultimate_proxy=df:ultimate
 	variable num_minis_proxy=dimsize(ultimate_proxy,0)
 	
-	make /o/n=(num_minis_original) df:pFalse /wave=pFalse=(Use[p] ? 0 : nan)
+	make /o/n=(num_minis_original) df:pFalse /wave=pFalse=(MiniNumRetained(channel,p) ? 0 : nan)
 	if(num_minis_proxy)
 		make /free/n=(0,num_stats) ultimate_combined
 		concatenate /np=0 {ultimate,ultimate_proxy},ultimate_combined
