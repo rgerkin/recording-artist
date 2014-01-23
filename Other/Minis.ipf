@@ -1515,7 +1515,7 @@ Function MiniSummary([channel])
 	dfref df=GetMinisChannelDF(channel)
 	wave /sdfr=df index
 	variable numMinis = numpnts(index)
-	make /o/n=(numMinis) Summary=nan
+	make /o/n=(numMinis) df:Summary /wave=Summary=nan
 	MoreMiniStats(channel)
 	variable i
 	string stats=miniRankStats+miniOtherStats
