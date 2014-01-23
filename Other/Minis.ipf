@@ -2422,25 +2422,25 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	dfref df=GetMinisChannelDF(channel,create=1)
 	dfref dataDF=GetChannelDF(channel)
 	wave /z/sdfr=dataDF MinisAnalysisWave=$miniMethod
+	wave /t/sdfr=df MiniCounts
+	variable maxSweep=str2num(MiniCounts[dimsize(MiniCounts,0)-1][0])
 	if(!WaveExists(MinisAnalysisWave))
-		wave /t/sdfr=df MiniCounts
-		variable maxSweep=str2num(MiniCounts[dimsize(MiniCounts,0)-1][0])
 		make /o/n=(maxSweep+1,3) dataDF:$miniMethod /WAVE=MinisAnalysisWave
 	else
-		redimension /n=(-1,3) MinisAnalysisWave
+		redimension /n=(maxSweep+1,3) MinisAnalysisWave
 	endif
 	if(!WaveExists(Locs) || !WaveExists(Vals))
 		MinisAnalysisWave[sweepNum][]=NaN
 		return -1
 	endif
 	
-	Variable count=numpnts(Locs)
-	
 	if(numpnts(Vals))
 		WaveStats /Q/M=1 Vals
-		MinisAnalysisWave[sweepNum][0] = abs(V_avg) // Mean mini amplitude.  
+		MinisAnalysisWave[sweepNum][0] = abs(V_avg) // Mean mini amplitude.
+		Variable count=V_npnts
 	else
 		MinisAnalysisWave[sweepNum][0] = NaN
+		count = 0
 	endif
 	//ampl[sweep-1] = StatsMedian(Vals) // Median mini amplitude.  
 	MinisAnalysisWave[sweepNum][1] = count/duration // Mini frequency.  
