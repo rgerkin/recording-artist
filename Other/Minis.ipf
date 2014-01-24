@@ -1518,10 +1518,10 @@ Function UpdateMiniAnalysis([no_display])
 			variable net_duration=str2num(note(Locs))
 			for(i=0;i<numpnts(Vals);i+=1)
 				if(MiniRetained(channel,sweepNum,i))
-					if(threshold>0)
-						Vals[i]=Event_Size[V_Value]
-					else
-						Vals[i]=-Event_Size[V_Value]
+					variable indeks = GetMiniIndex(channel,sweepNum,i)
+					Vals[i] = Event_Size[indeks]
+					if(threshold<0)
+						Vals[i] *= -1
 					endif
 				else
 					Vals[i]=nan
