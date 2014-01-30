@@ -2503,8 +2503,10 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	
 	wave /z/t/sdfr=df MiniCounts
 	if(!waveexists(MiniCounts))
-		Make /o/T/n=(ItemsInList(sweeps),3) df:MiniCounts /wave=MiniCounts=""
-		MiniCounts[][0]=StringFromList(p,sweeps)
+		variable currSweep=GetCurrSweep()
+		wave /z/t/sdfr=df MiniCounts
+		Make /o/T/n=(currSweep,3) df:MiniCounts /wave=MiniCounts=""
+		MiniCounts[][0]=num2str(p)
 		MiniCounts[][1]=""
 		MiniCounts[][2]="Use"
 	endif
@@ -2512,10 +2514,7 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	Make /free/n=(dimsize(MiniCounts,0)) MiniSweepIndex=str2num(MiniCounts[p][0])
 	FindValue /V=(sweepNum) MiniSweepIndex
 	variable miniCountsIndex = v_value
-	if(miniCountsIndex>=0)
-		MiniCounts[miniCountsIndex][1]=num2str(count)
-	endif
-
+	
 	variable ignore = miniCountsIndex>=0 && stringmatch(MiniCounts[miniCountsIndex][2],"Ignore")
 	if(numpnts(Vals))
 		WaveStats /Q/M=1 Vals
@@ -2527,8 +2526,12 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	endif
 	MinisAnalysisWave[sweepNum][1] = ignore ? nan : count/duration // Mini frequency.  
 	MinisAnalysisWave[sweepNum][2] = ignore ? nan : count // Mini count.  
-	Note /K Locs num2str(duration)
 	
+	if(miniCountsIndex>=0)
+		MiniCounts[miniCountsIndex][1]=num2str(count)
+	endif
+
+	Note /K Locs num2str(duration)	
 End
 
 Function DisplayMiniRateAndAmpl(channel)
