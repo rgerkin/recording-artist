@@ -2501,36 +2501,34 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 		return -1
 	endif
 	
+	wave /z/t/sdfr=df MiniCounts
+	if(!waveexists(MiniCounts))
+		Make /o/T/n=(ItemsInList(sweeps),3) df:MiniCounts /wave=MiniCounts=""
+		MiniCounts[][0]=StringFromList(p,sweeps)
+		MiniCounts[][1]=""
+		MiniCounts[][2]="Use"
+	endif
+	
+	Make /free/n=(dimsize(MiniCounts,0)) MiniSweepIndex=str2num(MiniCounts[p][0])
+	FindValue /V=(sweepNum) MiniSweepIndex
+	variable miniCountsIndex = v_value
+	if(miniCountsIndex>=0)
+		MiniCounts[miniCountsIndex][1]=num2str(count)
+	endif
+
+	variable ignore = miniCountsIndex>=0 && stringmatch(MiniCounts[miniCountsIndex][2],"Ignore")
 	if(numpnts(Vals))
 		WaveStats /Q/M=1 Vals
-		MinisAnalysisWave[sweepNum][0] = abs(V_avg) // Mean mini amplitude.
+		MinisAnalysisWave[sweepNum][0] = ignore ? nan : abs(V_avg) // Mean mini amplitude.
 		Variable count=V_npnts
 	else
 		MinisAnalysisWave[sweepNum][0] = NaN
 		count = 0
 	endif
-	//ampl[sweep-1] = StatsMedian(Vals) // Median mini amplitude.  
-	MinisAnalysisWave[sweepNum][1] = count/duration // Mini frequency.  
-	MinisAnalysisWave[sweepNum][2] = count // Mini count.  
+	MinisAnalysisWave[sweepNum][1] = ignore ? nan : count/duration // Mini frequency.  
+	MinisAnalysisWave[sweepNum][2] = ignore ? nan : count // Mini count.  
 	Note /K Locs num2str(duration)
 	
-	//String /G root:Minis:sweeps=sweeps
-	variable currSweep=GetCurrSweep()
-	string sweeps=StrVarOrDefault(joinpath({minisFolder,"sweeps"}),"0,"+num2str(currSweep-1))
-	sweeps=ListExpand(sweeps)
-	wave /z/t/sdfr=df MiniCounts
-	if(!waveexists(MiniCounts))
-		Make /o/T/n=(ItemsInList(sweeps),3) df:MiniCounts=""
-		MiniCounts[][0]=StringFromList(p,sweeps)
-		MiniCounts[][1]=""
-		MiniCounts[][2]="Use"
-	endif
-	wave /t/sdfr=df MiniCounts
-	Make /free/n=(dimsize(MiniCounts,0)) MiniSweepIndex=str2num(MiniCounts[p][0])
-	FindValue /V=(sweepNum) MiniSweepIndex
-	if(V_Value>=0)
-		MiniCounts[V_Value][1]=num2str(count)
-	endif
 End
 
 Function DisplayMiniRateAndAmpl(channel)
