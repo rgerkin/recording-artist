@@ -835,8 +835,17 @@ function ExportWins([types,match,except])
 end
 
 
-function ExportHDF5([path_name,file_name])
-	string path_name,file_name
+function ExportHDF5([path_name,file_name,folder])
+	string path_name,file_name,folder
+
+	if(paramisdefault(folder))
+		folder = "root:"
+	endif
+	dfref df = $folder
+	if(!datafolderrefstatus(df))
+		doalert 0,"No such data folder: "+folder
+		return -1
+	endif
 	
 #if exists("HDF5CreateFile")	
 	if(paramisdefault(path_name) || !strlen(path_name))
@@ -860,7 +869,7 @@ function ExportHDF5([path_name,file_name])
 	HDF5CreateFile /O/P=$path_name fileID as file_name+".h5"
 	//variable groupID
 	//HDF5CreateGroup fileID, "/root", groupID
-	HDF5SaveGroup /O /R /T root:, fileID, "."
+	HDF5SaveGroup /O /R /T df, fileID, "."
 	HDF5CloseFile /Z fileID  
 #else
 	printf "HDF5 XOP not loaded.\r"  

@@ -3069,10 +3069,15 @@ Function /S MedianWave(w,bin_size)
 	Make /o/n=(ceil(numpnts(w)*dimdelta(w,0)/bin_size)) $("Median_"+NameOfWave(w))
 	Wave Med=$("Median_"+NameOfWave(w))
 	SetScale /P x,dimoffset(w,0),bin_size,Med
+#if exists("Median")!=3
 	Med=Median(w=w,x1=x-bin_size/2,x2=x+bin_size/2)
+#else
+	Med=Median(w,x-bin_size/2,x+bin_size/2)
+#endif
 	return GetWavesDataFolder(Med,2)
 End
 
+#if exists("Median")!=3
 Function Median([w,x1,x2])
 	Wave w
 	Variable x1,x2
@@ -3090,6 +3095,7 @@ Function Median([w,x1,x2])
 	KillWaves tempMedianWave
 	return result
 End
+#endif
 
 Function Median2(w)
 	Wave w

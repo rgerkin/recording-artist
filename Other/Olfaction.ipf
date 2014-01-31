@@ -516,7 +516,12 @@ function ModelROC(df,models[,permute,j_start])
 			// Interpolate to get a tpr which is a function of an evenly spaced (from 0 to 1) fpr.  This way averaging across cells will work.    
 			make /free/n=1001 roc_
 			setscale /I x,0,1,roc_	
+#if exists("Interpolate2")==4
 			Interpolate2 /T=1 /I=3 /Y=roc_ inverted_noSpikes,inverted_spikes
+#else
+			DoAlert 0,"No Interpolate2 operation available.  Is the Interpolate XOP loaded?"
+			return -1
+#endif
 			roc_=limit(roc_,0,1)
 			rocs[][j][model]=roc_[p]
 			waveclear muExists_spikes,muExists_noSpikes

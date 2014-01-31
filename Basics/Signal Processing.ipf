@@ -342,7 +342,11 @@ Function /wave RidgeFollow(w)
 	string name=getwavesdatafolder(w,2)+"_ridge"
 	make /o/n=(dimsize(w,0)) $name /wave=ridge
 	copyscales w,ridge
+#if exists("Interpolate2")==4
 	Interpolate2 /T=2 /I=3 /Y=$name xRidge, yRidge // cannot put 'ridge' here in place of '$name'.   
+#else
+	DoAlert 0,"The Interpolate2 operation was not found.  Is the Interpolate XOP loaded?"
+#endif
 	killwaves /z xRidge,yRidge
 	return ridge
 End
