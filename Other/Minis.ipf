@@ -1186,9 +1186,10 @@ Function SwitchMiniView(mode)
 	xx+=55
 	GroupBox RejectBox pos={xx,yy-5}, size={122,31}
 	xx+=6
-	Button Reject disable=0, pos={xx,yy}, proc=ShowMinisButtons, title="Reject:"
+	Button Reject disable=0, pos={xx,yy}, proc=ShowMinisButtons, title="\\W401"
 	Button RejectBelow disable=!browse, size={20,20}, proc=ShowMinisButtons, title="<="
 	Button RejectAbove disable=!browse, size={20,20}, proc=ShowMinisButtons, title=">="
+	SetWindow ShowMinisWin userData(lastReject)=""
 	xx+=125
 	Button Locate disable=!browse, size={50,20}, pos={xx,yy}, proc=ShowMinisButtons, title="Locate"
 	
@@ -1239,12 +1240,14 @@ Function SwitchMiniView(mode)
 	Label /Z/W=ShowMinisWin left, "pA"
 End
 
-Function ShowMinisButtons(ctrlName)
-	String ctrlName
+Function ShowMinisButtons(info)
+	Struct WMButtonAction &info
 	
 	dfref df=GetMinisDF()
 	nvar /z/sdfr=df currMini
-	strswitch(ctrlName)
+	variable undo = info.eventMod & 1
+	string rejected = ""
+	strswitch(info.ctrlName)
 		case "FitOneMini":
 			FitMinis(first=currMini,last=currMini)
 			break
@@ -1275,13 +1278,25 @@ Function ShowMinisButtons(ctrlName)
 			AverageMinis()
 			break
 		case "Reject":
-			RejectMini()
+			if(undo)
+				RestoreMinis()
+			else
+				rejected = RejectMini()
+			endif
 			break
 		case "RejectBelow":
-			RejectMinis("Below")
+			if(undo)
+				RestoreMinis()
+			else
+				rejected = RejectMinis("Below")
+			endif
 			break
 		case "RejectAbove":
-			RejectMinis("Above")
+			if(undo)
+				RestoreMinis()
+			else
+				rejected = RejectMinis("Above")
+			endif
 			break
 		case "Summary":
 			MiniSummary()
@@ -1328,6 +1343,9 @@ Function ShowMinisButtons(ctrlName)
 				Checkbox $option_, pos={5,i*25+2}, variable=optionsDF:$option_, title=option, proc=ShowMinisCheckboxes
 			endfor
 	endswitch
+	if(strlen(rejected))
+		SetWindow ShowMinisWin userData(last_rejected)=rejected
+	endif
 End
 
 Function ShowMinisCheckboxes(ctrlName,val)
@@ -2038,14 +2056,17 @@ Function FitMini(num[,channel])//trace)
 End
 
 // Remove the current mini from the graph and delete it, so it doesn't get included in the final analysis.  
-Function RejectMini()
+Function /s RejectMini([undo])
+	variable undo
+	
 	dfref df=GetMinisDF()
 	nvar /z/sdfr=df currMini,traversal_direction
 	if(numtype(currMini))
-		return -1
+		return ""
 	endif
 	RemoveCurrMiniFromGraph()
 	KillMini(currMini)
+	string rejected = num2str(currMini)
 	svar /sdfr=df currChannel
 	variable proxy=GetMinisProxyState()
 	dfref df=GetMinisChannelDF(currChannel)
@@ -2059,6 +2080,7 @@ Function RejectMini()
 	if(stringmatch(mode,"browse"))	
 		GoToMini(currMini)
 	endif
+	return rejected
 End
 
 // Remove the current mini from the graph
@@ -2086,8 +2108,9 @@ Function RemoveCurrMiniFromGraph()
 End
 
 // Same as RejectMini, but for all minis less than the current index (Mini #).  
-Function RejectMinis(direction)
-	String direction
+Function /s RejectMinis(direction)
+	string direction
+	
 	RemoveCurrMiniFromGraph()
 	dfref df=GetMinisDF()
 	nvar /sdfr=df currMini
@@ -2098,11 +2121,13 @@ Function RejectMinis(direction)
 	String channel=S_Value
 	dfref df=GetMinisChannelDF(channel)
 	wave /t/sdfr=df MiniNames
+	string rejected = ""
 	strswitch(direction)
 		case "Below": 
 			for(i=currMini;i>=0;i-=1)
 				GoToMini(i)
 				KillMini(i)
+				rejected += num2str(i)+";"
 			endfor
 			currMini=0
 			break
@@ -2112,12 +2137,14 @@ Function RejectMinis(direction)
 				if(KillMini(i))
 					break
 				endif
+				rejected += num2str(i)+";"
 			endfor
 			currMini=limit(currMini,0,NumMinis(channel)-1)
 			break
 	endswitch
 	
 	GoToMini(currMini)
+	return rejected
 End
 
 Function KillMini(miniNum[,channel,proxy,preserve_loc])
@@ -2181,6 +2208,53 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 		SetVariable CurrMini limits={0,num_minis-1,1}, win=ShowMinisWin
 	endif
 End
+
+function RestoreMinis()
+	ControlInfo /W=ShowMinisWin Channel
+	string channel=S_Value
+	dfref df=GetMinisChannelDF(channel)
+	if(!datafolderrefstatus(df))
+		return -2
+	endif
+	wave /sdfr=df Index
+	
+	string last_rejected = getuserdata("ShowMinisWin","","last_rejected")
+	variable i
+	for(i=0;i<itemsinlist(last_rejected);i+=1)
+		variable restoreMiniNum = str2num(stringfromlist(i,last_rejected))
+		RestoreMini(restoreMiniNum)
+	endfor
+	if(numtype(restoreMiniNum)==0)
+		insertpoints 0,1,Index
+		Index[0] = restoreMiniNum
+		SetWindow ShowMinisWin userData(last_rejected)=removefromlist(num2str(restoreMiniNum),last_rejected)
+	endif
+	
+	Variable num_minis=numpnts(Index)
+	if(wintype("ShowMinisWin"))
+		SetVariable CurrMini limits={0,num_minis-1,1}, win=ShowMinisWin
+	endif
+end
+
+function RestoreMini(miniNum)
+	variable miniNum
+	
+	ControlInfo /W=ShowMinisWin Channel
+	string channel=S_Value
+	dfref df=GetMinisChannelDF(channel)
+	if(!datafolderrefstatus(df))
+		return -2
+	endif
+	wave /sdfr=df Index
+	
+	string last_rejected = getuserdata("ShowMinisWin","","last_rejected")
+	variable restoreMiniNum = str2num(stringfromlist(0,last_rejected))
+	if(numtype(restoreMiniNum)==0)
+		insertpoints 0,1,Index
+		Index[0] = restoreMiniNum
+		SetWindow ShowMinisWin userData(last_rejected)=removefromlist(num2str(restoreMiniNum),last_rejected)
+	endif
+end
 
 Function /S GoToMini(miniNum)
 	variable miniNum
