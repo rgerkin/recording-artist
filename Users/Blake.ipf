@@ -111,9 +111,12 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 		Resample /dim=1 /up=(upsample) contour
 	endif
 	string parameter_names = FitFunctionParameterNames()
-	label bottom stringfromlist(holdX,parameter_names)
-	label left stringfromlist(holdY,parameter_names)
+	string x_name = stringfromlist(holdX,parameter_names)
+	string y_name = stringfromlist(holdY,parameter_names)
+	label bottom x_name
+	label left y_name
 	cd root:
+	printf "Best fit found for %s=%.4g and %s=%.4g\r",x_name,log10 & 1 ? 10^bestX : bestX,y_name,log10 & 2 ? 10^bestY : bestY
 end
 
 // Fit with one pair of parameters held and return a relative chi-squared value.  
