@@ -1,7 +1,7 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 #include <Global Fit 2>
 
-function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log10,upsample,purpleChi2])
+function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log10,upsample,purpleChi2,reset_fits])
 	variable holdX // Index of first parameter to be held (x-axis)
 	variable holdY // Index of second parameter to be held (y-axis).  
 	variable enzyme // Index of the enzyme parameter (always held). 
@@ -11,6 +11,7 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 	variable log10 // Whether to plot on a logarithmic scale.  
 	variable upsample // Upsample the final contour plot by the indicated factor.  Only applies if 'num' is >= 21.  
 	variable purpleChi2 // The relative value of chi-squared (as a multiple of the best chi-squared) at which the plot becomes fully purple.  
+	variable reset_fits // Reset fit coefficients to the overall best fit before doing each new fit.  
 	
 	// Independent control for x-axis and y-axis sizing.  
 	variable lowX // Smallest parameter value for x-axis relative to optimum.  If optimum is 7 and you want to plot down to 5, this should be -2.  
@@ -81,7 +82,7 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 	cd root:Packages:NewGlobalFit
 	bestCoefs[holdX][1] = 1 // Hold coefficient on X-axis.  
 	bestCoefs[holdY][1] = 1 // Hold coefficient on Y-axis.  
-	contour = Fit(x,y,bestCoefs,holdX,holdY,best_chisq,log10=log10) // Fill the contour matrix with data.  
+	contour = Fit(x,y,bestCoefs,holdX,holdY,best_chisq,log10=log10,reset_fits=reset_fits) // Fill the contour matrix with data.  
 	
 	// Display the fits.  
 	string win
@@ -120,13 +121,14 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 end
 
 // Fit with one pair of parameters held and return a relative chi-squared value.  
-static function Fit(xx,yy,coefs,hold1,hold2,best_chisq[,log10])
+static function Fit(xx,yy,coefs,hold1,hold2,best_chisq[,log10,reset_fits])
 	variable xx // Value (or log10 of value) of first parameter to be held.  
 	variable yy // Value (or log10 of value) of second parameter to be held.  
 	variable hold1 // Index of first parameter to be held.  
 	variable hold2 // Index of second parameter to be held.  
 	variable best_chisq // Value of best chi-squared value, to which result will be normalized.  
 	variable log10 // Whether or not we are using logarithmic spacing.  
+	variable reset_fits // Reset fit coefficients to the overall best fit first.  
 	wave coefs // Current values of the fit coefficients.  
 	
 	variable maxIters = 1000 // Maximum number of iterations per fit.  
@@ -136,7 +138,12 @@ static function Fit(xx,yy,coefs,hold1,hold2,best_chisq[,log10])
 	wave NewGF_LinkageMatrix
 	coefs[hold1][0] = log10 & 1 ? 10^xx : xx
 	coefs[hold2][0] = log10 & 2 ? 10^yy : yy
-	DoNewGlobalFit(NewGF_FitFuncNames, NewGF_DataSetsList, NewGF_LinkageMatrix, coefs, NewGF_CoefficientNames, $"", fitOptions, fitLength, 1, maxIters=maxIters, resultWavePrefix="", resultDF="")
+	if(reset_fits)
+		duplicate /free coefs,coefs_
+	else
+		wave coefs_ = coefs
+	endif
+	DoNewGlobalFit(NewGF_FitFuncNames, NewGF_DataSetsList, NewGF_LinkageMatrix, coefs_, NewGF_CoefficientNames, $"", fitOptions, fitLength, 1, maxIters=maxIters, resultWavePrefix="", resultDF="")
 	wave FitY,YCumData
 	make /free/n=(numpnts(YCumData)) w_chisq = YCumData[p]>0 ? (YCumData[p]-FitY[p])^2 / FitY[p] : 0 // Compute the chi-squared components.  
 	variable chisq = sum(w_chisq) // Sum to obtain chi-squared.  
