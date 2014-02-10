@@ -222,6 +222,61 @@ static function Fit(xx,yy,coefs,hold1,hold2,best_chisq[,log10,reset_fits,constra
 	return result // Return the result.  
 end
 
+function JackknifeEstimates(enzyme[,epsilon,passes,quiet])
+	variable enzyme // Index of the enzyme parameter (always held). 
+	variable epsilon // Step size relative to parameter values.  
+	variable passes // Maximum number of times to try each fit.
+	variable quiet // Don't print messages after every failed fit.  
+	
+	epsilon = paramisdefault(epsilon) ? 1e-4 : epsilon
+	passes = paramisdefault(passes) ? 10 : passes
+	
+	// Perform the initial, unconstrained fit.  
+	cd root:Packages:NewGlobalFit
+	wave NewGF_CoefWave
+	wave /t NewGF_DataSetsList
+	NewGF_CoefWave[enzyme][1] = 1 // Hold enzyme concentration.
+	variable guessX = NewGF_CoefWave[0][0] // Initial guess for X.  
+	variable guessY = NewGF_CoefWave[1][0] // Initial guess for Y.  
+	ControlInfo/W=NewGlobalFitPanel#NewGF_GlobalControlArea NewGF_ConstraintsCheckBox
+	variable constrain = v_value
+	variable mask_col = finddimlabel(NewGF_DataSetsList,1,"Masks")
+	if(mask_col<0)
+		variable no_old_masks = 1
+		redimension /n=(-1,dimsize(NewGF_DataSetsList,1)+1) NewGF_DataSetsList
+		mask_col = dimsize(NewGF_DataSetsList,1)-1
+		setdimlabel 1,mask_col,Masks,NewGF_DataSetsList
+	else
+		duplicate /free/t/r=[][mask_col,mask_col] NewGF_DataSetsList, old_masks
+	endif
+	variable i,j
+	for(i=0;i<dimsize(NewGF_DataSetsList,0);i+=1)
+		string mask_name = "mask_"+num2str(i)
+		wave data = $NewGF_DataSetsList[i][0]
+		make /o/n=(numpnts(data)) root:$mask_name = 1
+		NewGF_DataSetsList[i][mask_col] = "root:"+mask_name
+	endfor
+	make /o/n=(dimsize(NewGF_CoefWave,0),0) root:jackknife_estimates /wave=estimates
+	for(i=0;i<dimsize(NewGF_DataSetsList,0);i+=1)
+		printf "Jackknife Estimates for dataset %d.\r",i
+		wave mask = $NewGF_DataSetsList[i][mask_col]
+		for(j=0;j<numpnts(mask);j+=1)
+			//printf "\tJackknife Estimates for data point %d.\r",j
+			mask = p==j ? 0 : 1
+			variable best_chisq = Fit(guessX,guessY,NewGF_CoefWave,0,1,1,constrain=constrain,quiet=quiet) // Chi-squared for the best fit (nothing held except enzyme concentration).  )		
+			redimension /n=(-1,dimsize(estimates,1)+1) estimates
+			estimates[][dimsize(estimates,1)-1] = NewGF_CoefWave[p][0]
+		endfor
+		mask = 1
+	endfor
+	if(no_old_masks)
+		deletepoints /m=1 mask_col,1,NewGF_DataSetsList
+	else
+		NewGF_DataSetsList[][mask_col] = old_masks
+	endif
+	setdatafolder root:
+end
+
 static function /s FitFunctionParameterNames()
 	wave /t funcNames = root:Packages:NewGlobalFit:NewGF_FitFuncNames
 	string text = ProcedureText(funcNames[0])
