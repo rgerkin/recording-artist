@@ -1,6 +1,9 @@
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 #include <Global Fit 2>
 
+static constant e_NADH = 6220 // Extinction coefficient for NADH in (M*cm)^-1
+static constant path_length = 0.401 // Path length for the experiment in cm.  
+
 function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log10,upsample,purpleChi2,reset_fits,epsilon,passes,quiet])
 	variable holdX // Index of first parameter to be held (x-axis)
 	variable holdY // Index of second parameter to be held (y-axis).  
@@ -251,3 +254,170 @@ static function MakeTicksAndLabels(var,best,low,high)
 	make /o/t/n=(numpnts(tiks)) $(var+"_tick_labels") /wave=labels = selectstring(tiks[p]==round(tiks[p]),"",num2str(10^tiks[p]))
 end
 
+function LoadDataFile()
+	variable refNum
+	open /m="Choose a data file"/r refNum
+	if(!strlen(s_filename))
+		return -1
+	endif
+	setdatafolder root:
+	make /free/t/n=0 file_well_indices
+	variable i,read = 0,block=0
+	string line
+	do
+		FReadLine refNum, line
+		if(read)
+			if(itemsinlist(line,"\t")>1)
+				if(stringmatch(line,"0:00*"))
+					block+=1
+					variable sample = 0
+					newdatafolder /o/s root:$("Block"+num2str(block))
+					make /o/n=0 times,temps
+					make /o/n=(0,numpnts(file_well_indices)) values
+					for(i=0;i<numpnts(file_well_indices);i+=1)
+						setdimlabel 1,i,$file_well_indices[i],values
+					endfor
+				endif
+				variable minutes,seconds
+				sscanf stringfromlist(0,line,"\t"), "%d:%d", minutes, seconds
+				times[sample] = {minutes*60+seconds}
+				temps[sample] = {str2num(stringfromlist(1,line,"\t"))}
+				for(i=0;i<numpnts(file_well_indices);i+=1)
+					values[sample][i] = {str2num(stringfromlist(i+2,line,"\t"))}
+				endfor
+				sample += 1
+			endif
+		else
+			if(stringmatch(line,"Time(hh:mm:ss)*"))
+				redimension /n=(itemsinlist(line,"\t ")-2) file_well_indices 
+				for(i=2;i<itemsinlist(line,"\t");i+=1)
+					string item=stringfromlist(i,line,"\t")
+					file_well_indices[i-2] = item
+				endfor			
+				read = 1
+			endif
+		endif
+	while(strlen(line))
+	close refNum
+	variable blocks = block
+	for(block=1;block<=blocks;block+=1)
+		setdatafolder root:$("Block"+num2str(block))
+		wave values
+		i=0
+		duplicate /o file_well_indices $"well_indices"
+		wave well_indices
+		do
+			if(numtype(values[0][i])==2)
+				deletepoints /m=1 i,1,values
+				deletepoints /m=0 i,1,well_indices
+			else
+				i+=1
+			endif
+		while(i<dimsize(values,1))
+	endfor
+	setdatafolder root:
+end
+
+function FindLinearRegions([duration,min_r2,only_block])
+	variable duration,min_r2,only_block
+	
+	duration = paramisdefault(duration) ? 60*7.5 : duration
+	min_r2 = paramisdefault(min_r2) ? 0.97 :min_r2
+	
+	setdatafolder root:
+	variable block = 1
+	do
+		if(!paramisdefault(only_block))
+			if(block<only_block)
+				block+=1
+				continue
+			elseif(block>only_block)
+				break
+			endif
+		endif
+		dfref blockDF = root:$("Block"+num2str(block))
+		if(datafolderrefstatus(blockDF))
+			cd blockDF
+			printf "Block %d:\r",block
+			wave times,values
+			wave /t well_indices
+			variable start = 0, finish = 0
+			do
+				finish += 1
+			while(times[finish]-times[start]<duration)
+			variable samples = finish - start
+			make /o/n=(dimsize(values,1)) starts = nan, finishes = nan
+			variable i
+			for(i=0;i<dimsize(values,1);i+=1)
+				start = 0
+				finish = start + samples
+				do
+					duplicate /free/r=[start,finish] times, times_
+					duplicate /free/r=[start,finish][i,i] values values_
+					variable r2 = statscorrelation(times_,values_)^2
+					//print i,start,finish,r2
+					if(r2 >= min_r2)
+						printf "\tWell %s exhibited r^2 = %.3f from t=%d seconds to t=%d seconds.\r",well_indices[i],r2,times[start],times[finish]
+						starts[i] = times[start]
+						finishes[i] = times[finish]
+						break
+					endif
+					start += 1
+					finish += 1
+					if(finish >= dimsize(values,0))
+						printf "\tWell %s never exhibited a region of length %d seconds with r^2 >= %.3f.\r",well_indices[i],duration,min_r2
+						break
+					endif
+				while(1)
+			endfor
+		else
+			break
+		endif
+		block += 1
+	while(1)
+	setdatafolder root:
+end
+
+function InitialHydrolysisRate(block,well)
+	variable block
+	string well
+	
+	dfref blockDF = root:$("Block"+num2str(block))
+	if(!datafolderrefstatus(blockDF))
+		printf "No data for block %d.\r",block
+		return nan
+	endif
+	wave /z/sdfr=blockDF values,starts,finishes,times
+	wave /z/t/sdfr=blockDF well_indices
+	findvalue /text=well/txop=4 well_indices
+	variable column = v_value
+	variable startT = starts[column]
+	variable finishT = finishes[column]
+	findvalue /v=(startT) times
+	variable start = v_value // Start index.  
+	findvalue /v=(finishT) times
+	variable finish = v_value // Start index.  
+	duplicate /free/r=[][column,column] values, well_values
+	curvefit /Q line, well_values[start,finish] /X=times
+	variable slope = K1 // Slope in M/min^-1
+	variable result = - slope / (e_NADH*path_length)
+	return result
+end
+
+function InitialHydrolysisRates(block)
+	variable block
+	
+	dfref blockDF = root:$("Block"+num2str(block))
+	if(!datafolderrefstatus(blockDF))
+		printf "No data for block %d.\r",block
+		return -1
+	endif
+	wave /z/sdfr=blockDF values
+	wave /z/t/sdfr=blockDF well_indices
+	make /o/n=(dimsize(values,1)) blockDF:initial_hydrolysis_rates /wave=rates=nan
+	variable i
+	for(i=0;i<dimsize(values,1);i+=1)
+		string well = well_indices[i]
+		rates[i] = InitialHydrolysisRate(block,well)
+	endfor	
+end
