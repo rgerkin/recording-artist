@@ -222,14 +222,18 @@ static function Fit(xx,yy,coefs,hold1,hold2,best_chisq[,log10,reset_fits,constra
 	return result // Return the result.  
 end
 
-function JackknifeEstimates(enzyme[,epsilon,passes,quiet])
+function JackknifeEstimates(enzyme[,epsilon,passes,quiet,mode,number,holdout])
 	variable enzyme // Index of the enzyme parameter (always held). 
 	variable epsilon // Step size relative to parameter values.  
 	variable passes // Maximum number of times to try each fit.
 	variable quiet // Don't print messages after every failed fit.  
+	variable mode // Mode for determining which data to holdout for each jackknife sample.  
+	variable number // Number of jackknife estimates to use.     
+	variable holdout // Number to holdout in each estimate, given the mode.  
 	
 	epsilon = paramisdefault(epsilon) ? 1e-4 : epsilon
 	passes = paramisdefault(passes) ? 10 : passes
+	holdout = paramisdefault(holdout) ? 1 : holdout
 	
 	// Perform the initial, unconstrained fit.  
 	cd root:Packages:NewGlobalFit
@@ -249,7 +253,7 @@ function JackknifeEstimates(enzyme[,epsilon,passes,quiet])
 	else
 		duplicate /free/t/r=[][mask_col,mask_col] NewGF_DataSetsList, old_masks
 	endif
-	variable i,j
+	variable i,j,n
 	for(i=0;i<dimsize(NewGF_DataSetsList,0);i+=1)
 		string mask_name = "mask_"+num2str(i)
 		wave data = $NewGF_DataSetsList[i][0]
@@ -257,21 +261,107 @@ function JackknifeEstimates(enzyme[,epsilon,passes,quiet])
 		NewGF_DataSetsList[i][mask_col] = "root:"+mask_name
 	endfor
 	make /o/n=(dimsize(NewGF_CoefWave,0),0) root:jackknife_estimates /wave=estimates
+	
+	variable num_data = 0, num_data_y=0
 	for(i=0;i<dimsize(NewGF_DataSetsList,0);i+=1)
-		printf "Jackknife Estimates for dataset %d.\r",i
 		wave mask = $NewGF_DataSetsList[i][mask_col]
-		for(j=0;j<numpnts(mask);j+=1)
-			//printf "\tJackknife Estimates for data point %d.\r",j
-			mask = p==j ? 0 : 1
-			variable best_chisq = Fit(guessX,guessY,NewGF_CoefWave,0,1,1,constrain=constrain,quiet=quiet) // Chi-squared for the best fit (nothing held except enzyme concentration).  )		
-			redimension /n=(-1,dimsize(estimates,1)+1) estimates
-			estimates[][dimsize(estimates,1)-1] = NewGF_CoefWave[p][0]
-		endfor
-		mask = 1
-	endfor
+		variable num_data_x = numpnts(mask)
+		num_data_y += 1
+		num_data += numpnts(mask)
+	endfor		
+	if(holdout > 0.5*num_data)
+		printf "You tried to hold out %d, which is more than half of the data %d.\r",holdout,num_data
+		return -1
+	endif
+	
+	switch(mode)
+		case 0: // Holdout random data.  
+			number = paramisdefault(number) ? 50 : number
+			break
+		case 1: // Holdout ordered data.  
+			number = paramisdefault(number) ? num_data : number
+			break
+		case 2: // Holdout whole X-values.    
+			number = paramisdefault(number) ? num_data_x : number
+			break
+		case 3: // Holdout whole Y-values.  
+			wave mask = $NewGF_DataSetsList[0][mask_col]			
+			number = paramisdefault(number) ? num_data_y : number
+			break
+		case 4 : // Holdout X-values and then Y-values.  
+			wave mask = $NewGF_DataSetsList[0][mask_col]		
+			number = paramisdefault(number) ? num_data_x+num_data_y : number	
+			break
+	endswitch
+	
+	redimension /n=(-1,number) estimates
+	wave /t list = NewGF_DataSetsList
+	for(n=0;n<number;n+=1)
+		switch(mode)
+			case 0: // Holdout random data.  
+				make /free/n=(num_data) super_mask,index=p,randos = gnoise(1)
+				sort randos,index
+				super_mask = index[p] < holdout ? 0 : 1
+				variable counter = 0
+				for(i=0;i<dimsize(list,0);i+=1)
+					wave mask = $list[i][mask_col]			
+					mask = super_mask[p+counter]
+					counter += numpnts(mask)
+				endfor	
+				break
+			case 1: // Holdout ordered data.  
+				make /free/n=(num_data) super_mask = mod(n,num_data)-p < holdout && mod(n,num_data)-p >= 0 ? 0 : 1
+				counter = 0
+				for(i=0;i<dimsize(list,0);i+=1)
+					wave mask = $list[i][mask_col]			
+					mask = super_mask[p+counter]
+					counter += numpnts(mask)
+				endfor	
+				break
+			case 2: // Holdout whole X-values.    
+				for(i=0;i<dimsize(list,0);i+=1)
+					wave mask = $list[i][mask_col]			
+					mask = mod(n,num_data_x)-p < holdout && mod(n,num_data_x)-p >= 0 ? 0 : 1
+					print n,i,mask
+				endfor	
+				break
+			case 3: // Holdout whole Y-values.  DOESN"T WORK.  
+				for(i=0;i<dimsize(list,0);i+=1)
+					wave mask = $list[i][mask_col]			
+					mask = mod(n,num_data_y)-i < holdout && mod(n,num_data_y)-i >= 0 ? 0 : 1
+					print n,i,mask
+				endfor	
+				break
+			case 4 : // Holdout X-values and then Y-values.  Holdout always equals 1.  DOESN'T WORK.  
+				for(i=0;i<dimsize(list,0);i+=1)
+					wave mask = $list[i][mask_col]			
+					if(mod(n,num_data_x+num_data_y)<num_data_x)
+						mask = i==n ? 0 : 1
+					else
+						mask = p==n ? 0 : 1
+					endif
+				endfor
+				break
+			default:
+				printf "%d not a jacknife mode.\r",mode
+				return -2
+				break
+		endswitch
+		variable best_chisq = Fit(guessX,guessY,NewGF_CoefWave,0,1,1,constrain=constrain,quiet=quiet) // Chi-squared for the best fit (nothing held except enzyme concentration).  )		
+		estimates[][n] = NewGF_CoefWave[p][0]
+		matrixop /o root:jackknife_mean = meancols(estimates^t)
+		matrixop /o root:jackknife_std = sqrt(varcols(estimates^t))^t
+	endfor	
+
+	// Restore masking.  
 	if(no_old_masks)
-		deletepoints /m=1 mask_col,1,NewGF_DataSetsList
+		for(i=0;i<dimsize(NewGF_DataSetsList,0);i+=1)
+			wave mask = $NewGF_DataSetsList[i][mask_col]			
+			mask = 1
+		endfor			
+		deletepoints /m=1 mask_col,1,NewGF_DataSetsList	
 	else
+		// TODO: Restore mask values if there were old masks being used.  
 		NewGF_DataSetsList[][mask_col] = old_masks
 	endif
 	setdatafolder root:
