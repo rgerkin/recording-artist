@@ -52,7 +52,7 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 	bestCoefs[][2] = bestCoefs[p][0]*epsilon // Set epsilon values to 1e-4 of the best fit parameter estimates.  
 	if(constrain) // If there are constraints on the fit.  
 		wave/t/z ConstraintWave = $"GFUI_GlobalFitConstraintWave"
-		variable i
+		variable i,j
 		do // Remove them for parameters that are being held.  
 			variable held = stringmatch(ConstraintWave[i],"K"+num2str(holdX)+" *")
 			held = held || stringmatch(ConstraintWave[i],"K"+num2str(holdY)+" *")
@@ -90,9 +90,16 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 		lowY = -0.75*bestY // Make sure it gets set no lower than 0.25 * bestY.  
 	endif
 	cd root:
-	make /o/n=(num,num) contour
+	make /o/n=(num,num,5) contour
+	setdimlabel 3,0,rel_chisquared,contour
+	setdimlabel 3,1,chisquared,contour
+	setdimlabel 3,2,x,contour
+	setdimlabel 3,3,y,contour
+	setdimlabel 3,4,epsilon,contour
 	setscale /I x,bestX+lowX,bestX+highX,contour
 	setscale /I y,bestY+lowY,bestY+highY,contour
+	contour[][][2] = dimoffset(contour,0)+p*dimdelta(contour,0)
+	contour[][][3] = dimoffset(contour,1)+q*dimdelta(contour,1)
 	if(log10 & 1)
 		MakeTicksAndLabels("x",bestX,lowX,highX)
 		wave x_ticks
@@ -108,13 +115,23 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 	cd root:Packages:NewGlobalFit
 	bestCoefs[holdX][1] = 1 // Hold coefficient on X-axis.  
 	bestCoefs[holdY][1] = 1 // Hold coefficient on Y-axis.  
+	variable new_epsilon = epsilon
 	variable pass = 1
 	do
-		contour = numtype(contour[p][q])==2 || pass==1 ? Fit(x,y,bestCoefs,holdX,holdY,best_chisq,log10=log10,reset_fits=reset_fits,constrain=constrain,quiet=quiet) : contour[p][q] // Fill the contour matrix with data.  
+		for(i=0;i<dimsize(contour,0);i+=1)
+			for(j=0;j<dimsize(contour,1);j+=1)
+				if(numtype(contour[i][j])==2 || pass==1)
+					variable xx = dimoffset(contour,0)+i*dimdelta(contour,0)
+					variable yy = dimoffset(contour,1)+i*dimdelta(contour,1)
+					contour[i][j][0] =  Fit(xx,yy,bestCoefs,holdX,holdY,best_chisq,log10=log10,reset_fits=reset_fits,constrain=constrain,quiet=quiet) // Fill the contour matrix with data.  
+					contour[i][j][4] = new_epsilon
+				endif
+			endfor
+		endfor
 		wavestats /q contour
 		if(v_numnans && pass<passes)
 			printf "%d out of %d fits were unsuccessful.  Retrying these.\r",v_numnans,numpnts(contour)
-			variable new_epsilon = epsilon * 1.5^pass
+			new_epsilon = epsilon * 1.5^pass
 			if(new_epsilon < 1e-1)
 				printf "Increasing epislon to %g.\r", new_epsilon
 				bestCoefs[][2] = bestCoefs[p][0] * new_epsilon
@@ -128,13 +145,14 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 		endif
 		pass += 1
 	while(1)
+	contour[][][1] = contour[p][q][0] * best_chisq
 	
 	// Display the fits.  
 	string win
 	sprintf win,"ContourPlot_%d_%d",holdX,holdY
 	dowindow /k $win
 	display /n=$win
-	appendimage contour
+	appendimage /g=1 contour
 	if(log10 & 1)
 		//modifyGraph axThick(bottom)=0,nticks(bottom)=0
 		//newfreeaxis /b log_bottom
