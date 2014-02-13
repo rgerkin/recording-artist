@@ -91,11 +91,11 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 	endif
 	cd root:
 	make /o/n=(num,num,5) contour
-	setdimlabel 3,0,rel_chisquared,contour
-	setdimlabel 3,1,chisquared,contour
-	setdimlabel 3,2,x,contour
-	setdimlabel 3,3,y,contour
-	setdimlabel 3,4,epsilon,contour
+	setdimlabel 2,0,rel_chisquared,contour
+	setdimlabel 2,1,chisquared,contour
+	setdimlabel 2,2,x,contour
+	setdimlabel 2,3,y,contour
+	setdimlabel 2,4,epsilon,contour
 	setscale /I x,bestX+lowX,bestX+highX,contour
 	setscale /I y,bestY+lowY,bestY+highY,contour
 	contour[][][2] = dimoffset(contour,0)+p*dimdelta(contour,0)
@@ -122,7 +122,7 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 			for(j=0;j<dimsize(contour,1);j+=1)
 				if(numtype(contour[i][j])==2 || pass==1)
 					variable xx = dimoffset(contour,0)+i*dimdelta(contour,0)
-					variable yy = dimoffset(contour,1)+i*dimdelta(contour,1)
+					variable yy = dimoffset(contour,1)+j*dimdelta(contour,1)
 					contour[i][j][0] =  Fit(xx,yy,bestCoefs,holdX,holdY,best_chisq,log10=log10,reset_fits=reset_fits,constrain=constrain,quiet=quiet) // Fill the contour matrix with data.  
 					contour[i][j][4] = new_epsilon
 				endif
@@ -302,14 +302,17 @@ function JackknifeEstimates(enzyme[,epsilon,passes,quiet,mode,number,holdout])
 		case 2: // Holdout whole X-values.    
 			number = paramisdefault(number) ? num_data_x : number
 			break
-		case 3: // Holdout whole Y-values.  
-			wave mask = $NewGF_DataSetsList[0][mask_col]			
-			number = paramisdefault(number) ? num_data_y : number
-			break
-		case 4 : // Holdout X-values and then Y-values.  
-			wave mask = $NewGF_DataSetsList[0][mask_col]		
-			number = paramisdefault(number) ? num_data_x+num_data_y : number	
-			break
+//		case 3: // Holdout whole Y-values.  
+//			wave mask = $NewGF_DataSetsList[0][mask_col]			
+//			number = paramisdefault(number) ? num_data_y : number
+//			break
+//		case 4 : // Holdout X-values and then Y-values.  
+//			wave mask = $NewGF_DataSetsList[0][mask_col]		
+//			number = paramisdefault(number) ? num_data_x+num_data_y : number	
+//			break
+		default:
+			printf "%d not a jacknife mode.\r",mode
+			return -2
 	endswitch
 	
 	redimension /n=(-1,number) estimates
@@ -340,7 +343,6 @@ function JackknifeEstimates(enzyme[,epsilon,passes,quiet,mode,number,holdout])
 				for(i=0;i<dimsize(list,0);i+=1)
 					wave mask = $list[i][mask_col]			
 					mask = mod(n,num_data_x)-p < holdout && mod(n,num_data_x)-p >= 0 ? 0 : 1
-					print n,i,mask
 				endfor	
 				break
 			case 3: // Holdout whole Y-values.  DOESN"T WORK.  
@@ -360,17 +362,14 @@ function JackknifeEstimates(enzyme[,epsilon,passes,quiet,mode,number,holdout])
 					endif
 				endfor
 				break
-			default:
-				printf "%d not a jacknife mode.\r",mode
-				return -2
-				break
 		endswitch
 		variable best_chisq = Fit(guessX,guessY,NewGF_CoefWave,0,1,1,constrain=constrain,quiet=quiet) // Chi-squared for the best fit (nothing held except enzyme concentration).  )		
 		estimates[][n] = NewGF_CoefWave[p][0]
-		matrixop /o root:jackknife_mean = meancols(estimates^t)
-		matrixop /o root:jackknife_std = sqrt(varcols(estimates^t))^t
 	endfor	
-
+	
+	matrixop /o root:jackknife_mean = meancols(estimates^t)
+	matrixop /o root:jackknife_std = sqrt(varcols(estimates^t))^t
+	
 	// Restore masking.  
 	if(no_old_masks)
 		for(i=0;i<dimsize(NewGF_DataSetsList,0);i+=1)
@@ -382,6 +381,14 @@ function JackknifeEstimates(enzyme[,epsilon,passes,quiet,mode,number,holdout])
 		// TODO: Restore mask values if there were old masks being used.  
 		NewGF_DataSetsList[][mask_col] = old_masks
 	endif
+	
+	wave /sdfr=root: jackknife_mean,jackknife_std
+	printf "Jackknife means +/- standard deviations are:\r"
+	for(i=0;i<dimsize(jackknife_mean,0);i+=1)
+		if(!NewGF_CoefWave[i][1]) // If parameter not held.  
+			printf "\tParameter %d: %.6g +/- %.6g\r",i,jackknife_mean[i],jackknife_std[i] 
+		endif
+	endfor
 	setdatafolder root:
 end
 
