@@ -1701,7 +1701,7 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	endfor
 	
 	// Test pulse.  
-	for(k=0;k<LCM_;k+=1)
+	for(k=0;k<LCM_[chan];k+=1)
 		testPulseApplied=0
 		for(j=0;j<pulseSets;j+=1)
 			if(!paramisdefault(triparity) && mod(j,3)!=triparity)
@@ -2398,12 +2398,12 @@ function DefaultPlusNegative4_stim(Stimulus,chan,firstSample,lastSample,pulseNum
 end
 
 // PSC Noise (alpha-filtered poisson process) as in Galan et al, 2006.  
-Function MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
+Function /wave MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
 	Variable duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz
 	
 	if(rate<0)
 		printf "Rate must be > 0.\r"
-		return 0
+		return NULL
 	endif
 	Variable points=kHz*duration*1000
 	dfref df=Core#PackageHome(module,"stimuli")
@@ -2427,7 +2427,7 @@ Function MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
 End
 
 // Alpha-filtered white noise as in Galan et al, 2006.  
-Function MakeAlphaNoise(duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz)
+Function /wave MakeAlphaNoise(duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz)
 	Variable duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz
 	
 	Variable points=kHz*duration*1000

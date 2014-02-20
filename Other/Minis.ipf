@@ -698,11 +698,11 @@ Function MiniScore(Data,Template)
 		MatrixOp /o ScaleWave=(Template.Piece-sum(Template)*sum(Piece)/length)/(Template.Template-sum(Template)*sum(Template)/length)
 		Variable Offset=(sum(Piece)-ScaleWave[0]*sum(Template))/length;
 		//MatrixOp /o Fitted_Template=Template*Scale[0]+Offset;
-    		MatrixOp /o SSE=sumsqr(Piece-Fitted_Template)
+    	MatrixOp /o SSE=sumsqr(Piece-Fitted_Template)
 		Variable Standard_Error=sqrt(SSE[0]/(length-1)) // Should this be -1 or not?  
-		MiniScores[i]=ScaleWave/Standard_Error
-    	endfor
-    	CopyScales /P Data,MiniScores
+		MiniScores[i]=ScaleWave[0]/Standard_Error
+    endfor
+    CopyScales /P Data,MiniScores
 End
 
 Function PlotAllMiniFits(channel)

@@ -97,7 +97,7 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 				break
 			default:
 				printf "Unknown distribution: %s.  Exiting.\r",distr
-				return -1
+				return nan
 		endswitch
 	endif
 	
@@ -178,14 +178,14 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 		if(!quiet)
 			printf "There are infs or NaNs in the data set.\r"
 		endif
-		//return -1
+		return nan
 	endif
 	
 	// Optionally break up a covariate into several numCovariates valued at 0 or 1, corresponding to the whether the covariate was in a particular range of values at that observation.  
 	if(!paramisdefault(bin))
 		if(dimsize(bin,0)!=5)
 			printf "Number of rows in the 'bin' parameter wave must be 5.  Exiting.\r"
-			return -1
+			return nan
 		endif
 		for(i=0;i<dimsize(bin,1);i+=1)
 			variable wn=bin[0][i]
@@ -280,7 +280,7 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 			variable numKnots=numpnts(knots)
 			if(wavemax(knots)>splineModulus)
 				printf "Spline modulus must be at least as large as the position of the largest knot.\r"
-				return -1
+				return nan
 			endif
 			if(splineCircular)
 				//variable numNewCoefficients=(splineOrder-splineDiff)*numKnots - 1
@@ -393,7 +393,7 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 	string likelihoodName=distr+"_"+link
 	if(exists(likelihoodName)!=6)
 		printf "No such function: %s.  Exiting.\r",likelihoodName
-		return betas
+		return nan
 	endif	
 	funcref gaussian_identity likelihood=$likelihoodName
 	
@@ -472,14 +472,14 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 				string scoreName="d_"+distr+"_"+link
 				if(exists(scoreName)!=6)
 					printf "No such function: %s.  Exiting.\r",scoreName
-					return betas
+					return nan
 				endif	
 				funcref d_gaussian_identity score=$scoreName
 				FindRoots /q/i=(maxIters) /f=(maxStepSize) /x=betas score,xxTrain
 				break
 			default:
 				printf "No such fitting method: %d.\r",method
-				return betas
+				return nan
 		endswitch
 	endif
 	if(condition>0)
@@ -528,7 +528,7 @@ Function GLMFit(yy,wxx,distr[,distrParams,link,betas,prior,priorParams,func,spli
 			break
 		default:
 			printf "No such link function %s.  Exiting.\r",link
-			return -1
+			return nan
 	endswitch
 	
 	strswitch(distr)

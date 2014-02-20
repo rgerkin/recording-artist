@@ -119,7 +119,7 @@ Function DistanceCovariance(w1,w2[,permute])
 	matrixop /free B_=subtractmean(subtractmean(B,1),2)
 	matrixop /free result=sqrt(mean(A_*B_))
 	
-	return result
+	return result[0]
 End
 
 // http://en.wikipedia.org/wiki/Distance_correlation
@@ -1742,7 +1742,7 @@ Function HRI(wave1,wave2[,segment_duration])
 		Duplicate /o/R=[i*segment_duration,(i+1)*segment_duration-1] waveB,$"waveBsegment"; Wave waveBsegment
 		Corr=StatsCorrelation(waveASegment,waveBSegment)
 		MatrixOp /o Multiplicand=mag(waveASegment-waveBSegment)/(mag(waveASegment)+mag(waveBSegment))
-		TWave[i]=Corr*(1-Multiplicand)
+		TWave[i]=Corr*(1-Multiplicand[0])
 	endfor
 	Variable HRI1=(sum(TWave)^2)/sqrt(num_segments)
 	MatrixOp /o HRI2=sqrt(Frobenius(waveA)*Frobenius(waveB))/sum(mag(waveA-waveB))

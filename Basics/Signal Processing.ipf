@@ -351,7 +351,7 @@ Function /wave RidgeFollow(w)
 	return ridge
 End
 
-Function GaborTransform(w)
+Function /wave GaborTransform(w)
 	wave w
 	
 	duplicate /free w,windowed
@@ -1551,7 +1551,7 @@ Function /S HighPassFilter(ToFilter,cutoff,width)
 	return dest
 End
 
-Function BandPassFilter(w,lo,hi)
+Function /wave BandPassFilter(w,lo,hi)
 	wave w
 	variable lo,hi
 	wavestats /q/m=1 w
