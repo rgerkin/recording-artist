@@ -16,8 +16,9 @@ strconstant miniFitCoefs="Rise Time;Decay Time;Offset Time;Baseline;Amplitude;" 
 strconstant miniRankStats="Chi-Squared;Event Size;Event Time;R2;Log(1-R2);Cumul Error;Mean Error;MSE;Score;Rise 10%-90%;Interval;Plausability;pFalse;"
 strconstant miniOtherStats="Fit Time Before;Fit_Time_After;"
 //strconstant miniFitCoefs="Decay_Time;Offset_Time;y0;Amplitude"
-constant miniFitBefore=3 // In ms. Set to approximately the rise time constant.  
-constant miniFitAfter=9 // In ms. Set to approximately twice the decay time constant.   
+static constant refract=0.01 // Minimum interval between minis in seconds. 
+static constant miniFitBefore=3 // In ms. Set to approximately the rise time constant.  
+static constant miniFitAfter=9 // In ms. Set to approximately twice the decay time constant.   
 
 #ifdef SQL
 	override constant SQL_=1
@@ -57,11 +58,11 @@ static Function /S MethodList(method)
 	String method
 	
 	Variable i
-	String methods=ListPackageInstances(module,"analysisMethods")
+	String methods=Core#ListPackageInstances(module,"analysisMethods")
 	String matchingMethods=""
 	for(i=0;i<ItemsInList(methods);i+=1)
 		String oneMethod=StringFromList(i,methods)
-		string sourceMethod=StrPackageSetting(module,"analysisMethods",oneMethod,"method")
+		string sourceMethod=Core#StrPackageSetting(module,"analysisMethods",oneMethod,"method")
 		if(stringMatch(sourceMethod,method))
 			matchingMethods+=oneMethod+";"
 		endif
@@ -819,7 +820,6 @@ Function /wave FindMinis(w0[,df,thresh,tStart,tStop,within_median,print_stats,sw
 	Make /o/n=0 df:Locs,df:Vals,df:Index
 	wave /sdfr=df Locs,Vals,Index
 	variable i,rise_time=0.0015 // seconds
-	variable refract=0.01 // 10 ms minimum interval between minis. 
 	duplicate /free w,Jumps
 	Jumps-=w(x-rise_time)
 	FindLevels /Q/M=(refract)/EDGE=(thresh > 0 ? 1 : 2) Jumps,thresh; Wave W_FindLevels
