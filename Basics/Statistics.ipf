@@ -4850,3 +4850,10 @@ function covariance(w1,w2)
 	matrixop /free result = mean(w1*w2) - mean(w1)*mean(w2)
 	return result[0]
 end
+
+function FleshlerHoffman(i,N,p)
+	variable i,N,p
+	
+	variable ti = ((-ln(1-p))^-1) * (1+ln(N)+(N-i)*ln(N-i)-(N-i+1)*ln(N-i+1))
+	return ti
+end
