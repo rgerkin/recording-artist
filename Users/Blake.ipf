@@ -4,7 +4,7 @@
 static constant e_NADH = 6220 // Extinction coefficient for NADH in (M*cm)^-1
 static constant path_length = 0.401 // Path length for the experiment in cm.  
 
-function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log10,upsample,purpleChi2,reset_fits,epsilon,passes,quiet])
+function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log10,upsample,purpleChi2,reset_fits,epsilon,passes,fallback,quiet])
 	variable holdX // Index of first parameter to be held (x-axis)
 	variable holdY // Index of second parameter to be held (y-axis).  
 	variable enzyme // Index of the enzyme parameter (always held). 
@@ -17,6 +17,7 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 	variable reset_fits // Reset fit coefficients to the overall best fit before doing each new fit.  
 	variable epsilon // Step size relative to parameter values.  
 	variable passes // Maximum number of times to try each fit.
+	variable fallback // If a fit fails, leave the contour point at its current value.  
 	variable quiet // Don't print messages after every failed fit.  
 	
 	// Independent control for x-axis and y-axis sizing.  
@@ -123,8 +124,11 @@ function ContourPlot(holdX,holdY,enzyme[,low,high,lowX,lowY,highX,highY,num,log1
 				if(numtype(contour[i][j])==2 || pass==1)
 					variable xx = dimoffset(contour,0)+i*dimdelta(contour,0)
 					variable yy = dimoffset(contour,1)+j*dimdelta(contour,1)
-					contour[i][j][0] =  Fit(xx,yy,bestCoefs,holdX,holdY,best_chisq,log10=log10,reset_fits=reset_fits,constrain=constrain,quiet=quiet) // Fill the contour matrix with data.  
-					contour[i][j][4] = new_epsilon
+					variable val = Fit(xx,yy,bestCoefs,holdX,holdY,best_chisq,log10=log10,reset_fits=reset_fits,constrain=constrain,quiet=quiet) // Get the value.  
+					if(!numtype(val) || !fallback)
+						contour[i][j][0] =  val // Set a contour matrix point to this value.  
+						contour[i][j][4] = new_epsilon
+					endif
 				endif
 			endfor
 		endfor
