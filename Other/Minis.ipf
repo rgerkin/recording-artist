@@ -826,7 +826,7 @@ Function /wave FindMinis(w0[,df,thresh,tStart,tStop,within_median,print_stats,sw
 	rise_time /= 1000 // Convert from ms to s.  
 	duplicate /free w,Jumps
 	Jumps-=w(x-rise_time)
-	duplicate /o jumps,crap
+	duplicate /o jumps,$"mini_signal"
 	variable refract = MiniSetting("Detection","Refractory")
 	refract = refract/1000 // Convert from ms to s.  
 	FindLevels /Q/M=(refract)/EDGE=(thresh > 0 ? 1 : 2) Jumps,thresh; Wave W_FindLevels
