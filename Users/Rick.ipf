@@ -24,7 +24,7 @@
 #include "::Acquisition:Experiment Update"
 //#include "Manual Upstate Detection"
 //#include "Model Reverb"
-#include "Minis"
+//#include "Minis"
 //#include "More Analysis"
 //#include "Networking"
 //#include "Reverberation"

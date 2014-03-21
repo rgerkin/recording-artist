@@ -31,6 +31,10 @@
 #include "UrbanLegend"
 #endif
 
+#ifdef Minis
+#include "Minis"
+#endif
+
 #endif
 
 #if exists("Core#SetProfile")

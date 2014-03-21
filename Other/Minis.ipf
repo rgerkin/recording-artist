@@ -16,9 +16,6 @@ strconstant miniFitCoefs="Rise Time;Decay Time;Offset Time;Baseline;Amplitude;" 
 strconstant miniRankStats="Chi-Squared;Event Size;Event Time;R2;Log(1-R2);Cumul Error;Mean Error;MSE;Score;Rise 10%-90%;Interval;Plausability;pFalse;"
 strconstant miniOtherStats="Fit Time Before;Fit_Time_After;"
 //strconstant miniFitCoefs="Decay_Time;Offset_Time;y0;Amplitude"
-static constant refract=0.01 // Minimum interval between minis in seconds. 
-static constant miniFitBefore=3 // In ms. Set to approximately the rise time constant.  
-static constant miniFitAfter=9 // In ms. Set to approximately twice the decay time constant.   
 
 #ifdef SQL
 	override constant SQL_=1
@@ -29,6 +26,16 @@ constant fitOffset=25
 #if exists("SQLHighLevelOp") && strlen(functionlist("SQLConnekt",";",""))
 #define SQL
 #endif
+
+function MiniSetting(package,setting)
+	string package,setting
+	
+	dfref df = Core#PackageHome("Minis",package)
+	if(!datafolderrefstatus(df))
+		Core#LoadPackages("Minis",packages=package)
+	endif
+	return Core#VarPackageSetting("Minis",package,"",setting)
+end
 
 // Static functions that replace those found in the Acq package, if it is not present.  
 #ifndef Acq
@@ -127,6 +134,8 @@ end
 function /df GetMinisDF()
 	dfref df=newfolder(minisFolder)
 	string variables
+	variable miniFitBefore = MiniSetting("fitting","before")
+	variable miniFitAfter = MiniSetting("fitting","after")
 	sprintf variables,"currMini=0;fit_before=%f;fit_after=%f",miniFitBefore,miniFitAfter
 	string strings
 	sprintf strings,"channels=%s;",""//GetUsedMiniChannels()
@@ -805,23 +814,21 @@ Function /wave FindMinis(w0[,df,thresh,tStart,tStop,within_median,print_stats,sw
 	variable /g df:net_duration=tStop-tStart
 	nvar /sdfr=df net_duration
 	variable kHz=0.001/dimdelta(w,0)
-	// High-pass
-		//smooth /m=0 100*kHz+1,w_smooth // 100 ms median smoothing (for removal of low frequency components).  
-		resample /rate=10 w_smooth
-		//smooth /b=1 100*kHz+1,w_smooth // 100 ms boxcar smoothing (for removal of low frequency components).  
-		w-=w_smooth(x)
-	// Low-pass
-		resample /rate=1000 w
-		//tac()
-		//resample /rate=(kHz*1000) w
-		//smooth /b=1 2*kHz+1,w // 2 ms box-car smoothing.  
+	resample /rate=10 w_smooth
+	w-=w_smooth(x) // Remove low-frequency changes. 
+	variable med_filter_width = MiniSetting("Detection","med_filter") 
+	smooth /m=0 med_filter_width*kHz,w // Median filter to remove high-frequency artifacts.  
 	make /free/n=(dimsize(w,0)) Peak=0
 	SetScale/P x 0,dimdelta(w,0), Peak
 	Make /o/n=0 df:Locs,df:Vals,df:Index
 	wave /sdfr=df Locs,Vals,Index
-	variable i,rise_time=0.0015 // seconds
+	variable i,rise_time=MiniSetting("detection","delta")
+	rise_time /= 1000 // Convert from ms to s.  
 	duplicate /free w,Jumps
 	Jumps-=w(x-rise_time)
+	duplicate /o jumps,crap
+	variable refract = MiniSetting("Detection","Refractory")
+	refract = refract/1000 // Convert from ms to s.  
 	FindLevels /Q/M=(refract)/EDGE=(thresh > 0 ? 1 : 2) Jumps,thresh; Wave W_FindLevels
 	for(i=0;i<numpnts(W_FindLevels);i+=1)
 		variable loc=W_FindLevels[i]	
@@ -904,8 +911,8 @@ Function ShowMinis([channels])
 		SetWindow ShowMinisWin hook(select)=ShowMinisHook
 		dfref df=GetMinisDF()
 		Variable /G df:currMini=0
-		Variable /G df:fit_before=miniFitBefore
-		Variable /G df:fit_after=miniFitAfter
+		Variable /G df:fit_before=MiniSetting("Fitting","before")
+		Variable /G df:fit_after=MiniSetting("Fitting","after")
 	else
 		DoWindow /F ShowMinisWin
 	endif
