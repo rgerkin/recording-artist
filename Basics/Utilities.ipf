@@ -202,7 +202,7 @@ Function IMD(num)
 	Execute /Q "SetIgorOption IndependentModuleDev="+num2str(num)
 End
 
-function help(str)
+function showhelp(str)
 	string str
 	displayhelptopic str
 end
