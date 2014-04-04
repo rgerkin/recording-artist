@@ -6001,3 +6001,106 @@ Function SynapticAnalysis([win_name])
 
 
 #endif
+
+
+
+
+#pragma rtGlobals=3		// Use modern global access method and strict wave access.
+
+Function SaveMiniWaves([win_name])	
+	string win_name
+	variable i
+	string PathName = ""
+	string Path1
+	prompt PathName, "Path to folder"
+	doprompt "", pathName
+	
+	if (strlen(pathName)==0)
+		newPath/o Path1
+		else
+		newPath/o Path1, PathName
+	endif
+	
+	
+		//These lines magically get the waves you want off the SweepsWin window
+		win_name=selectstring(paramisdefault(win_name),win_name,winname(0,1))
+		string traces = TraceNameList(win_name, ";", 1)
+		
+		for(i=0; i<itemsinList(traces); i+=1)
+			string trace = StringFromList(i,traces)
+			Wave TraceWave=TraceNameToWaveRef(win_name,trace)
+			save/i/p=Path1 TraceWave
+		endfor
+
+
+		
+
+End
+
+Function LoadMinis()
+	string PathName
+	string FileName
+	variable FileIndex
+	prompt pathName, "PathName"
+	doprompt "", pathName
+	 
+	//If no path was specified, prompt for one
+	if(strlen(pathName)==0)
+		newPath/o tempPath
+		pathName= "tempPath"
+	endif
+	
+	do
+		fileName = IndexedFile($PathName, fileIndex, ".ibw")
+			//  break out of loop when there are no more fileNames
+			if (strlen(fileName) == 0)
+				//print fileName
+				break
+			endif	
+			
+		LoadWave/q/o/P=$pathName FileName
+		
+	FileIndex+=1
+	While (1)
+	
+End
+	
+	
+///Mini analysis program from Robyn 12-1-09
+Function miniwavesAG(first,last)
+    variable first, last
+    variable j
+    variable i=first
+    string tempwave, newwave
+    variable fillin
+    variable baselineValue
+    
+    do
+        tempWave = "sweep"+num2str(i)
+      //make new wave so original isn't overwritten.  Will eventually be called "y"+i
+        duplicate/o $tempWave wv1
+     //replace stimulus artifact
+     	fillin = wv1[79]
+     	 wv1[79,1209] = fillin
+     	 //get baseline for subtraction
+   //  	 wavestats /q/r=(1,2) wv1//was this
+   	wavestats/q/r=(1,5) wv1	//Aryn changed 7-31-10
+     	baselineValue = v_avg
+
+    //    j=500
+   //     do   
+            wv1-= baselineValue
+            ///////Just for NOW//////////
+  //          wv1*=-1
+            /////////////////////////
+            
+//           print tempWave
+//            print baselineValue
+            j = j+1
+    //    while(j<=50000)       
+        sprintf newwave, "%s%g", "y",i
+        duplicate/o wv1 $newwave
+        i = i+1
+    while(i<=last)
+End
+	
