@@ -1253,6 +1253,7 @@ function SetAssembler(chan,assembler)
 			string title="StDev"
 			break
 		case "Template":
+		case "PoissonTemplate":
 			err = LoadTemplate(chan,"template")
 			break
 		case "Frozen":
@@ -2184,6 +2185,24 @@ function Template_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 	Stimulus[firstSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	
+	if(pulseNum==pulses-1)
+		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
+		if(waveexists(template))
+			Convolve template,Stimulus
+		endif
+	endif
+end
+
+function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)
+	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
+	variable start=abs(enoise(dimsize(Stimulus,0)))
+	
+	Stimulus[start][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
