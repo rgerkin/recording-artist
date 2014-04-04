@@ -752,6 +752,7 @@ function /s ListPackageInstances(module,package[,editor,saver,match,except,all,q
 	
 	// List all the package instances.  
 	variable i
+	variable generic = IsGenericPackage(module,package)
 	string instances=""
 	dfref manifestDF=PackageManifest(module,package,quiet=quiet,load=load)
 	if(onDisk)
@@ -759,7 +760,7 @@ function /s ListPackageInstances(module,package[,editor,saver,match,except,all,q
 		newpath /o/q/z packagePath,loc
 		if(!v_flag)
 			instances=indexedfile(packagePath,-1,".pxp")
-			instances=replacestring(".pxp;",instances,";")
+			instances=replacestring(".pxp;",instances,"")
 		endif
 	else
 		dfref packageDF=PackageHome(module,package,quiet=quiet,load=load)
@@ -2137,8 +2138,8 @@ Function /S LoadPackage(module,package[,instances,noOverwrite,loadLive,quiet])
 	
 	instances=selectstring(!paramisdefault(instances),ListPackageInstances(module,package,onDisk=1,quiet=1),instances)
 	variable default_=stringmatch(instances,"_default_")
-	variable i,generic=IsGenericPackage(module,package)
-	if(!generic && !strlen(instances)) // Non-generic package; all instances requested.  
+	variable i
+	if(!strlen(instances)) // All instances requested.  
 		string name=Core#CurrProfileName()
 		string path=PackageDiskLocation(module,package,quiet=quiet)
 		if(strlen(path))
@@ -2151,28 +2152,22 @@ Function /S LoadPackage(module,package[,instances,noOverwrite,loadLive,quiet])
 	endif
 	string loaded=""
 	dfref packageDF=PackageHome(module,package,create=1,quiet=quiet)
-	if(!generic)
-		if(!strlen(instances) && !default_)
-			if(!quiet)
+	if(!strlen(instances) && !default_)
+		if(!quiet)
 #ifdef Dev
-				printf "No instances found on disk for package '%s'. Loading from defaults...\r",package
+			printf "No instances found on disk for package '%s'. Loading from defaults...\r",package
 #endif
-			endif
-			loaded=LoadPackageInstance(module,package,"_default_",quiet=quiet)
-		else
 		endif
-		for(i=0;i<ItemsInList(instances);i+=1)
-			string instance=StringFromList(i,instances)
-			dfref instanceDF=InstanceHome(module,package,instance,quiet=1)
-			if(!noOverwrite || datafolderrefstatus(instanceDF))
-				loaded+=LoadPackageInstance(module,package,instance,quiet=quiet)+";"
-			endif
-		endfor
-	elseif(default_)
 		loaded=LoadPackageInstance(module,package,"_default_",quiet=quiet)
-	elseif(!noOverwrite || !datafolderrefstatus(instanceDF))
-		loaded=LoadPackageInstance(module,package,"",quiet=quiet)
+	else
 	endif
+	for(i=0;i<ItemsInList(instances);i+=1)
+		string instance=StringFromList(i,instances)
+		dfref instanceDF=InstanceHome(module,package,instance,quiet=1)
+		if(!noOverwrite || datafolderrefstatus(instanceDF))
+			loaded+=LoadPackageInstance(module,package,instance,quiet=quiet)+";"
+		endif
+	endfor
 	return loaded
 End
 
@@ -2189,56 +2184,55 @@ Function /s LoadPackageInstance(module,package,instance[,quiet,special])
 	variable default_=stringmatch(instance,"_default_")
 	instance=selectstring(default_,instance,DefaultInstance(module,package,forceManifest=1,quiet=quiet))
 	dfref instanceDF=InstanceHome(module,package,instance,create=1,quiet=quiet)
-	variable i,generic=IsGenericPackage(module,package,quiet=quiet)
-	if(!generic) // Non-generic package.  
-		string path=PackageDiskLocation(module,package,default_=default_,create=!default_,quiet=quiet)
-		string search=instance
-	else // Generic package.  
-		path=ModuleDiskLocation(module,default_=default_,create=!default_,quiet=quiet)
-		search=package
-	endif
-	newpath /o/c/q currPath,path
+	variable i,generic=IsGenericPackage(module,package)
+	string search=instance
 	
 	if(default_)
 		dfref manifest=PackageManifest(module,package,quiet=quiet)
-		if(!datafolderrefstatus(manifest))
-			error=-4
-		endif
-		variable loadedFromManifest=!LoadPackageFromManifest(module,package,quiet=quiet)
-		if(!loadedFromManifest && !quiet)
-			printf "Could not load default instance from manifest for package %s\r",package
-		endif
-		string defaultInstance=strvarordefault(getdatafolder(1,manifest)+"defaultInstance","")
-		if(!strlen(defaultInstance))
-			defaultInstance=defaultInstanceName
-		endif
-		newpath /o/q currPath path
-		if(v_flag)
-			if(!quiet)
-				printf "Could not find path for package %s on disk.\r",package
-			endif
-			error=-5
-		else
-			for(i=0;i<itemsinlist(defaultInstance);i+=1)
-				instance=stringfromlist(i,defaultInstance)
-				variable refNum
-				open /r/z/p=currPath refNum as instance+".pxp"
-				if(!v_flag)
-					search=instance
-					variable foundDefault=1
-				elseif(!stringmatch(defaultInstance,defaultInstanceName)) // Don't report or try to load
-					if(!quiet)
-						printf "Instance %s for package %s could not be found on disk.\r",instance,package
-					endif
+		if(!datafolderrefstatus(manifest)) // Manifest not found.  
+			printf "Could not find package manifest for package %s\r", package
+			error = -4
+		else // Manifest found.  
+			variable loadedFromManifest=!LoadPackageFromManifest(module,package,quiet=quiet) // Load default package from manifest.  
+			if(!loadedFromManifest)
+				if(!quiet)
+					printf "Could not load default instance from manifest for package %s\r",package
+					error = -6
 				endif
-			endfor
+			else
+			endif
+//			string defaultInstance=strvarordefault(getdatafolder(1,manifest)+"defaultInstance","")
+//		if(!strlen(defaultInstance))
+//			defaultInstance=defaultInstanceName
+//		endif
+//		string path = ""
+//		if(v_flag)
+//			if(!quiet)
+//				printf "Could not find path for package %s on disk.\r",package
+//			endif
+//			error=-5
+//		else
+//			for(i=0;i<itemsinlist(defaultInstance);i+=1)
+//				instance=stringfromlist(i,defaultInstance)
+//				variable refNum
+//				open /r/z/p=currPath refNum as instance+".pxp"
+//				if(!v_flag)
+//					search=instance
+//					variable foundDefault=1
+//				elseif(!stringmatch(defaultInstance,defaultInstanceName)) // Don't report or try to load
+//					if(!quiet)
+//						printf "Instance %s for package %s could not be found on disk.\r",instance,package
+//					endif
+//				endif
+//			endfor
 		endif
 	else
-		pathinfo currPath
+		string path=PackageDiskLocation(module,package,quiet=quiet)
+		newpath /o/c/q currPath,path
 		string list=IndexedFile(currPath,-1,".pxp")
 		variable foundOnDisk=WhichListItem(search+".pxp",list,";",0,0)>=0
 	endif
-	if(foundDefault || foundOnDisk)
+	if(foundOnDisk)
 		setdatafolder instanceDF
 		LoadData /O/P=currPath /Q/R search+".pxp"
 		if(v_flag>0 && generic)
@@ -2385,28 +2379,17 @@ function CreatePathLocation(diskPath)
 	endfor
 end
 
-function /s PackageDiskLocation(module,package[,default_,create,quiet])
+function /s PackageDiskLocation(module,package[,create,quiet])
 	string module,package
-	variable default_ // The location of the default, with the manifest.   
 	variable create,quiet
 	
-	string path=ModuleDiskLocation(module,default_=default_,create=create,quiet=quiet)
-	variable generic=IsGenericPackage(module,package)
-	string extension=selectstring(generic,"",".pxp")
-	path=joinpath({path,package})+extension
+	string path=ModuleDiskLocation(module,default_=0,create=create,quiet=quiet)
+	path=joinpath({path,package})
 	string err="Could not find disk location for package '%s' at %s.\r"
-	if(!generic)
-		if(create)
-			newpath /o/c/q/z currPath path
-		else
-			newpath /o/q/z currPath path
-			if(v_flag && !quiet)
-				printf err,package,path
-				path = ""
-			endif
-		endif
+	if(create)
+		newpath /o/c/q/z currPath path
 	else
-		getfilefolderinfo /q/z path
+		newpath /o/q/z currPath path
 		if(v_flag && !quiet)
 			printf err,package,path
 			path = ""
@@ -2527,11 +2510,7 @@ function /df InstanceHome(module,package,instance[,sub,create,quiet])
 	strswitch(instance)
 		case "":
 		case "_default_":
-			if(generic)
-				instance=""
-			else
-				instance=DefaultInstance(module,package,quiet=quiet)//defaultInstanceName
-			endif
+			instance=DefaultInstance(module,package,quiet=quiet)//defaultInstanceName
 			break
 	endswitch
 	
@@ -2691,7 +2670,7 @@ function LoadPackageFromManifest(module,package[,sub,quiet])
 	dfref source=PackageManifest(module,package,sub=sub,quiet=quiet)
 	dfref dest=PackageHome(module,package,create=1,sub=sub,quiet=quiet)
 	string destLoc=getdatafolder(1,dest)
-	string instance=selectstring(generic,DefaultInstance(module,package,quiet=quiet),"")
+	string instance=DefaultInstance(module,package,quiet=quiet)
 	destLoc=joinpath({destLoc,instance,sub})
 	NewFolder(destLoc)
 	dest=$destLoc
@@ -2918,12 +2897,12 @@ Function SavePackageInstance(module,package,instance[,special])
 	sprintf path,"%sprofiles:%s:%s",SpecialDirPath("Packages",0,0,0),CurrProfileName(),module
 	NewPath /O/Q/C modulePath,path // In case the module directory does not exist yet.  
 	variable generic=IsGenericPackage(module,package)
-	dfref instanceDF=InstanceHome(module,package,instance)
-	if(!generic)
-		path+=":"+package
+	dfref instanceDF=InstanceHome(module,package,instance)	
+	path+=":"+package
+	if(strlen(instance))
 		string toSave=instance
 	else
-		toSave=package
+		toSave = DefaultInstance(module,package)
 	endif
 	NewPath /O/Q/C currPath,path
 	if(v_flag)

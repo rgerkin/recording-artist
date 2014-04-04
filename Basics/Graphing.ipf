@@ -4123,14 +4123,14 @@ Function GraphMatrix(mat[,dim,subtractMean])
 				AppendToGraph mat[i][]
 				if(subtractMean)
 					MatrixOp /O meann=mean(row(mat,i))
-					ModifyGraph offset[i]={0,-meann}
+					ModifyGraph offset[i]={0,-meann[0]}
 				endif
 				break
 			case 1:
 				AppendToGraph mat[][i]
 				if(subtractMean)
 					MatrixOp /O meann=mean(col(mat,i))
-					ModifyGraph offset[i]={0,-meann}
+					ModifyGraph offset[i]={0,-meann[0]}
 				endif
 				break
 		endswitch

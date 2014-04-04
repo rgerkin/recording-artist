@@ -119,7 +119,7 @@ Function DistanceCovariance(w1,w2[,permute])
 	matrixop /free B_=subtractmean(subtractmean(B,1),2)
 	matrixop /free result=sqrt(mean(A_*B_))
 	
-	return result
+	return result[0]
 End
 
 // http://en.wikipedia.org/wiki/Distance_correlation
@@ -1742,7 +1742,7 @@ Function HRI(wave1,wave2[,segment_duration])
 		Duplicate /o/R=[i*segment_duration,(i+1)*segment_duration-1] waveB,$"waveBsegment"; Wave waveBsegment
 		Corr=StatsCorrelation(waveASegment,waveBSegment)
 		MatrixOp /o Multiplicand=mag(waveASegment-waveBSegment)/(mag(waveASegment)+mag(waveBSegment))
-		TWave[i]=Corr*(1-Multiplicand)
+		TWave[i]=Corr*(1-Multiplicand[0])
 	endfor
 	Variable HRI1=(sum(TWave)^2)/sqrt(num_segments)
 	MatrixOp /o HRI2=sqrt(Frobenius(waveA)*Frobenius(waveB))/sum(mag(waveA-waveB))
@@ -3069,10 +3069,15 @@ Function /S MedianWave(w,bin_size)
 	Make /o/n=(ceil(numpnts(w)*dimdelta(w,0)/bin_size)) $("Median_"+NameOfWave(w))
 	Wave Med=$("Median_"+NameOfWave(w))
 	SetScale /P x,dimoffset(w,0),bin_size,Med
+#if exists("Median")!=3
 	Med=Median(w=w,x1=x-bin_size/2,x2=x+bin_size/2)
+#else
+	Med=Median(w,x-bin_size/2,x+bin_size/2)
+#endif
 	return GetWavesDataFolder(Med,2)
 End
 
+#if exists("Median")!=3
 Function Median([w,x1,x2])
 	Wave w
 	Variable x1,x2
@@ -3090,6 +3095,7 @@ Function Median([w,x1,x2])
 	KillWaves tempMedianWave
 	return result
 End
+#endif
 
 Function Median2(w)
 	Wave w
@@ -4843,4 +4849,11 @@ function covariance(w1,w2)
 	wave w1,w2
 	matrixop /free result = mean(w1*w2) - mean(w1)*mean(w2)
 	return result[0]
+end
+
+function FleshlerHoffman(i,N,p)
+	variable i,N,p
+	
+	variable ti = ((-ln(1-p))^-1) * (1+ln(N)+(N-i)*ln(N-i)-(N-i+1)*ln(N-i+1))
+	return ti
 end

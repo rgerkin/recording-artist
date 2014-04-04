@@ -823,7 +823,7 @@ Function SealTestCollectSweeps(DAQ)
 				String sutterMove=GetUserData("LogPanel","Sutter_Move","")
 				nvar /sdfr=df thresholdCrossed
 				wave /z/sdfr=chanDF Threshold
-				if(!thresholdCrossed && ((WaveExists(Threshold) && inputRes>Threshold) || pressure<0))
+				if(!thresholdCrossed && ((WaveExists(Threshold) && inputRes>Threshold[0]) || pressure<0))
 					//if(StringMatch(sutterMove,"Stop"))
 						Sutter#Stop()
 					//endif

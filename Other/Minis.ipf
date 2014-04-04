@@ -16,12 +16,15 @@ strconstant miniFitCoefs="Rise Time;Decay Time;Offset Time;Baseline;Amplitude;" 
 strconstant miniRankStats="Chi-Squared;Event Size;Event Time;R2;Log(1-R2);Cumul Error;Mean Error;MSE;Score;Rise 10%-90%;Interval;Plausability;pFalse;"
 strconstant miniOtherStats="Fit Time Before;Fit_Time_After;"
 //strconstant miniFitCoefs="Decay_Time;Offset_Time;y0;Amplitude"
+<<<<<<< local
 #ifdef Aryn
 	override constant miniFitBefore=2 // In ms.  
 	override constant miniFitAfter=2 // In ms.  
 #endif
 constant miniFitBefore=6 // In ms.  
 constant miniFitAfter=9 // In ms.  
+=======
+>>>>>>> other
 
 #ifdef SQL
 	override constant SQL_=1
@@ -32,6 +35,16 @@ constant fitOffset=25
 #if exists("SQLHighLevelOp") && strlen(functionlist("SQLConnekt",";",""))
 #define SQL
 #endif
+
+function MiniSetting(package,setting)
+	string package,setting
+	
+	dfref df = Core#PackageHome("Minis",package)
+	if(!datafolderrefstatus(df))
+		Core#LoadPackages("Minis",packages=package)
+	endif
+	return Core#VarPackageSetting("Minis",package,"",setting)
+end
 
 // Static functions that replace those found in the Acq package, if it is not present.  
 #ifndef Acq
@@ -61,11 +74,11 @@ static Function /S MethodList(method)
 	String method
 	
 	Variable i
-	String methods=ListPackageInstances(module,"analysisMethods")
+	String methods=Core#ListPackageInstances(module,"analysisMethods")
 	String matchingMethods=""
 	for(i=0;i<ItemsInList(methods);i+=1)
 		String oneMethod=StringFromList(i,methods)
-		string sourceMethod=StrPackageSetting(module,"analysisMethods",oneMethod,"method")
+		string sourceMethod=Core#StrPackageSetting(module,"analysisMethods",oneMethod,"method")
 		if(stringMatch(sourceMethod,method))
 			matchingMethods+=oneMethod+";"
 		endif
@@ -130,6 +143,8 @@ end
 function /df GetMinisDF()
 	dfref df=newfolder(minisFolder)
 	string variables
+	variable miniFitBefore = MiniSetting("fitting","before")
+	variable miniFitAfter = MiniSetting("fitting","after")
 	sprintf variables,"currMini=0;fit_before=%f;fit_after=%f",miniFitBefore,miniFitAfter
 	string strings
 	sprintf strings,"channels=%s;",""//GetUsedMiniChannels()
@@ -702,11 +717,11 @@ Function MiniScore(Data,Template)
 		MatrixOp /o ScaleWave=(Template.Piece-sum(Template)*sum(Piece)/length)/(Template.Template-sum(Template)*sum(Template)/length)
 		Variable Offset=(sum(Piece)-ScaleWave[0]*sum(Template))/length;
 		//MatrixOp /o Fitted_Template=Template*Scale[0]+Offset;
-    		MatrixOp /o SSE=sumsqr(Piece-Fitted_Template)
+    	MatrixOp /o SSE=sumsqr(Piece-Fitted_Template)
 		Variable Standard_Error=sqrt(SSE[0]/(length-1)) // Should this be -1 or not?  
-		MiniScores[i]=ScaleWave/Standard_Error
-    	endfor
-    	CopyScales /P Data,MiniScores
+		MiniScores[i]=ScaleWave[0]/Standard_Error
+    endfor
+    CopyScales /P Data,MiniScores
 End
 
 Function PlotAllMiniFits(channel)
@@ -808,24 +823,21 @@ Function /wave FindMinis(w0[,df,thresh,tStart,tStop,within_median,print_stats,sw
 	variable /g df:net_duration=tStop-tStart
 	nvar /sdfr=df net_duration
 	variable kHz=0.001/dimdelta(w,0)
-	// High-pass
-		//smooth /m=0 100*kHz+1,w_smooth // 100 ms median smoothing (for removal of low frequency components).  
-		resample /rate=10 w_smooth
-		//smooth /b=1 100*kHz+1,w_smooth // 100 ms boxcar smoothing (for removal of low frequency components).  
-		w-=w_smooth(x)
-	// Low-pass
-		resample /rate=1000 w
-		//tac()
-		//resample /rate=(kHz*1000) w
-		//smooth /b=1 2*kHz+1,w // 2 ms box-car smoothing.  
+	resample /rate=10 w_smooth
+	w-=w_smooth(x) // Remove low-frequency changes. 
+	variable med_filter_width = MiniSetting("Detection","med_filter") 
+	smooth /m=0 med_filter_width*kHz,w // Median filter to remove high-frequency artifacts.  
 	make /free/n=(dimsize(w,0)) Peak=0
 	SetScale/P x 0,dimdelta(w,0), Peak
 	Make /o/n=0 df:Locs,df:Vals,df:Index
 	wave /sdfr=df Locs,Vals,Index
-	variable i,rise_time=0.0015 // seconds
-	variable refract=0.01 // 10 ms minimum interval between minis. 
+	variable i,rise_time=MiniSetting("detection","delta")
+	rise_time /= 1000 // Convert from ms to s.  
 	duplicate /free w,Jumps
 	Jumps-=w(x-rise_time)
+	duplicate /o jumps,$"mini_signal"
+	variable refract = MiniSetting("Detection","Refractory")
+	refract = refract/1000 // Convert from ms to s.  
 	FindLevels /Q/M=(refract)/EDGE=(thresh > 0 ? 1 : 2) Jumps,thresh; Wave W_FindLevels
 	for(i=0;i<numpnts(W_FindLevels);i+=1)
 		variable loc=W_FindLevels[i]	
@@ -908,8 +920,8 @@ Function ShowMinis([channels])
 		SetWindow ShowMinisWin hook(select)=ShowMinisHook
 		dfref df=GetMinisDF()
 		Variable /G df:currMini=0
-		Variable /G df:fit_before=miniFitBefore
-		Variable /G df:fit_after=miniFitAfter
+		Variable /G df:fit_before=MiniSetting("Fitting","before")
+		Variable /G df:fit_after=MiniSetting("Fitting","after")
 	else
 		DoWindow /F ShowMinisWin
 	endif
@@ -1190,9 +1202,10 @@ Function SwitchMiniView(mode)
 	xx+=55
 	GroupBox RejectBox pos={xx,yy-5}, size={122,31}
 	xx+=6
-	Button Reject disable=0, pos={xx,yy}, proc=ShowMinisButtons, title="Reject:"
+	Button Reject disable=0, pos={xx,yy}, proc=ShowMinisButtons, title="\\W401"
 	Button RejectBelow disable=!browse, size={20,20}, proc=ShowMinisButtons, title="<="
 	Button RejectAbove disable=!browse, size={20,20}, proc=ShowMinisButtons, title=">="
+	SetWindow ShowMinisWin userData(lastReject)=""
 	xx+=125
 	Button Locate disable=!browse, size={50,20}, pos={xx,yy}, proc=ShowMinisButtons, title="Locate"
 	
@@ -1243,12 +1256,14 @@ Function SwitchMiniView(mode)
 	Label /Z/W=ShowMinisWin left, "pA"
 End
 
-Function ShowMinisButtons(ctrlName)
-	String ctrlName
+Function ShowMinisButtons(info)
+	Struct WMButtonAction &info
 	
 	dfref df=GetMinisDF()
 	nvar /z/sdfr=df currMini
-	strswitch(ctrlName)
+	variable undo = info.eventMod & 1
+	string rejected = ""
+	strswitch(info.ctrlName)
 		case "FitOneMini":
 			FitMinis(first=currMini,last=currMini)
 			break
@@ -1279,13 +1294,25 @@ Function ShowMinisButtons(ctrlName)
 			AverageMinis()
 			break
 		case "Reject":
-			RejectMini()
+			if(undo)
+				RestoreMinis()
+			else
+				rejected = RejectMini()
+			endif
 			break
 		case "RejectBelow":
-			RejectMinis("Below")
+			if(undo)
+				RestoreMinis()
+			else
+				rejected = RejectMinis("Below")
+			endif
 			break
 		case "RejectAbove":
-			RejectMinis("Above")
+			if(undo)
+				RestoreMinis()
+			else
+				rejected = RejectMinis("Above")
+			endif
 			break
 		case "Summary":
 			MiniSummary()
@@ -1332,6 +1359,9 @@ Function ShowMinisButtons(ctrlName)
 				Checkbox $option_, pos={5,i*25+2}, variable=optionsDF:$option_, title=option, proc=ShowMinisCheckboxes
 			endfor
 	endswitch
+	if(strlen(rejected))
+		SetWindow ShowMinisWin userData(last_rejected)=rejected
+	endif
 End
 
 Function ShowMinisCheckboxes(ctrlName,val)
@@ -2042,14 +2072,17 @@ Function FitMini(num[,channel])//trace)
 End
 
 // Remove the current mini from the graph and delete it, so it doesn't get included in the final analysis.  
-Function RejectMini()
+Function /s RejectMini([undo])
+	variable undo
+	
 	dfref df=GetMinisDF()
 	nvar /z/sdfr=df currMini,traversal_direction
 	if(numtype(currMini))
-		return -1
+		return ""
 	endif
 	RemoveCurrMiniFromGraph()
 	KillMini(currMini)
+	string rejected = num2str(currMini)
 	svar /sdfr=df currChannel
 	variable proxy=GetMinisProxyState()
 	dfref df=GetMinisChannelDF(currChannel)
@@ -2063,6 +2096,7 @@ Function RejectMini()
 	if(stringmatch(mode,"browse"))	
 		GoToMini(currMini)
 	endif
+	return rejected
 End
 
 // Remove the current mini from the graph
@@ -2090,8 +2124,9 @@ Function RemoveCurrMiniFromGraph()
 End
 
 // Same as RejectMini, but for all minis less than the current index (Mini #).  
-Function RejectMinis(direction)
-	String direction
+Function /s RejectMinis(direction)
+	string direction
+	
 	RemoveCurrMiniFromGraph()
 	dfref df=GetMinisDF()
 	nvar /sdfr=df currMini
@@ -2102,11 +2137,13 @@ Function RejectMinis(direction)
 	String channel=S_Value
 	dfref df=GetMinisChannelDF(channel)
 	wave /t/sdfr=df MiniNames
+	string rejected = ""
 	strswitch(direction)
 		case "Below": 
 			for(i=currMini;i>=0;i-=1)
 				GoToMini(i)
 				KillMini(i)
+				rejected += num2str(i)+";"
 			endfor
 			currMini=0
 			break
@@ -2116,12 +2153,14 @@ Function RejectMinis(direction)
 				if(KillMini(i))
 					break
 				endif
+				rejected += num2str(i)+";"
 			endfor
 			currMini=limit(currMini,0,NumMinis(channel)-1)
 			break
 	endswitch
 	
 	GoToMini(currMini)
+	return rejected
 End
 
 Function KillMini(miniNum[,channel,proxy,preserve_loc])
@@ -2185,6 +2224,53 @@ Function KillMini(miniNum[,channel,proxy,preserve_loc])
 		SetVariable CurrMini limits={0,num_minis-1,1}, win=ShowMinisWin
 	endif
 End
+
+function RestoreMinis()
+	ControlInfo /W=ShowMinisWin Channel
+	string channel=S_Value
+	dfref df=GetMinisChannelDF(channel)
+	if(!datafolderrefstatus(df))
+		return -2
+	endif
+	wave /sdfr=df Index
+	
+	string last_rejected = getuserdata("ShowMinisWin","","last_rejected")
+	variable i
+	for(i=0;i<itemsinlist(last_rejected);i+=1)
+		variable restoreMiniNum = str2num(stringfromlist(i,last_rejected))
+		RestoreMini(restoreMiniNum)
+	endfor
+	if(numtype(restoreMiniNum)==0)
+		insertpoints 0,1,Index
+		Index[0] = restoreMiniNum
+		SetWindow ShowMinisWin userData(last_rejected)=removefromlist(num2str(restoreMiniNum),last_rejected)
+	endif
+	
+	Variable num_minis=numpnts(Index)
+	if(wintype("ShowMinisWin"))
+		SetVariable CurrMini limits={0,num_minis-1,1}, win=ShowMinisWin
+	endif
+end
+
+function RestoreMini(miniNum)
+	variable miniNum
+	
+	ControlInfo /W=ShowMinisWin Channel
+	string channel=S_Value
+	dfref df=GetMinisChannelDF(channel)
+	if(!datafolderrefstatus(df))
+		return -2
+	endif
+	wave /sdfr=df Index
+	
+	string last_rejected = getuserdata("ShowMinisWin","","last_rejected")
+	variable restoreMiniNum = str2num(stringfromlist(0,last_rejected))
+	if(numtype(restoreMiniNum)==0)
+		insertpoints 0,1,Index
+		Index[0] = restoreMiniNum
+		SetWindow ShowMinisWin userData(last_rejected)=removefromlist(num2str(restoreMiniNum),last_rejected)
+	endif
+end
 
 Function /S GoToMini(miniNum)
 	variable miniNum

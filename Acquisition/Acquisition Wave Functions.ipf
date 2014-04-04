@@ -1247,31 +1247,19 @@ function SetAssembler(chan,assembler)
 	string daq=Chan2DAQ(chan)
 	string win=DAQ+"_Selector"
 	Core#SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
+	variable err = 0
 	strswitch(assembler)
 		case "Noisy":
 			string title="StDev"
 			break
+		case "Template":
+		case "PoissonTemplate":
+			err = LoadTemplate(chan,"template")
+			break
 		case "Frozen":
 		case "FrozenPlusNegative":
+			err = LoadTemplate(chan,"frozen")
 			title="Multiplier"
-			dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
-			wave /z/sdfr=df Frozen
-			if(!waveexists(Frozen))
-				printf "Could not find a frozen wave in %s.\r",joinpath({getdatafolder(1,df),"Frozen"})
-				LoadWave /O/Q
-				if(v_flag)
-					string name=stringfromlist(0,s_waveNames)
-					if(strlen(name))
-						duplicate /o $name df:Frozen
-						killwaves /z $name
-					endif
-				endif
-				wave /z/sdfr=df Frozen
-				if(!waveexists(Frozen))
-					SetAssembler(chan,"Default")
-					return -1
-				endif
-			endif
 			break
 		case "Optimus2":
 			SweepIndexWindow()
@@ -1279,7 +1267,34 @@ function SetAssembler(chan,assembler)
 			title="\F'Symbol'D\F'Default'Ampl"
 			break
 	endswitch
-	Titlebox Title_dAmpl title=title, win=$win
+	if(!err)
+		Titlebox Title_dAmpl title=title, win=$win
+	endif
+	return err
+end
+
+function LoadTemplate(chan,w_name)
+	variable chan
+	string w_name
+	
+	dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
+	wave /z/sdfr=df w = $w_name
+	if(!waveexists(w))
+		printf "Could not find a %s wave in %s.\r",w_name,joinpath({getdatafolder(1,df),"Frozen"})
+		LoadWave /O/Q
+		if(v_flag)
+			string name=stringfromlist(0,s_waveNames)
+			if(strlen(name))
+				duplicate /o $name df:$w_name
+				killwaves /z $name
+			endif
+		endif
+		wave /z/sdfr=df w = $w_name
+		if(!waveexists(w))
+			SetAssembler(chan,"Default")
+			return -1
+		endif
+	endif
 end
 
 function SetListenHook(hook[,DAQ])
@@ -1701,7 +1716,7 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	endfor
 	
 	// Test pulse.  
-	for(k=0;k<LCM_;k+=1)
+	for(k=0;k<LCM_[chan];k+=1)
 		testPulseApplied=0
 		for(j=0;j<pulseSets;j+=1)
 			if(!paramisdefault(triparity) && mod(j,3)!=triparity)
@@ -2161,6 +2176,41 @@ function AlphaSynapse_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	endif
 end
 
+function Template_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)
+	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
+	Stimulus[firstSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	variable pulses=GetStimParam("Pulses",chan,pulseSet)
+	
+	if(pulseNum==pulses-1)
+		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
+		if(waveexists(template))
+			Convolve template,Stimulus
+		endif
+	endif
+end
+
+function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)
+	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
+	variable start=abs(enoise(dimsize(Stimulus,0)))
+	
+	Stimulus[start][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	variable pulses=GetStimParam("Pulses",chan,pulseSet)
+	if(pulseNum==pulses-1)
+		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
+		if(waveexists(template))
+			Convolve template,Stimulus
+		endif
+	endif
+end
+
 function Noisy_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
 	wave Stimulus
 	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
@@ -2398,12 +2448,12 @@ function DefaultPlusNegative4_stim(Stimulus,chan,firstSample,lastSample,pulseNum
 end
 
 // PSC Noise (alpha-filtered poisson process) as in Galan et al, 2006.  
-Function MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
+Function /wave MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
 	Variable duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz
 	
 	if(rate<0)
 		printf "Rate must be > 0.\r"
-		return 0
+		return NULL
 	endif
 	Variable points=kHz*duration*1000
 	dfref df=Core#PackageHome(module,"stimuli")
@@ -2427,7 +2477,7 @@ Function MakePSCNoise(duration,stepBegin,stepDuration,stepDC,ampl,rate,tau,kHz)
 End
 
 // Alpha-filtered white noise as in Galan et al, 2006.  
-Function MakeAlphaNoise(duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz)
+Function /wave MakeAlphaNoise(duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz)
 	Variable duration,stepBegin,stepDuration,stepDC,ampl,tau,kHz
 	
 	Variable points=kHz*duration*1000

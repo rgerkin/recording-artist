@@ -747,7 +747,7 @@ Function UpdateDrugs()
 	wave /t/sdfr=df name,units,history
 	variable i
 	for(i=0;i<=numpnts(drug);i+=1)
-		if(drug)
+		if(drug[i])
 			drugs+=name[i]+","+num2str(conc[i])+" "+units[i]+";"
 		endif
 	endfor
