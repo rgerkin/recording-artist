@@ -1247,31 +1247,18 @@ function SetAssembler(chan,assembler)
 	string daq=Chan2DAQ(chan)
 	string win=DAQ+"_Selector"
 	Core#SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
+	variable err = 0
 	strswitch(assembler)
 		case "Noisy":
 			string title="StDev"
 			break
+		case "Template":
+			err = LoadTemplate(chan,"template")
+			break
 		case "Frozen":
 		case "FrozenPlusNegative":
+			err = LoadTemplate(chan,"frozen")
 			title="Multiplier"
-			dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
-			wave /z/sdfr=df Frozen
-			if(!waveexists(Frozen))
-				printf "Could not find a frozen wave in %s.\r",joinpath({getdatafolder(1,df),"Frozen"})
-				LoadWave /O/Q
-				if(v_flag)
-					string name=stringfromlist(0,s_waveNames)
-					if(strlen(name))
-						duplicate /o $name df:Frozen
-						killwaves /z $name
-					endif
-				endif
-				wave /z/sdfr=df Frozen
-				if(!waveexists(Frozen))
-					SetAssembler(chan,"Default")
-					return -1
-				endif
-			endif
 			break
 		case "Optimus2":
 			SweepIndexWindow()
@@ -1279,7 +1266,34 @@ function SetAssembler(chan,assembler)
 			title="\F'Symbol'D\F'Default'Ampl"
 			break
 	endswitch
-	Titlebox Title_dAmpl title=title, win=$win
+	if(!err)
+		Titlebox Title_dAmpl title=title, win=$win
+	endif
+	return err
+end
+
+function LoadTemplate(chan,w_name)
+	variable chan
+	string w_name
+	
+	dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
+	wave /z/sdfr=df w = $w_name
+	if(!waveexists(w))
+		printf "Could not find a %s wave in %s.\r",w_name,joinpath({getdatafolder(1,df),"Frozen"})
+		LoadWave /O/Q
+		if(v_flag)
+			string name=stringfromlist(0,s_waveNames)
+			if(strlen(name))
+				duplicate /o $name df:$w_name
+				killwaves /z $name
+			endif
+		endif
+		wave /z/sdfr=df w = $w_name
+		if(!waveexists(w))
+			SetAssembler(chan,"Default")
+			return -1
+		endif
+	endif
 end
 
 function SetListenHook(hook[,DAQ])
@@ -2158,6 +2172,23 @@ function AlphaSynapse_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
 		Convolve AlphaSynapso(1,3,0,50),Stimulus
+	endif
+end
+
+function Template_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)
+	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
+	Stimulus[firstSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	variable pulses=GetStimParam("Pulses",chan,pulseSet)
+	
+	if(pulseNum==pulses-1)
+		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
+		if(waveexists(template))
+			Convolve template,Stimulus
+		endif
 	endif
 end
 
