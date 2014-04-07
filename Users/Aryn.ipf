@@ -40,17 +40,22 @@ function StimulusTable()
 	appendtotable StimulusAmpls_0//,StimulusAmpls_1
 end
 
-function DoIhStuff(chan)
+function IhAnalysis(chan)
 	variable chan
 	
 	variable i,sweepNum
 	variable first = GetCursorSweepNum("A")
 	variable last = GetCursorSweepNum("B")
+	variable sampleRate
 	string list = ""
 	dfref df=Core#InstanceHome("Acq","sweepsWin","win0")
 	wave /sdfr=df SelWave
+	
+	make/o/n=0 VmInitial
+	make/o/n=0 VmFinal
+
 	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
-		if(SelWave[sweepNum][chan] & 16)
+		if(SelWave[sweepNum][chan+1] & 16)
 			variable ampl = GetEffectiveAmpl(chan,sweepNum=sweepNum)
 			wave w = GetChanSweep(chan,sweepNum)
 			string name = "Ih_average_"+num2str(ampl)
@@ -73,15 +78,51 @@ function DoIhStuff(chan)
 		wave avg = $CleanupName(name,0)
 		string the_note = note(avg)
 		avg /= strlen(the_note)
-		colortab2wave rainbow
-		wave m_colors
-		setscale x,0,1,m_colors
-		variable red = m_colors(i/itemsinlist(list))[0]
-		variable green = m_colors(i/itemsinlist(list))[1]
-		variable blue = m_colors(i/itemsinlist(list))[2]
-		appendtograph /c=(red,green,blue) avg
+			SampleRate = deltax(w)
+			SetScale/P x 0,SampleRate,"", avg
+			 
+		appendtograph avg
+	
+		redimension/n=(i+1) VmInitial
+		redimension/n=(i+1) VmFinal
+		
+		wavestats/q/r=(0.5, 0.7) avg
+			VmInitial[i] = v_min
+		wavestats/q/r=(3.3, 3.5) avg
+			VmFinal[i] = v_min	
 	endfor
+		
+		duplicate/o VmInitial Sag
+		Sag-=VmFinal
+		Sag*=-1
+		
+		display Sag vs VmInitial
+			SetAxis left 0,35
+			SetAxis bottom -80,-160
+			ModifyGraph mode=3
+			ModifyGraph marker(Sag)=0			
+		
+		CurveFit/M=2/W=0 line, Sag/X=VmInitial/D
+		wave W_Coef
+		variable SagSlope = W_Coef[1]
+		string SagSlopeString = Num2Str(SagSlope)
+		
+		wavestats/q sag
+		variable SagMax = v_max
+		string SagMaxString = Num2Str(SagMax)
+		
+		TextBox/C/N=text0/F=0/A=LT/Y = -5 "slope = " + SagSlopeString
+		TextBox/C/N=text1/F=0/A=LT "Sag Max = " + SagMaxString
+		
+		make/o/n=2 IhResults
+		IhResults[0] = SagMax
+		IhResults[1] = SagSlope
+		edit IhResults
+				
+
 end
+
+
 
 //This procedure file keeps track of all custom preferences.  In general, these preferences are 
 //user entered parameters in dialog boxes.  Managing preferences this way causes dialog box
@@ -2878,77 +2919,212 @@ End
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 
-Function TestPulseAnalysis()
-	string RinWaveName, RinString, RsSTring, CapString, AvgWaveName, TempName
+//Function TestPulseAnalysis()
+//	string RinWaveName, RinString, RsSTring, CapString, AvgWaveName, TempName
+//	variable voltageStep=-5
+//	variable holding
+//	variable integral, ichange, MinLocation, baseline, avgLate, MinLocPoint
+//	variable numerator, denominator, CapforRS
+//	variable RsPoint, Rs, RinValue, CapValue, tau, RsNew
+//	variable i, V_flag, indexNum
+//	string TPtextName, TPOutputName
+//	string baseName
+//	prompt BaseName, "BaseName"
+//	doprompt "", baseName
+//
+//	make/o/t/n=5 TPtext
+//	make/o/n=5 TPOutput
+//	
+//	TPtext[0] = "Rin"; TPtext[1] = "Capacitance"; TPtext[2] = "Rs"; TPtext[3] = "transient"; TPtext[4] = "holding"
+//	
+//	//make sure cancel button works
+//	if(V_flag)
+//		abort
+//	endif
+//	
+//	AverageTrace()
+//	
+//	make/o/t/n=0 AvgName
+//	//Get avg wave off the graph
+//	do	
+//		redimension/n=(numpnts(AvgName)+1) AvgName
+//		AvgWaveName = WaveName("", i, 1)
+//		AvgName[i]=AvgWaveName
+//		if (strlen(AvgWaveName) == 0)
+//			break
+//		endif
+//	
+//	i += 1
+//	indexNum = i
+//	while(1)
+//	
+//	indexNum-=1
+//
+//		tempName = WaveName("", indexNum, 1)
+//		wave RinWave =  $tempName 		
+//		display RinWave; ModifyGraph rgb=(0,0,0)
+//		
+//	//Calculate Rin
+//		wavestats/q/r=(0.006,0.0097) RinWave
+//			baseline = v_avg
+//			holding = v_avg
+//	//	wavestats/q/r=(0.017, 0.0194) RinWave
+//		wavestats/q/r=(0.027, 0.029) RinWave
+//			avgLate = v_avg
+//		iChange = baseline-avgLate
+//			iChange*=1e3	//convert current from pA to nA
+//			//R = V/I
+//			RinValue = (voltagestep)/(iChange)
+//				RinValue*=-1e6	//convert to MOhms
+//		TPOutput[0] = RinValue
+//	
+////	//Calculate Rs (simple way)
+////		WaveStats/q/r=[98, 107] RinWave
+////			MinLocation=V_minloc	
+////			Rspoint=V_min
+////		//Rs=(V/I)
+////			iChange=(RsPoint-baseline)*1e-9	//calculates change in current and converts to nA
+////			Rs=voltageStep/iChange
+////			Rs/=1e6	//conveerts Rs to MOhms
+//	
+//
+//	//Calculate Capacitance
+//		duplicate/o/r=(0.0099, 0.014) RinWave IntWave			//0.014 for MSNs; 0.0117 for FS or LTS
+//			IntWave-=baseline
+//		Integrate IntWave; integral = IntWave[numpnts(intWave)]
+//			// C=q/V  	
+//			VoltageStep/=-1000	//convert from mV to V
+//			capValue=(Integral/voltagestep)
+//			CapValue*=-1
+//		TPOutput[1] = CapValue
+//		
+//	//Caclulate Rs, independently of transient with tau = RC
+//			WaveStats/q/r=(0.01, 0.0114) RinWave
+//			MinLocation=V_minloc	
+//			MinLocPoint = x2pnt(RinWave, minLocation)
+//			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
+//			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
+//			wave W_coef
+//			tau = W_coef[2]
+//				CapforRs= CapValue
+//				CapforRs*=1e-12
+//			RsNew = tau/CapforRs
+//				RsNew*=1e-6
+//				TPOutput[2] = RsNew
+//				TPOutput[3] = tau
+//				TPOutput[4] = holding
+//				
+//		
+////	//Calculate Rs- resistant to filtering: Rs = (Tau * voltage step) / [(integral)+(Tau * final current)]
+////From Matthew
+////			MinLocPoint = x2pnt(RinWave, minLocation)
+////			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
+////			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
+////			wave W_coef
+////			tau = W_coef[2]
+////			numerator = tau * VoltageStep
+////				iChange*=1e-9		//Current in units of A
+////				integral *=1e-12	//Charge in units of Q/s
+////			denominator = integral + (tau * iChange)
+////			RsNew = numerator/denominator
+////				RsNew*=1e-6 		//Rs in units of MOhms
+////			print "Rs New = ", RsNew, "MOhms"
+//			
+//		
+//			RinString=  num2str (RinValue)
+//			RsString = num2str (RsNew)
+//			CapString = num2str (CapValue)
+//
+//			RinString = "Rin =  "+ RinString + " MOhms"
+//			RsString = "Rs =  " + RsString + " MOhms"
+//			CapString = "Cap = " + CapString + " pF"
+//
+//		TextBox/C/N=text2/F=0/S=3/M/A=RB/Y=20/X=10 CapString
+//		TextBox/C/N=text1/F=0/S=3/M/A=RB/Y=30/X=4 RsString
+//		TextBox/C/N=text0/F=0/S=3/M/A=RB/Y=40/x=2 RinString
+//		
+//		sprintf TPtextName, "%s%s", "TPtext_", baseName
+//			duplicate/o TPtext $TPTextName
+//		sprintf TPOutputName, "%s%s", "TPOutput_", baseName
+//			duplicate/o TPOutput $TPOutputName
+//		
+//		edit $TPtextName, $TPOutputName
+//	
+//End
+
+
+Function TestPulseAnalysis(chan)
+	variable chan
+	
+	variable i,sweepNum
+	variable first = GetCursorSweepNum("A")
+	variable last = GetCursorSweepNum("B")
+	variable sampleRate
+	string list = ""
+	string  RinString, RsSTring, CapString
 	variable voltageStep=-5
 	variable holding
 	variable integral, ichange, MinLocation, baseline, avgLate, MinLocPoint
 	variable numerator, denominator, CapforRS
 	variable RsPoint, Rs, RinValue, CapValue, tau, RsNew
-	variable i, V_flag, indexNum
-	string TPtextName, TPOutputName
-	string baseName
-	prompt BaseName, "BaseName"
-	doprompt "", baseName
-
-	make/o/t/n=5 TPtext
-	make/o/n=5 TPOutput
-	
-	TPtext[0] = "Rin"; TPtext[1] = "Capacitance"; TPtext[2] = "Rs"; TPtext[3] = "transient"; TPtext[4] = "holding"
-	
+	variable  V_flag
+	dfref df=Core#InstanceHome("Acq","sweepsWin","win0")
+	wave /sdfr=df SelWave
+		
 	//make sure cancel button works
 	if(V_flag)
 		abort
 	endif
 	
-	AverageTrace()
+	make/o/t/n=5 TPtext
+	make/o/n=5 TPOutput
 	
-	make/o/t/n=0 AvgName
-	//Get avg wave off the graph
-	do	
-		redimension/n=(numpnts(AvgName)+1) AvgName
-		AvgWaveName = WaveName("", i, 1)
-		AvgName[i]=AvgWaveName
-		if (strlen(AvgWaveName) == 0)
-			break
+	TPtext[0] = "Rin"; TPtext[1] = "Capacitance"; TPtext[2] = "Rs"; 
+	TPtext[3] = "transient"; TPtext[4] = "holding"
+	
+	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
+		if(SelWave[sweepNum][chan+1] & 16)
+			wave w = GetChanSweep(chan,sweepNum)
+			string name = "TP_avg"
+			wave /z avg = $CleanupName(name,0)
+			if(!waveexists(avg) || numpnts(avg)==0)
+				make /o/n=(numpnts(w)) $CleanupName(name,0) /wave=avg=0
+			endif
+			if(whichlistitem(name,list)<0)
+				avg=0
+				note /k avg, ""
+				list += name+";"
+			endif
+			avg += w[p]
+			note /nocr avg, "X"
 		endif
-	
-	i += 1
-	indexNum = i
-	while(1)
-	
-	indexNum-=1
-
-		tempName = WaveName("", indexNum, 1)
-		wave RinWave =  $tempName 		
-		display RinWave; ModifyGraph rgb=(0,0,0)
+	endfor
+	display /k=1
+	for(i=0;i<itemsinlist(list);i+=1)
+		name = stringfromlist(i,list)
+		wave avg = $CleanupName(name,0)
+		string the_note = note(avg)
+		avg /= strlen(the_note)
+			SampleRate = deltax(w)
+			SetScale/P x 0,SampleRate,"", avg
+			 appendtograph avg
+			ModifyGraph rgb=(0,0,0)
+	endfor
 		
 	//Calculate Rin
-		wavestats/q/r=(0.006,0.0097) RinWave
+		wavestats/q/r=(0.01,0.09) avg
 			baseline = v_avg
 			holding = v_avg
-	//	wavestats/q/r=(0.017, 0.0194) RinWave
-		wavestats/q/r=(0.027, 0.029) RinWave
+		wavestats/q/r=(0.18, 0.2) avg
 			avgLate = v_avg
 		iChange = baseline-avgLate
 			iChange*=1e3	//convert current from pA to nA
-			//R = V/I
 			RinValue = (voltagestep)/(iChange)
 				RinValue*=-1e6	//convert to MOhms
 		TPOutput[0] = RinValue
-	
-//	//Calculate Rs (simple way)
-//		WaveStats/q/r=[98, 107] RinWave
-//			MinLocation=V_minloc	
-//			Rspoint=V_min
-//		//Rs=(V/I)
-//			iChange=(RsPoint-baseline)*1e-9	//calculates change in current and converts to nA
-//			Rs=voltageStep/iChange
-//			Rs/=1e6	//conveerts Rs to MOhms
-	
 
 	//Calculate Capacitance
-		duplicate/o/r=(0.0099, 0.014) RinWave IntWave			//0.014 for MSNs; 0.0117 for FS or LTS
+		duplicate/o/r=(0.1, 0.125) avg IntWave			
 			IntWave-=baseline
 		Integrate IntWave; integral = IntWave[numpnts(intWave)]
 			// C=q/V  	
@@ -2957,11 +3133,11 @@ Function TestPulseAnalysis()
 			CapValue*=-1
 		TPOutput[1] = CapValue
 		
-	//Caclulate Rs, independently of transient with tau = RC
-			WaveStats/q/r=(0.01, 0.0114) RinWave
+	//Caclulate Rs, with tau = RC, resistant to filtering
+			WaveStats/q/r=(0.1, 0.125) avg
 			MinLocation=V_minloc	
-			MinLocPoint = x2pnt(RinWave, minLocation)
-			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
+			MinLocPoint = x2pnt(avg, minLocation)
+			duplicate/o/r=[MinLocPoint, 1300] avg TauWave
 			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
 			wave W_coef
 			tau = W_coef[2]
@@ -2970,26 +3146,9 @@ Function TestPulseAnalysis()
 			RsNew = tau/CapforRs
 				RsNew*=1e-6
 				TPOutput[2] = RsNew
-				TPOutput[3] = tau
+				TPOutput[3] = tau*1000
 				TPOutput[4] = holding
 				
-		
-//	//Calculate Rs- resistant to filtering: Rs = (Tau * voltage step) / [(integral)+(Tau * final current)]
-//From Matthew
-//			MinLocPoint = x2pnt(RinWave, minLocation)
-//			duplicate/o/r=[MinLocPoint, 125] RinWave TauWave
-//			CurveFit/q/NTHR=0 exp_XOffset  TauWave /D 
-//			wave W_coef
-//			tau = W_coef[2]
-//			numerator = tau * VoltageStep
-//				iChange*=1e-9		//Current in units of A
-//				integral *=1e-12	//Charge in units of Q/s
-//			denominator = integral + (tau * iChange)
-//			RsNew = numerator/denominator
-//				RsNew*=1e-6 		//Rs in units of MOhms
-//			print "Rs New = ", RsNew, "MOhms"
-			
-		
 			RinString=  num2str (RinValue)
 			RsString = num2str (RsNew)
 			CapString = num2str (CapValue)
@@ -3002,12 +3161,9 @@ Function TestPulseAnalysis()
 		TextBox/C/N=text1/F=0/S=3/M/A=RB/Y=30/X=4 RsString
 		TextBox/C/N=text0/F=0/S=3/M/A=RB/Y=40/x=2 RinString
 		
-		sprintf TPtextName, "%s%s", "TPtext_", baseName
-			duplicate/o TPtext $TPTextName
-		sprintf TPOutputName, "%s%s", "TPOutput_", baseName
-			duplicate/o TPOutput $TPOutputName
+		edit TPtext, TPOutput 
 		
-		edit $TPtextName, $TPOutputName
+		
 	
 End
 
@@ -3676,7 +3832,7 @@ End
 //Note, sampling rate for fast spikes is a bit of an issue- spike times aren't exactly at the peak of each spike.
 Function GraphRate([win_name])
 	string win_name
-	variable threshold = -240
+	variable threshold = -20
 	string RateDisplayName, TimeDisplayName
 	string Name
 	
@@ -3686,6 +3842,7 @@ Function GraphRate([win_name])
 	string traces = TraceNameList(win_name, ";", 1)
 	string trace = StringFromList(0,traces)
 	Wave TraceWave=TraceNameToWaveRef(win_name,trace)
+
 
 	FindSpikeTimesAG(TraceWave, 0, 30, Threshold)
 	
@@ -3711,12 +3868,12 @@ Function SpikeShapeAnalysis([win_name])
 	variable startTime, endTime
 	variable threshold = -35
 	variable trainTime, binLength
-	variable startAnalysis = 1.1
+	variable startAnalysis = 1.0
 	variable EndAnalysis = 2
 	variable APPeak, halfMaxPoint1, halfMaxPoint2, halfMax, halfheight, Apht
 	variable deltaOne, SampleRate
 	variable pnt1, pnt2, numSpikes, AvgRate
-	variable ThreshPnt, APThresh
+	variable ThreshPnt, APThresh, halfLevel
 	variable APwidth, FirstCrossing, SecondCrossing, NumberOfSpikes
 	string SpkName, RateString, CVString, SpikeParametersName, SpikeParamOutputName, avgSpkWvName
 	string SpkTotalName, SpikeTimesName, SpikeRatesName, avgNameWave, nSpikesString
@@ -3725,7 +3882,8 @@ Function SpikeShapeAnalysis([win_name])
 	wave/t spkWaveNames
 	prompt startAnalysis, "Time to start Analysis"
 	prompt baseName, "BaseName"
-	doprompt "", startAnalysis, baseName
+	prompt threshold, "threshold"
+	doprompt "", startAnalysis, baseName, threshold
 	
 	
 //These lines magically get the waves you want off the SweepsWin window
@@ -3736,11 +3894,12 @@ Function SpikeShapeAnalysis([win_name])
 	make/o/n=0 CVwave
 	make/o/n=0 FRwave
 	make/o/n=0 nSpikesWave
+	make/o/n=0 SpikeLatencyWave
 //for loop goes through each wave on graph until there aren't anymore
 	for(j=0;j<ItemsInList(traces);j+=1)
 		string trace = StringFromList(j,traces)
 		Wave TraceWave=TraceNameToWaveRef(win_name,trace)
-		print Trace
+		//print Trace
 		startTime = startanalysis  //resets start and end time to prompted values
 		endTime = endAnalysis  //resets start and end time to prompted values
 			i=0
@@ -3748,7 +3907,7 @@ Function SpikeShapeAnalysis([win_name])
 				startTime = startanalysis  //resets start and end time to prompted values
 				endTime = endAnalysis  //resets start and end time to prompted values
 				FindSpikeTimesAG(TraceWave,startTime,endTime,Threshold)
-				wave spikeIntervals, spikeTimes, spikePeakVoltages, spikeRates
+				wave spikeIntervals, spikeTimes, spikePeakVoltages, spikeRates 	
 			 	startTime = SpikeTimes[0]
 			 	EndTime = SpikeTimes[numpnts(spikeRates)]
 				//save out each spike as individual wave; use constant interval before and after spike
@@ -3772,6 +3931,11 @@ Function SpikeShapeAnalysis([win_name])
 			while (i<numpnts(spikeTimes))
 			//edit spikeintervals, spikerates
 			
+			//Save out time of first spike
+			redimension/n=(j+1) SpikeLatencyWave
+			SpikeLatencyWave[j] = SpikeTimes[0]-1
+			
+		
 			//Calculate CV and firing rate
 			wavestats/q spikeintervals
 				CVvar = (v_sdev / v_avg)
@@ -3786,7 +3950,7 @@ Function SpikeShapeAnalysis([win_name])
 				nSpikesWave[j] = NumberOfSpikes
 		endfor
 		 
-		 edit CVwave, FRwave, nSpikesWave
+		// edit CVwave, FRwave, nSpikesWave, SpikeLatencyWave
 		//calculate avg FR and CV across all traces
 		wavestats/q CVwave
 			variable CVfinal = v_avg
@@ -3799,7 +3963,12 @@ Function SpikeShapeAnalysis([win_name])
 		wavestats/q nSpikesWave
 			variable nSpikesFinal = v_sum
 			nSpikesString = Num2Str(nSpikesFinal)
-			print "Spikes analyzed = ", nSpikesFinal
+			//print "Spikes analyzed = ", nSpikesFinal
+			
+		wavestats/q SpikeLatencyWave
+			variable SpikeLatency = v_avg*1000
+		//	print SpikeLatency
+	
 	
 		//Average spikes together
 		displaymeantrace()
@@ -3816,11 +3985,12 @@ Function SpikeShapeAnalysis([win_name])
 		
 		//Analyze Spike Parameters//////////////////////////////////////////////////////////////////////////////
 		wave AvgSpike =$avgNameWave
-		make/o/t/n=10 SpikeParameters 
+		make/o/t/n=11 SpikeParameters 
 		SpikeParameters[0] = "AP Thresh"; SpikeParameters[1] = "Spike Width"; SpikeParameters[2] = "Half width"; 
 		SpikeParameters[3] = "AHP Vm"; SpikeParameters[4] = "AHP"; SpikeParameters[5] = "PeakVm"; 
-		SpikeParameters[6] = "Spk Ht"; SpikeParameters[7] = "Rate"; SpikeParameters[8] = "CV"; SpikeParameters[9] = "n spikes"
-		make/o/n=10 SpikeParamOutput
+		SpikeParameters[6] = "Spk Ht"; SpikeParameters[7] = "Rate"; SpikeParameters[8] = "CV"; 
+		SpikeParameters[9] = "Spike Latency";SpikeParameters[10] = "n spikes"
+		make/o/n=11 SpikeParamOutput
 		SpikeParamOutput=nan
 		
 		//Find APThreshold by looking at 2nd derivative (when 2nd deriv exceeds 3e8)
@@ -3841,7 +4011,7 @@ Function SpikeShapeAnalysis([win_name])
 			//width
 			findlevel/q/r=(-0.0076, -0.0001)/Edge=1 avgSpike, APThresh
 				FirstCrossing= v_LevelX
-			findlevel/q/r=(0.00026, 0.01)/Edge=2 avgSpike, APThresh
+			findlevel/q/r=(0.00015, 0.0018)/Edge=2 avgSpike, APThresh		//was 0.0076? and 0.01
 				SecondCrossing= v_LevelX
 			APwidth = SecondCrossing-FirstCrossing
 				APwidth*=1000 //convert to ms
@@ -3853,12 +4023,15 @@ Function SpikeShapeAnalysis([win_name])
 				SpikeParamOutput[5] = APpeak	//assign spike peak
 					APht = APpeak - APThresh	//calculate spike height from threshold
 					SpikeParamOutput[6] = APht
-			halfheight =  (APThresh  - APPeak)/2
-			findlevel/q/r=(FirstCrossing, 0) avgSpike, halfheight
+	//	print APThresh, firstcrossing, secondcrossing, APPeak
+			halfheight =  (APThresh  - APPeak)/2*-1; print halfheight, APThresh
+				halfLevel = APThresh+halfheight; print halfLevel
+			findlevel/q/r=(FirstCrossing, 0) avgSpike, halfLevel
 				halfMaxPoint1 = v_levelX
-			findlevel/q/r=(0, SecondCrossing) avgSpike, halfheight
+			findlevel/q/r=(0, SecondCrossing) avgSpike, halfLevel
 				halfMaxPoint2 = v_levelX
 			halfMax = halfMaxPoint2- halfMaxPoint1
+		//	print halfMaxPoint1, halfMaxPoint2
 				halfMAx*=1000 //convert to ms
 			SpikeParamOutput[2]=halfMax
 				
@@ -3875,7 +4048,8 @@ Function SpikeShapeAnalysis([win_name])
 			SpikeParamOutput[6]= APht
 			SpikeParamOutput[7]= FRfinal
 			SpikeParamOutput[8] = CVfinal
-			SpikeParamOutput[9] = k
+			SpikeParamOutput[9] = SpikeLatency
+			SpikeParamOutput[10] = k
 			
 			//give output waves unique names
 			sprintf SpikeParametersName, "%s%s", "SpkParams_", baseName
@@ -3905,9 +4079,211 @@ End
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-Function IFplot([win_name])
+Function IFplot1([win_name])
 	string win_name
 	variable i,j,m,k,h
+	variable istart, iend ///to delete
+	variable startTime =1
+	variable endTime = 2
+	variable VmRest, CurrentStart, CurrentEnd, FRinitial, FRend, ARratio
+	string cmdString, RateDisplayName, TimeDisplayName
+	wave/t istepsWaves_w
+	string baseName, IFPlotOutputName, IFPlotDataName
+	variable threshold = -20
+	variable hypNum, RateNum
+	variable FRvar, InputCurrent
+	variable count
+	variable curr_sweep = GetCurrSweep() // Current sweep number. 
+	variable num_channels = GetNumChannels() // Number of channels. 
+	string FRWaveName, InputCurrentWaveName , InputValue, ARratioName
+	wave StimulusAmpls_0
+	prompt baseName, "baseName"
+	prompt threshold, "threshold"
+	doprompt "Select wave range istepsanalysis", baseName, threshold
+
+	if (waveExists(StimulusAmpls_0)==0)
+		StimulusTable()
+	Endif
+	
+	//make sure function cancels
+	if(V_flag)
+		abort
+	endif
+		
+	//waves to hold info 
+	make/o/n=0 FRwave
+	make/o/n=0 InputCurrentWave
+	make/o/n=0 FirstHundred
+	make/o/n=0 LastHundred
+	make/o/n=0 ARratioWave
+	
+	//output waves
+	make/o/t/n=12 IFplotOutput
+	IFplotOutput[0] = "maxFR"
+	IFplotOutput[1] = "Rheobase"
+	IFplotOutput[2] = "Input Range"
+	IFplotOutput[3] = "Cell attached rate"
+	IFPlotOutput[4] = "Cell attached CV"
+	IFplotOutput[5] = "tau_fast"
+	IFplotOutput[6] = "tau_slow"
+	IFplotOutput[7] = "Linear slope"
+	IFplotOutput[8] = "Adaptation 50 Hz"
+	IFplotOutput[9] = "Adaptation 150 Hz"
+	IFplotOutput[10] = "Adaptation 250 Hz"
+	IFPlotOutput[11] = "Vm rest"
+	
+	make/o/n=12 IFPlotData
+	IFPlotData = nan
+	
+	//These lines magically get the waves you want off the SweepsWin window
+	win_name=selectstring(paramisdefault(win_name),win_name,winname(0,1))
+	string traces = TraceNameList(win_name, ";", 1)
+	
+	//for loop goes through each wave on graph until there aren't anymore
+	for(i=0;i<ItemsInList(traces);i+=1)
+		string Trace =  stringfromlist(i,traces)
+		Wave TraceWave=TraceNameToWaveRef(win_name,trace)
+		string labell = getwavesdatafolder(TraceWave,0)
+		variable chan = GetLabelChan(labell)
+		variable sweepNum
+		sscanf nameofwave(traceWave),"sweep%d",sweepNum
+		InputCurrent = GetEffectiveAmpl(chan,sweepNum=sweepNum)
+		variable strLength = strlen(Trace)
+			if (strLength >=12)	
+				 InputValue = Trace[12,strLength]
+			else
+				 InputValue = Trace[5, strLength]
+			endif
+		variable SweepPoint = str2num(inputValue); //print SweepPoint
+			if (SweepPoint == nan)	//Catch times when sweep number is not read correctly...but doesn't actually work
+				print "Couldn't find number of sweep"
+				abort
+			endif	
+		InputCurrent =  StimulusAmpls_0[SweepPoint]
+			redimension/n=(i+1) InputCurrentWave
+			InputCurrentWave[i] = InputCurrent
+		FindSpikeTimesAG(TraceWave, startTime, endTime, Threshold)
+		wave spikeRates, spikeTimes
+			//gets avg Vm if no spikes
+			if (numpnts(SpikeRates)<1)
+				wavestats/q TraceWave
+				IFPlotData[11] = v_avg
+			endif
+		if (numpnts(SpikeRates)>0)
+		//Finds the average firing rate across the whole second
+			wavestats/q spikeRates
+			FRvar = v_avg
+			redimension/n=(i+1) FRwave
+			FRwave[i] =FRvar
+		//Finds the adaptation ratio
+		for (j=0; j<(numpnts(spikeTimes)); j+=1)
+			if (SpikeTimes[j] > 1 && SpikeTimes[j]  < 1.1)
+				redimension/n=(k+1) FirstHundred
+				FirstHundred[k] = SpikeRates[j]
+				k+=1
+			endif
+			if (SpikeTimes[j] > 1.9 && SpikeTimes[j] <2)
+				redimension/n=(m+1) LastHundred
+				LastHundred[m] = SpikeRates[j-1]
+				m+=1
+			endif
+		endfor				
+			//EDIT FIRSTHUNDRED, LASTHUNDRED
+				if (numpnts(FirstHundred)>0)
+					wavestats/q FirstHundred
+					FRinitial = v_avg
+					else
+					FRinitial = nan
+					print "for ", Trace, " trace, not enough spikes for adaptation"
+				endif
+				if (numpnts(LastHundred)>0)
+					wavestats/q LastHundred
+					FRend = v_avg
+					else
+					FRend = nan
+					print "for ", j, " trace, not enough spikes for adaptation"
+				endif
+			//Calculate adaptation ratio
+					ARratio = FRend / FRinitial
+					redimension/n=(i+1) ARratioWave
+					ARratioWave[i] = ARratio
+	endif
+		endfor
+	
+	//Create IF plot
+	sprintf FRWaveName, "%s%s", "FR_", baseName
+		duplicate/o FRWave $FRWaveName
+	sprintf InputCurrentWaveName, "%s%s", "Current_", baseName
+		duplicate/o InputCurrentWave $InputCurrentWaveName
+	display $FRwaveName vs $InputCurrentWaveName
+		ModifyGraph mode=4,marker=19
+		
+	//Create adatpation ratio graph
+	sprintf ARratioName, "%s%s", "Adapt_", baseName
+		duplicate/o ARratioWave $ARratioName
+	display $ARratioName vs $FRWaveName
+		ModifyGraph mode=4,marker=19
+		SetAxis left 0.5,1
+		
+	//Get max FR
+	variable pntsFRWave = numpnts(FRWave)
+	IFPlotdata[0]= FRWave[pntsFRWave]
+	
+	//Get Rheobase
+	extract/o/indx FRWave,tempWave,FRWave!=0
+	variable RheoPost = tempWave[0]
+	IFPlotdata[1] = InputCurrentWave[RheoPost-1]; print IFPlotdata[1]
+	
+	//Get dynamic input range
+	IFPlotdata [2] = InputCurrentWave[pntsFRWave] -IFPlotdata[1]
+	
+	//Get fits to I-F plot
+	CurveFit/q/M=2/W=0 dblexp_XOffset,FRWave/X=InputCurrentWave/D
+		wave W_Coef
+		variable FastTau = W_coef[4]
+		variable SlowTau = W_Coef[2]
+		IFPlotdata[5] = FastTau
+		IFplotData[6] = SlowTau
+		
+	//Adaptation at different firing rates
+	for(h=0;h<numpnts(FRWave);h+=1)
+		if (FRWave[h]>30&&FRWave[h] <70)	//AR for ~50 Hz
+			IFPlotData[8] = ARRatioWave[h]
+		endif
+		if (FRWave[h]>120&&FRWave[h] <180)	//AR for ~150 Hz
+			IFPlotData[9] = ARRatioWave[h]
+		endif
+		if (FRWave[h]>200&&FRWave[h] <260)	//AR for ~250 Hz
+			IFPlotData[10] = ARRatioWave[h]
+		endif
+	endfor
+		
+	sprintf IFPlotOutputName, "%s%s", "IFOutput_", baseName
+		duplicate/o IFPlotOutput $IFPlotOutputName
+	sprintf IFPlotDataName, "%s%s", "IFData_", baseName
+		duplicate/o IFPlotData $IFPlotDataName
+	
+	edit $IFPlotOutputName, $IFPlotDataName
+//	edit  IFPlotOutput, IFPlotData
+		
+
+
+End
+
+Function IFplot(chan)
+	variable chan
+	
+	variable i,sweepNum
+	variable first = GetCursorSweepNum("A")
+	variable last = GetCursorSweepNum("B")
+	string list = ""
+	dfref df=Core#InstanceHome("Acq","sweepsWin","win0")
+	wave /sdfr=df SelWave
+	
+	
+	
+	string win_name
+	variable j,m,k,h
 	variable istart, iend ///to delete
 	variable startTime =1
 	variable endTime = 2
@@ -3959,74 +4335,61 @@ Function IFplot([win_name])
 	make/o/n=11 IFPlotData
 	IFPlotData = nan
 	
-	//These lines magically get the waves you want off the SweepsWin window
-	win_name=selectstring(paramisdefault(win_name),win_name,winname(0,1))
-	string traces = TraceNameList(win_name, ";", 1)
 	
-	//for loop goes through each wave on graph until there aren't anymore
-	for(i=0;i<ItemsInList(traces);i+=1)
-		string Trace =  stringfromlist(i,traces)
-		Wave TraceWave=TraceNameToWaveRef(win_name,trace)
-		string labell = getwavesdatafolder(TraceWave,0)
-		variable chan = GetLabelChan(labell)
-		variable sweepNum
-		sscanf nameofwave(traceWave),"sweep%d",sweepNum
-		InputCurrent = GetEffectiveAmpl(chan,sweepNum=sweepNum)
-		variable strLength = strlen(Trace)
-			if (strLength >=12)	
-				 InputValue = Trace[12,strLength]
-			else
-				 InputValue = Trace[5, strLength]
-			endif
-		variable SweepPoint = str2num(inputValue); //print SweepPoint
-			if (SweepPoint == nan)	//Catch times when sweep number is not read correctly...but doesn't actually work
-				print "Couldn't find number of sweep"
-				abort
-			endif	
-		InputCurrent =  StimulusAmpls_0[SweepPoint]
+	//These lines get wave off the graph and the current input associated with each wave
+	for(sweepNum=first;sweepNum<=last;sweepNum+=1)
+		if(SelWave[sweepNum][chan] & 16)
+			InputCurrent = GetEffectiveAmpl(chan,sweepNum=sweepNum)
+			wave TraceWave = GetChanSweep(chan,sweepNum)
 			redimension/n=(i+1) InputCurrentWave
 			InputCurrentWave[i] = InputCurrent
-		FindSpikeTimesAG(TraceWave, startTime, endTime, Threshold)
-		wave spikeRates, spikeTimes;// edit spikeRates, SpikeTimes
-		//Finds the average firing rate across the whole second
+			
+			FindSpikeTimesAG(TraceWave, startTime, endTime, Threshold)
+			wave spikeRates, spikeTimes
+			
+			//Finds the average firing rate across the whole second
+		if (SpikeRates > 0)
 			wavestats/q spikeRates
 			FRvar = v_avg
 			redimension/n=(i+1) FRwave
 			FRwave[i] =FRvar
-		//Finds the adaptation ratio
-		for (j=0; j<(numpnts(spikeTimes)); j+=1)
-			if (SpikeTimes[j] > 1 && SpikeTimes[j]  < 1.1)
-				redimension/n=(k+1) FirstHundred
-				FirstHundred[k] = SpikeRates[j]
-				k+=1
-			endif
-			if (SpikeTimes[j] > 1.9 && SpikeTimes[j] <2)
-				redimension/n=(m+1) LastHundred
-				LastHundred[m] = SpikeRates[j-1]
-				m+=1
-			endif
-		endfor				
-				if (numpnts(FirstHundred)>0)
+			
+			//Finds the adaptation ratio
+			for (j=0; j<(numpnts(spikeTimes)); j+=1)
+				if (SpikeTimes[j] > 1 && SpikeTimes[j]  < 1.1)
+					redimension/n=(k+1) FirstHundred
+					FirstHundred[k] = SpikeRates[j]
+					k+=1
+					endif
+				if (SpikeTimes[j] > 1.9 && SpikeTimes[j] <2)
+					redimension/n=(m+1) LastHundred
+					LastHundred[m] = SpikeRates[j-1]
+					m+=1
+					endif
+			endfor
+			if (numpnts(FirstHundred)>0)
 					wavestats/q FirstHundred
 					FRinitial = v_avg
 					else
 					FRinitial = nan
-					print "for ", Trace, " trace, not enough spikes for adaptation"
+					print "sweep", SweepNum, ", not enough spikes for initial adaptation"
 				endif
 				if (numpnts(LastHundred)>0)
 					wavestats/q LastHundred
 					FRend = v_avg
 					else
 					FRend = nan
-					print "for ", j, " trace, not enough spikes for adaptation"
-				endif
-			//Calculate adaptation ratio
-				//	print "FR end = ", FRend
-				//	print "FRinitial = ", FRinitial
-					ARratio = FRend / FRinitial
-					redimension/n=(i+1) ARratioWave
-					ARratioWave[i] = ARratio
-		endfor
+					print "sweep", SweepNum, ", not enough spikes for end adaptation"
+					endif
+			//Calculate the Adaptation ratio
+			ARratio = FRend / FRinitial
+			redimension/n=(i+1) ARratioWave
+			ARratioWave[i] = ARratio
+			endif
+		
+			i+=1
+		endif
+	endfor
 	
 	//Create IF plot
 	sprintf FRWaveName, "%s%s", "FR_", baseName
@@ -4048,20 +4411,12 @@ Function IFplot([win_name])
 	IFPlotdata[0]= FRWave[pntsFRWave]
 	
 	//Get Rheobase
-	if (FRWave[0] ==0)
-		if (FRWave[1]==0)
-			if (FRWave[2]==0)
-				IFPlotdata[1] = InputCurrentWave[3]
-			endif
-			IFPlotdata[1] = InputCurrentWave[2]
-		endif
-		IFPlotdata[1]=  InputCurrentWave[1]
-	else
-		IFPlotdata[1] = InputCurrentWave[0]
-	endif
-	
+	extract/o/indx FRWave,tempWave,FRWave!=0
+	variable RheoPost = tempWave[0]
+	IFPlotdata[1] = InputCurrentWave[RheoPost-1]; print IFPlotdata[1]
+
 	//Get dynamic input range
-	IFPlotdata [2] = InputCurrentWave[pntsFRWave] - InputCurrentWave[0]
+	IFPlotdata [2] = InputCurrentWave[pntsFRWave] - InputCurrentWave[RheoPost]
 	
 	//Get fits to I-F plot
 	CurveFit/q/M=2/W=0 dblexp_XOffset,FRWave/X=InputCurrentWave/D
@@ -4090,130 +4445,10 @@ Function IFplot([win_name])
 		duplicate/o IFPlotData $IFPlotDataName
 	
 	edit $IFPlotOutputName, $IFPlotDataName
-//	edit  IFPlotOutput, IFPlotData
-		
 
-
-		
-
-		
-		
-
-	
-	
-	abort
-	
-
-		
-	
-			
-
-
-	do
-		wave wv1 = $istepsWaves_w[i]
-			FindSpikeTimesAG(wv1, 0.05, 0.5, Threshold)
-			wave SpikeTimes
-			wave SpikeRates
-			
-			if (numpnts(SpikeTimes)>=1)
-				wavestats/q spikeRates		//this is where the error is
-				redimension/n=(numpnts(RateResponse)+1) RateResponse
-				redimension/n=(numpnts(istepsDisplay2)+1) istepsDisplay2
-			//	RateResponse[RateNum] = v_avg
-				RateNum+=1
-				wavestats/q/r=(0.05, 0.5) wv1
-				redimension/n=(numpnts(hypResponse)+1) hypResponse
-				redimension/n=(numpnts(istepsDisplay1)+1) istepsDisplay1
-			//	hypResponse[hypNum] = v_avg
-				hypNum+=1
-			//	istepsDisplay2[RateNum] = istepsValues[i]
-			//	istepsDisplay1[hypNum] = istepsValues[i]
-			endif
-				//make adaptation graph
-				dowindow/F AdaptationGraph
-					sprintf RateDisplayName "%s%g", "Rates_", i 
-						duplicate/o SpikeRates $RateDisplayName
-					sprintf  TimeDisplayName "%s%g", "Times_", i 
-						duplicate/o SpikeTimes $TimeDisplayName
-				appendtograph $RateDisplayName vs $TimeDisplayName
-				ModifyGraph mode=3,marker=19,msize=2,rgb=(0,0,0)
-				SetAxis bottom 0,0.6
-	
-
-		count+=1
-		i+=1
-		while (i<=iend)
-
-	//display the FR vs input graph and do linear fit to measure gain				
-		display RateResponse vs istepsDisplay2
-			ModifyGraph mode=4,marker=19,msize=3
-			ModifyGraph msize=4,rgb=(0,0,0)
-			label left "Firing Rate (Hz)"; label bottom "Input (pA)"
-			CurveFit/q/NTHR=0 line  rateresponse /X=istepsdisplay2 /D 
-			variable gain
-		//	gain = w_coef[1]*1000
-			
-	//Find the slope of positive current injections
-	CurveFit/q/NTHR=0 line  hypResponse[3,(i)] /X=istepsDisplay1 /D 
-	variable PosSlope
-	//PosSlope =W_coef[1]
-	
-	//Calculate rectification (NegSlope / PosSlope)
-		variable rectification
-	//	rectification = (NegSlope / PosSlope)
-		
-	//Find maxFR 
-	variable maxFR
-	variable numRateResponse
-	numRateResponse = numpnts(RateResponse)
-//	maxFR = RateResponse[numRateResponse]
-	
-	//Find rheobase
-	variable instFR
-	variable rheobase
-	variable p
-		do
-//		instFR = RateResponse[p]
-			if (instFR>0)
-//			print rateresponse[p]
-//				rheobase = istepsDisplay2[p]
-				break
-			endif
-		while (i<numpnts(rateresponse))
-		
-
-//Create wave to store output
-	wave istepsValues
-	make/o/n=0 hypResponse
-	make/o/n=0 RateResponse
-	make/o/n=0 istepsDisplay1
-	make/o/n=0 istepsDisplay2
-	make/o/n=100 VmWave; VmWave=nan
-	
-	make/o/n=7 OutputWave
-	make/o/t/n=7 OutputWaveTitle
-	
-	OutputWaveTitle[0] = "Vm rest"
-	OutputWaveTitle[1] = "HypSlope"
-	OutputWaveTitle[2] = "PosSlope"
-	OutputWaveTitle [3] = "rectification"
-	OutputWaveTitle[4 ] = "Gain"
-	OutputWaveTitle[5] = "maxFR"
-	OutputwaveTitle[6] = "rheobase"
-			
-	//Creat table withoutput values
-	edit OutputWaveTitle, Outputwave
-	
-	OutputWave[0] = VmRest
-//	OutputWave[1] = NegSlope
-	OutputWave[2] = PosSlope
-	OutputWave[3] = rectification
-	OutputWave[4] = Gain
-	OutputWave[5] = maxFR
-	OutputWave[6] = rheobase
-			
 
 End
+
 
 
 Function Plateau()
@@ -5539,6 +5774,7 @@ Function FindSpikeTimesSmoothed(w, startTime, endTime, thresh, minSpikeWidth, mi
 		DoAlert 0, "Given range for FindSpikes has zero or negative size"
 	endif
 	
+	
 	Variable primed = 0 // assures that no partial spikes will be picked up at the beginning of the detection window.
 	Variable spikeStartTime = startPoint
 	for(i=startPoint; i<endPoint; i+=1)
@@ -5826,12 +6062,14 @@ Function AttachedFR([win_name])
 	variable i
 	variable startTime = 0.5
 	variable endTime = 5
-	variable attFR, attCV
+	variable attFR, attCV, recordMode
 	prompt threshold, "threshold"
+	prompt RecordMode, "0=Cell attached; 1=Whole Cell"
 	prompt startTime, "start time"
 	prompt endTime, "end time"
+
 	
-	doprompt "", threshold, startTime, EndTime
+	doprompt "", threshold, RecordMode, startTime, EndTime
 	
 	make/o/n=0 attFRWave
 	make/o/n=0 attCVwave
@@ -5846,7 +6084,9 @@ Function AttachedFR([win_name])
 		Wave TraceWave=TraceNameToWaveRef(win_name,trace)
 		
 		duplicate/o TraceWave TempWave
-			TempWave*=-1
+			If (RecordMode==0)
+				TempWave*=-1
+			endif
 		
 		FindSpikeTimesAG(TempWave, startTime, endTime, Threshold)
 		wave spikeRates, spikeIntervals;// edit spikeRates, SpikeTimes
@@ -5868,6 +6108,7 @@ Function AttachedFR([win_name])
 		wavestats/q attCVwave
 			variable extraCellCV = v_avg
 			print "cell attached CV = ", extraCellCV
+			
 	
 End
 
@@ -5914,7 +6155,6 @@ End
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-Function SynapticAnalysis([win_name])
 	string win_name
 	variable deltaOne, SampleRate
 	variable fit, W_coef0, W_coef1, W_coef2, W_fitconstant,x
@@ -5927,16 +6167,13 @@ Function SynapticAnalysis([win_name])
 	string AvgDecayStr, AvgAmpStr
 	string ipscAmpName, ipscDecayName
 	string ipscStatsWaveName, ipscStatsName
-	wave w_coef
 	prompt baseName, "baseName"
 	doprompt "", baseName
 	
 	//make sure function cancels
 	if(V_flag)
-		abort
 	endif
 	
-	//waves for individual traces
 	make/o/n=0 ipscAmp
 	make/o/n=0 ipscdecay
 		
@@ -5945,7 +6182,6 @@ Function SynapticAnalysis([win_name])
 	string traces = TraceNameList(win_name, ";", 1)
 	string firsttrace =  stringfromlist(0,traces)
 	
-	for(i=0; i<itemsinList(traces); i+=1)
 		string trace = StringFromList(i,traces)
 		Wave TraceWave=TraceNameToWaveRef(win_name,trace)			
 		//Amplitude
@@ -5965,7 +6201,6 @@ Function SynapticAnalysis([win_name])
 
 		endfor
 	
-	edit ipscamp, ipscdecay
 
 	wave/t ipscstats
 	if (waveexists(ipscstats)==0)

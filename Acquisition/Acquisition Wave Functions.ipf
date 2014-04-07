@@ -1256,7 +1256,16 @@ function SetAssembler(chan,assembler)
 	string win=DAQ+"_Selector"
 	Core#SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
 	variable err = 0
+	string ampl_title="Ampl"
+	string dAmpl_title="\F'Symbol'D\F'Default'Ampl"
 	strswitch(assembler)
+		case "Ramp":
+			ampl_title="Min"
+			dAmpl_title="Max"
+			break
+		case "Sine":
+			dAmpl_title="Freq"
+			break
 		case "Noisy":
 			string title="StDev"
 			break
@@ -1615,7 +1624,10 @@ function /wave GetLivePulseSets(chan[,sweepNum])
 	
 	wave divisor = GetChanDivisor(chan,sweepNum=sweepNum)
 	wave remainder = GetChanRemainder(chan,sweepNum=sweepNum)
-	make /free/n=(numpnts(divisor)) pulseSetState = (divisor[p]==1 || 2^mod(sweepNum,divisor[p]) & remainder[p])
+	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(divisor[p],sweepNum) & remainder[p]
+	if(numpnts(divisor)==1)
+		pulseSetState = 1
+	endif
 	extract /free/indx pulseSetState,livePulseSets,pulseSetState>0
 	return livePulseSets
 end
@@ -2278,6 +2290,35 @@ function PoissonAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	endif
 end
 
+//sin function added by AG 3-21-13
+function Sine_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable freq=GetStimParam("dAmpl",chan,pulseSet)		//Set frequency (Hz)
+	variable ampl=GetStimParam("Ampl",chan,pulseSet)		//Set amplitude
+	variable kHz=GetKHz(MasterDAQ())
+	variable start = firstSample/(1000*kHz)
+	
+	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+= ampl * sin(2*pi*(x-start)*freq)
+end
+
+//sin function added by AG 3-21-13
+function Ramp_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
+	
+	variable amplEnd=GetStimParam("dAmpl",chan,pulseSet)		//Set frequency (Hz)
+	variable amplStart=GetStimParam("Ampl",chan,pulseSet)		//Set amplitude
+	variable kHz=GetKHz(MasterDAQ())
+	variable start = firstSample/(1000*kHz)
+	variable width = (lastSample-firstSample+1)/(1000*kHz)
+	variable slope = (amplEnd-amplStart)/width
+	
+	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+= amplStart + slope*(x-start)
+end
+
+#ifndef Aryn
 function Optimus1_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity)
 	wave Stimulus
 	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
