@@ -760,7 +760,7 @@ function /s ListPackageInstances(module,package[,editor,saver,match,except,all,q
 		newpath /o/q/z packagePath,loc
 		if(!v_flag)
 			instances=indexedfile(packagePath,-1,".pxp")
-			instances=replacestring(".pxp;",instances,"")
+			instances=replacestring(".pxp;",instances,";")
 		endif
 	else
 		dfref packageDF=PackageHome(module,package,quiet=quiet,load=load)
