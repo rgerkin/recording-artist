@@ -16,15 +16,6 @@ strconstant miniFitCoefs="Rise Time;Decay Time;Offset Time;Baseline;Amplitude;" 
 strconstant miniRankStats="Chi-Squared;Event Size;Event Time;R2;Log(1-R2);Cumul Error;Mean Error;MSE;Score;Rise 10%-90%;Interval;Plausability;pFalse;"
 strconstant miniOtherStats="Fit Time Before;Fit_Time_After;"
 //strconstant miniFitCoefs="Decay_Time;Offset_Time;y0;Amplitude"
-<<<<<<< local
-#ifdef Aryn
-	override constant miniFitBefore=2 // In ms.  
-	override constant miniFitAfter=2 // In ms.  
-#endif
-constant miniFitBefore=6 // In ms.  
-constant miniFitAfter=9 // In ms.  
-=======
->>>>>>> other
 
 #ifdef SQL
 	override constant SQL_=1
