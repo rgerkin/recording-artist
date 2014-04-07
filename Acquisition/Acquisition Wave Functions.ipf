@@ -454,10 +454,11 @@ Function ADC2Chan(adc)
 	string adc
 	
 	variable i,numChannels=GetNumChannels()
-	make /free/t/n=(numChannels) InputMap
-	for(i=0;i<numChannels;i+=1)
-		InputMap[i]=Core#StrPackageSetting(module,"channelConfigs",GetChanName(i),"inputMap")
-	endfor
+	wave InputMap = GetInputMap()
+	//make /free/t/n=(numChannels) InputMap
+	//for(i=0;i<numChannels;i+=1)
+	//	InputMap[i]=Core#StrPackageSetting(module,"channelConfigs",GetChanName(i),"inputMap")
+	//endfor
 	findvalue /text=adc /txop=4 InputMap
 	if(v_value>=0)
 		return v_value
@@ -471,10 +472,11 @@ Function DAC2Chan(dac)
 	string dac
 	
 	variable i,numChannels=GetNumChannels()
-	make /free/t/n=(numChannels) OutputMap
-	for(i=0;i<numChannels;i+=1)
-		OutputMap[i]=Core#StrPackageSetting(module,"channelConfigs",GetChanName(i),"OutputMap")
-	endfor
+	wave OutputMap = GetOutputMap()
+	//make /free/t/n=(numChannels) OutputMap
+	//for(i=0;i<numChannels;i+=1)
+	//	OutputMap[i]=Core#StrPackageSetting(module,"channelConfigs",GetChanName(i),"OutputMap")
+	//endfor
 	findvalue /text=dac /txop=4 OutputMap
 	if(v_value>=0)
 		return v_value
@@ -1113,7 +1115,7 @@ Function SetAcqMode(mode,chan)
 	string win=DAQ+"_Selector"
 	
 	if(IsDynamicClamp(mode)) // Set dynamic clamp.  
-		if(!stringmatch(DAQ,"ITC"))
+		if(!stringmatch(DAQType(DAQ),"ITC"))
 			PopupMenu $("Mode_"+num2str(chan)) mode=WhichListItem(oldMode,modes)+1
 			return -2
 			DoAlert 0,"Dynamic clamp is only supported on ITC devices."
@@ -1142,6 +1144,9 @@ Function SetAcqMode(mode,chan)
 	
 	if(WhichListItem(mode,modes)>=0) // Existing mode.  
 		Core#SetPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",mode)
+		if(IsDynamicClamp(mode))
+			SetupDynamicClamp(DAQs=DAQ)
+		endif
 		SwitchView("")
 	else
 		AcqModeDefaults(mode) // Set values for input resistance measurement, access resistance measurements, etc.  
@@ -1155,6 +1160,7 @@ Function GetAcqFreq([DAQ])
 	string DAQ
 	
 	DAQ=selectstring(paramisdefault(DAQ),DAQ,MasterDAQ())
+	dfref daqDF = GetDAQdf(DAQ)
 	nvar kHz=daqDF:kHz
 	return kHz
 End
@@ -1164,6 +1170,7 @@ Function SetAcqFreq(kHz_[,DAQ])
 	string DAQ
 	
 	DAQ=selectstring(paramisdefault(DAQ),DAQ,MasterDAQ())
+	dfref daqDF = GetDAQdf(DAQ)
 	nvar kHz=daqDF:kHz
 	kHz=kHz_
 End
@@ -1172,6 +1179,7 @@ Function GetAcqDuration([DAQ])
 	string DAQ
 	
 	DAQ=selectstring(paramisdefault(DAQ),DAQ,MasterDAQ())
+	dfref daqDF = GetDAQdf(DAQ)
 	nvar duration=daqDF:duration
 	return duration
 End

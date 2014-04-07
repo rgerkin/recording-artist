@@ -452,7 +452,7 @@ static Function SpeakAndListen([DAQ])
 		if(interval>ISI || sealtestOn)
 			if(dynamic && !sealtestOn)
 				if(reassemble)
-					SetupDynamicClamp(DAQ)
+					SetupDynamicClamp(DAQs=DAQ)
 				endif
 				lastDAQSweepT=StopMSTimer(-2)
 				ExecuteDynamicClamp(DAQ)
@@ -586,9 +586,10 @@ static Function UnloadDynamicClampMode([DAQ])
 End
 
 // Setup the stimulation/acquisition waves for use in dynamic clamp mode.  
-static Function SetupDynamicClamp(DAQ)
-	string DAQ
+static Function SetupDynamicClamp([DAQs])
+	string DAQs
 	
+	string DAQ = StringFromList(0,DAQs)
 	variable chan_=ADC2Chan("0")
 	if(chan_ != DAC2Chan("0")) // Dynamic clamp only works on ADC=0 and DAC=0.  	
 		DoAlert 0,"Dynamic clamp only works when the same Igor channel reads from DAC0 and writes to ADC0."
@@ -920,7 +921,7 @@ static Function StartClock(isi[,DAQ])
 	sprintf command,"ITC18StartAcq %d,%d,0",period/numInputs,bits
 	lastDAQSweepT=StopMSTimer(-2)
 	if(dynamic)
-		SetupDynamicClamp(DAQ)
+		SetupDynamicClamp(DAQs=DAQ)
 		ExecuteDynamicClamp(DAQ)
 	else
 		Execute /Q command
