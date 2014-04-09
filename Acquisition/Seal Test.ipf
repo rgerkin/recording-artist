@@ -31,6 +31,7 @@ Function SealTest(chanBits[,instance,DAQ])
 	dfref packageDF=Core#PackageHome(module,"sealTest")
 	string /g packageDF:instance=instance
 	dfref df=SealTestDF()
+	dfref instanceDF = df:$instance
 	dfref daqDF=GetDaqDF(DAQ)
 	NVar /sdfr=daqDF acquiring
 	if(acquiring==1) // If acquisition is in progress
@@ -47,7 +48,7 @@ Function SealTest(chanBits[,instance,DAQ])
 	variable /G df:chanBits=chanBits
 	variable i
 	variable /g df:zap=0, df:thresholdCrossed=0
-	nvar /sdfr=df freq,useTelegraph
+	nvar /sdfr=instanceDF freq,useTelegraph
 	freq=max(0.1,freq)
 	variable /G df:iteration=0
 	variable /G df:sealTestOn=0
@@ -182,9 +183,11 @@ Function SealTestOutput(chan)
 	String currFolder=GetDataFolder(1)
 	
 	dfref df=SealTestDF()
+	svar instance = df:instance
+	dfref instanceDF = df:$instance
 	dfref chanDF=SealTestChanDF(chan)
 	wave /sdfr=df ampl
-	nvar /sdfr=df freq
+	nvar /sdfr=instanceDF freq
 	String channel=num2str(chan)
 	String mode=GetAcqMode(chan)
 	string outputType=GetModeOutputType(mode,fundamental=1)
@@ -229,7 +232,9 @@ Function SealTestInput(chan)
 	variable chan
 	
 	dfref df=SealTestDF()
-	nvar /sdfr=df freq
+	svar instance = df:instance
+	dfref instanceDF = df:$instance
+	nvar /sdfr=instanceDF freq
 	String channel=num2str(chan)
 	String mode=GetAcqMode(chan)
 	
@@ -249,7 +254,7 @@ Function SealTestInput(chan)
 	
 	svar /sdfr=GetDaqDF(DAQ) inputWaves
 	string inputWaveStr=getwavesdatafolder(sweep,2)+","+Chan2ADC(chan)+gainStr+";"
-	nvar /sdfr=df pressureOn
+	nvar /sdfr=instanceDF pressureOn
 	if(pressureOn)
 		String pressureChan=num2str(str2num(Chan2ADC(chan))+4) // e.g. if the patch signal is plugged into ADC0, assume the pressure signal is plugged into ADC4.  
 		inputWaveStr+=getwavesdatafolder(pressureSweep,2)+","+pressureChan+";"
@@ -268,7 +273,9 @@ Function SealTestWindow([DAQ])
 	
 	DAQ=SelectString(ParamIsDefault(DAQ),DAQ,MasterDAQ())
 	dfref df=SealTestDF()
-	nvar /sdfr=df left,top,right,bottom,axisMin,axisMax
+	svar instance = df:instance
+	dfref instanceDF = df:$instance
+	nvar /sdfr=instanceDF left,top,right,bottom,axisMin,axisMax,freq
 	string win="SealTestWin"
 	if(WinType(win))
 		DoWindow /F $win
@@ -288,7 +295,7 @@ Function SealTestWindow([DAQ])
 //		return -1
 //	endif
 //	SetDataFolder root:sealtest
-	nvar /sdfr=df chanBits,freq
+	nvar /sdfr=df chanBits
 	variable numChannels=GetNumChannels(DAQ=DAQ)
 	wave /t Labels=GetChanLabels()
 	if(chanBits<1)
@@ -381,7 +388,7 @@ Function SealTestWindow([DAQ])
 	PopupMenu Channels, value=#("PopupOptions(\"\",\"Channels\",ChannelCombos(\"sealtest\",\"\"),selected=ChannelList("+num2str(chanBits)+"))")
 	xx+=90
 	wave /sdfr=df ampl
-	nvar /sdfr=df gridOn,seriesOn,pressureOn
+	nvar /sdfr=instanceDF gridOn,seriesOn,pressureOn
 	SetVariable Ampl,pos={xx,yy+2},size={80,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
 	xx+=90
 	SetVariable Freq,pos={xx,yy+2},size={80,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
@@ -524,6 +531,8 @@ Function SealTestAuxMeasurement(measurement,value)
 	
 	String DAQ=GetUserData("","","DAQ")
 	dfref df=SealTestDF()
+	svar instance = df:instance
+	dfref instanceDF = df:$instance
 	String traces=TraceNameList("",";",1)
 	Variable i
 	for(i=0;i<ItemsInList(traces);i+=1)
@@ -541,7 +550,7 @@ Function SealTestAuxMeasurement(measurement,value)
 	endfor
 	ModifyGraph tick($(measurement+"HistoryAxis"))=0*(value),noLabel($(measurement+"HistoryAxis"))=2*(!value),axThick($(measurement+"HistoryAxis"))=value
 	
-	nvar /sdfr=df seriesOn,pressureOn
+	nvar /sdfr=instanceDF seriesOn,pressureOn
 	if(!seriesOn && !pressureOn)
 		ModifyGraph axisEnab(inputHistoryTAxis)={0,1}
 		ModifyGraph freePos(inputHistoryAxis)={0,kwFraction}
@@ -689,9 +698,12 @@ Function SealTestStart(reset,DAQ)
 
 	dfref daqDF=GetDaqDF(DAQ)
 	dfref df=SealTestDF()
+	svar instance = df:instance
+	dfref instanceDF = df:$instance
 	string /g daqDF:listenHook
 	svar /sdfr=daqDF inputWaves,outputWaves,listenHook
-	nvar /sdfr=df chanBits,freq
+	nvar /sdfr=df chanBits
+	nvar /sdfr=instanceDF freq
 	SetListenHook("SealTestCollectSweeps(\"_daq_\")",DAQ=DAQ)
 	Speak(1,outputWaves,0,DAQs=DAQ)
 	Listen(1,1,inputWaves,5,1,listenHook,"ErrorHook()","",DAQs=DAQ)
@@ -736,7 +748,10 @@ Function SealTestCollectSweeps(DAQ)
 	
 	dfref daqDF=GetDaqDF(DAQ)
 	dfref df=SealTestDF()
-	nvar /sdfr=df chanBits,iteration,freq
+	svar instance = df:instance
+	dfref instanceDF = df:$instance
+	nvar /sdfr=df chanBits,iteration
+	nvar /sdfr=instanceDF freq
 	svar /sdfr=daqDF inputWaves,outputWaves
 	wave /sdfr=df Ampl
 	InDemultiplex(inputWaves)
@@ -798,7 +813,7 @@ Function SealTestCollectSweeps(DAQ)
 				endif
 			endif
 			
-			nvar /sdfr=df pressureOn
+			nvar /sdfr=instanceDF pressureOn
 			if(pressureOn)
 				variable pressureChan=str2num(Chan2ADC(i))+4 // Assumes pressure sensor hooked up 4 ADC channels away from the patch signal.  
 				wave /sdfr=chanDF pressureSweep

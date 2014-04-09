@@ -1200,7 +1200,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			break
 		case "Input_Resistance":
 			dfref df=Core#InstanceHome(module,"acqModes",mode)
-			nvar /sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
+			nvar /z/sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
 			if(!nvar_exists(inputLeft))
 				AcqModeDefaults(mode)
 				nvar /sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength

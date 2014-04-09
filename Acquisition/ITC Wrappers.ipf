@@ -756,8 +756,10 @@ static Function /S Sequence(DAQ)
 	variable sealTestOn=IsSealTestOn()
 		
 	if(sealTestOn)
-		dfref sealDF=SealTestDF()
-		nvar /sdfr=sealDF chanBits
+		dfref df=SealTestDF()
+		svar instance = df:instance
+		dfref instanceDF = df:$instance
+		nvar /sdfr=df chanBits
 		for(i=0;i<numChannels;i+=1)
 			if(!StringMatch(Chan2DAQ(i),DAQ))
 				continue
@@ -765,7 +767,7 @@ static Function /S Sequence(DAQ)
 			if(sealTestOn && (chanBits & 2^i))
 				ADC+=InputMap[i]
 				DAC+=OutputMap[i]
-				nvar /sdfr=sealDF pressureOn
+				nvar /sdfr=instanceDF pressureOn
 				if(pressureOn)
 					ADC+=num2str(str2num(InputMap[i])+4) // Assume input for pressure signal is 4 slots over from input for electrode signal.  
 					DAC+="N"
