@@ -345,8 +345,9 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 			SwitchView("")
 			break
 		case "Assembler":
-			string Assembler=ClearBrackets(info.popStr)
-			SetAssembler(chan,Assembler)
+			string assembler=ClearBrackets(info.popStr)
+			variable curr_pulse_set = CurrPulseSet(DAQ)
+			SetAssembler(chan,assembler,curr_pulse_set)
 			break
 		case "Stimuli":
 			strswitch(info.popStr)
@@ -634,7 +635,7 @@ Function PulseSetTabs(num,hide[,win])
 	ControlInfo /W=$win PulseSets
 	Variable curr_tab=V_Value
 	//string pulseParams=ListPackageObjects(module,"stimuli") // Doesn't give the preferred order of objects.  
-	string pulseParams="Begin;Ampl;dAmpl;Width;IPI;Pulses;Divisor;Remainder;testPulseOn" // ListPackageObjects() doesn't give the preferred order of objects.  
+	string pulseParams="Begin;Ampl;dAmpl;Width;IPI;Pulses;Divisor;Remainder;testPulseOn;assembler" // ListPackageObjects() doesn't give the preferred order of objects.  
 	
 	for(i=0;i<numChannels;i+=1)
 		if(stringmatch(Chan2DAQ(i),DAQ))
@@ -647,7 +648,7 @@ Function PulseSetTabs(num,hide[,win])
 			for(j=0;j<itemsinlist(pulseParams);j+=1)
 				string pulseParam=stringfromlist(j,pulseParams)
 				string pulseParamLoc=Core#PackageSettingLoc(module,"stimuli",channel,pulseParam)
-				if(!stringmatch(Core#ObjectType(pulseParamLoc),"WAV"))
+				if(!stringmatch(Core#ObjectType(pulseParamLoc),"WAV") && !stringmatch(Core#ObjectType(pulseParamLoc),"WAVT"))
 					continue
 				endif
 				wave w=$pulseParamLoc
@@ -655,7 +656,14 @@ Function PulseSetTabs(num,hide[,win])
 				if(oldNumPulseSets!=num)
 					redimension /n=(num,-1) w
 					if(oldNumPulseSets<num)
-						w[num-1][]=w[num-2][q]
+						// Nonsense that must be done because Igor can't handle different wave types assigned to the same wave reference.  
+						if(wavetype(w)>0)
+						 	wave wn = $pulseParamLoc
+							w[num-1][]=w[num-2][q]
+						else
+							wave /t wt = $pulseParamLoc
+							wt[num-1][]=wt[num-2][q]
+						endif
 					endif
 				endif
 			endfor
@@ -791,6 +799,14 @@ Function PulseSetTabs(num,hide[,win])
 	TitleBox Title_Remainder disable=(hide || V_max<=1)
 	PulseSetTabLabels()
 End
+
+function CurrPulseSet(DAQ)
+	string DAQ
+	
+	string win =GetDAQWin(DAQ=DAQ)
+	ControlInfo /W=$win PulseSets
+	return v_flag==8 ? v_value-1 : nan
+end
 
 Function BumpRemainderBoxes([DAQ])
 	string DAQ

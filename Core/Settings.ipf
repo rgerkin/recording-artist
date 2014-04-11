@@ -832,6 +832,12 @@ function /s PackageSettingLoc(module,package,instance,object[,setting,sub,quiet,
 	
 	setting=selectstring(!paramisdefault(setting),"value",setting)
 	sub=selectstring(!paramisdefault(sub),"",sub)
+	if(IsDeprecated(module,package,object))
+		object = ReplacementObject(module,package,object)
+		if(!strlen(object))
+			return ""
+		endif
+	endif
 	if(stringmatch(setting,"value"))
 		if(stringmatch(instance,"_new_"))
 			string loc=getdatafolder(1,NewInstanceHome(module,package,sub=sub,quiet=quiet))
@@ -844,6 +850,26 @@ function /s PackageSettingLoc(module,package,instance,object[,setting,sub,quiet,
 		loc+=object+":"+setting
 	endif
 	return loc
+end
+
+function IsDeprecated(module,package,object[,quiet])
+	string module,package,object
+	variable quiet
+	
+	string loc=getdatafolder(1,PackageManifest(module,package,quiet=quiet))
+	loc+=object+":deprecated"
+	
+	return NumVarOrDefault(loc,0)
+end
+
+function /s ReplacementObject(module,package,object[,quiet])
+	string module,package,object
+	variable quiet
+	
+	string loc=getdatafolder(1,PackageManifest(module,package,quiet=quiet))
+	loc+=object+":replaced"
+	
+	return StrVarOrDefault(loc,"")
 end
 
 function VarPackageSetting(module,package,instance,object[,setting,default_,sub,quiet])
@@ -2234,7 +2260,7 @@ Function /s LoadPackageInstance(module,package,instance[,quiet,special])
 	endif
 	if(foundOnDisk)
 		setdatafolder instanceDF
-		LoadData /O/P=currPath /Q/R search+".pxp"
+		LoadData /O=2/P=currPath /Q/R search+".pxp"
 		if(v_flag>0 && generic)
 			instance=defaultInstanceName
 		endif

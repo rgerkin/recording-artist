@@ -980,10 +980,15 @@ Function /S AssemblerList(chan)
 	return goodFuncs
 End
 
-function /s GetAssembler(chan)
-	variable chan
+function /s GetAssembler(chan[,pulse_set])
+	variable chan,pulse_set
 	
-	string assembler=Core#StrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",default_="Default_stim")
+	wave /t w_assembler = Core#WavTPackageSetting(module,"stimuli",GetChanName(chan),"assembler")
+	string assembler = w_assembler[pulse_set]
+	if(!strlen(assembler))
+		assembler = "Default_stim"
+	endif
+	
 	return removeending(assembler,"_stim")
 end
 
@@ -1117,8 +1122,8 @@ Function SetAcqMode(mode,chan)
 	if(IsDynamicClamp(mode)) // Set dynamic clamp.  
 		if(!stringmatch(DAQType(DAQ),"ITC"))
 			PopupMenu $("Mode_"+num2str(chan)) mode=WhichListItem(oldMode,modes)+1
-			return -2
 			DoAlert 0,"Dynamic clamp is only supported on ITC devices."
+			return -2
 		elseif(ADC!=0) // Must be ADC 0.  
 			PopupMenu $("Mode_"+num2str(chan)) mode=WhichListItem(oldMode,modes)+1
 			DoAlert 0,"Only ADC 0 can be dynamically clamped."
@@ -1248,13 +1253,13 @@ Function SerialOrIBW(stimName)
 	return result
 End
 
-function SetAssembler(chan,assembler)
-	variable chan
+function SetAssembler(chan,assembler,pulse_set)
+	variable chan,pulse_set
 	string assembler
 	
 	string daq=Chan2DAQ(chan)
 	string win=DAQ+"_Selector"
-	Core#SetStrPackageSetting(module,"stimuli",GetChanName(chan),"assembler",assembler)
+	Core#SetWavTPackageSetting(module,"stimuli",GetChanName(chan),"assembler",{assembler},indices={pulse_set})
 	variable err = 0
 	string ampl_title="Ampl"
 	string dAmpl_title="\F'Symbol'D\F'Default'Ampl"
@@ -1267,7 +1272,7 @@ function SetAssembler(chan,assembler)
 			dAmpl_title="Freq"
 			break
 		case "Noisy":
-			string title="StDev"
+			dampl_title="StDev"
 			break
 		case "Template":
 		case "PoissonTemplate":
@@ -1276,16 +1281,16 @@ function SetAssembler(chan,assembler)
 		case "Frozen":
 		case "FrozenPlusNegative":
 			err = LoadTemplate(chan,"frozen")
-			title="Multiplier"
+			dampl_title="Multiplier"
 			break
 		case "Optimus2":
 			SweepIndexWindow()
 		default:
-			title="\F'Symbol'D\F'Default'Ampl"
 			break
 	endswitch
 	if(!err)
-		Titlebox Title_dAmpl title=title, win=$win
+		Titlebox Title_Ampl title=ampl_title, win=$win
+		Titlebox Title_dAmpl title=dampl_title, win=$win
 	endif
 	return err
 end
@@ -1308,7 +1313,9 @@ function LoadTemplate(chan,w_name)
 		endif
 		wave /z/sdfr=df w = $w_name
 		if(!waveexists(w))
-			SetAssembler(chan,"Default")
+			string DAQ = Chan2DAQ(chan)
+			variable curr_pulse_set = CurrPulseSet(DAQ)
+			SetAssembler(chan,"Default",curr_pulse_set)
 			return -1
 		endif
 	endif
@@ -1671,11 +1678,6 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	variable triparity // Even (0) or odd (1).  
 	
 	string stimulusName=GetStimulusName(chan)
-	string Assembler=Core#StrPackageSetting(module,"stimuli",GetChanName(chan),"Assembler")
-	funcref Default_stim stimFunc=$(assembler+"_stim")
-	if(!strlen(stringbykey("NAME",funcrefinfo(stimFunc))) || stringmatch(Assembler,"Normal") || stringmatch(Assembler,"Default")) // Invalid or plain stimulus Assembler function.  
-		funcref Default_stim stimFunc=Default_stim // Use the normal stimulus Assembler function.  
-	endif
 	
 	//dfref df=root:parameters
 	//nvar /sdfr=df pulseSets
@@ -1712,6 +1714,12 @@ Function /S Assemble(chan,Stimulus[,triparity])
 			endif
 			variable remain=mod(k,divisor[j])
 			if(Divisor[j]<=1 || (Remainder[j] & 2^remain)) // If this pulse set is active on this sweep number.  
+				string assembler = GetAssembler(chan,pulse_set=j)
+				funcref Default_stim stimFunc=$(assembler+"_stim")
+				if(!strlen(stringbykey("NAME",funcrefinfo(stimFunc))) || stringmatch(Assembler,"Normal") || stringmatch(Assembler,"Default")) // Invalid or plain stimulus Assembler function.  
+					funcref Default_stim stimFunc=Default_stim // Use the normal stimulus Assembler function.  
+				endif
+				
 				variable numPulses=pulses[j]
 				if(stringmatch(Assembler,"Optimus*") && !stringmatch(nameofwave(Stimulus),"forcingWave")) // Brent / Anne-Marie / Ashok stimuli with random pulse number.  
 					numPulses=poissonnoise(numPulses)
@@ -2202,9 +2210,10 @@ function Template_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 	
 	variable ampl=GetStimParam("Ampl",chan,pulseSet)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
-	Stimulus[firstSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
-	variable pulses=GetStimParam("Pulses",chan,pulseSet)
+	variable begin = GetStimParam("Begin",chan,pulseSet)
 	
+	Stimulus[firstSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum // Pulse of only one sample, to be convolved below.  
+	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
@@ -2219,9 +2228,12 @@ function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,puls
 	
 	variable ampl=GetStimParam("Ampl",chan,pulseSet)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
-	variable start=abs(enoise(dimsize(Stimulus,0)))
+	variable begin = GetStimParam("Begin",chan,pulseSet)
+	variable width = GetStimParam("Width",chan,pulseSet)
+	variable loc=abs(enoise(0.001*width/dimdelta(Stimulus,0)))
+	loc += 0.001*begin/dimdelta(Stimulus,0)
 	
-	Stimulus[start][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	Stimulus[loc][sweepParity][pulseSet]+=ampl+dampl*pulseNum // Pulse of only one sample, to be convolved below.  
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
@@ -2333,11 +2345,12 @@ function Optimus1_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 #endif
 	endif
 	string DAQ=MasterDAQ()
-	dfref df=daqDF
+	dfref df=GetDAQdf(DAQ)
 	variable /g df:reassemble=1 // Reassemble the stimulus each sweep.  
 	variable sampling=50000 // In dynamic clamp, must sample at 50000 Hz due to hardware.  
 	variable kHz=sampling/1000
-	nvar /sdfr=daqDF numPulses
+	wave w_num_pulses = GetNumPulses(chan)
+	variable numPulses = w_num_pulses[pulseSet]
 	if(mod(pulseSet,3)!=0) // If not pulse set 0, i.e. not the bias, i.e. E or I.  
 		//wave sharedE=root:sharedE, sharedI=root:sharedI
 		variable ampl=GetStimParam("Ampl",chan,pulseSet)
