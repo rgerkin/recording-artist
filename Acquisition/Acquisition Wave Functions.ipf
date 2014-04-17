@@ -960,8 +960,10 @@ Function /S AssemblerList(chan)
 	
 	string funcs=functionlist("*_stim",";","")
 	string goodFuncs=""//"Normal;"
+	string daq = MasterDAQ()
+	variable pulse_set = CurrPulseSet(daq)
 	if(chan>=0)
-		string assembler=GetAssembler(chan)
+		string assembler=GetAssembler(chan,pulse_set=pulse_set)
 	else
 		assembler = ""
 	endif
@@ -984,9 +986,9 @@ function /s GetAssembler(chan[,pulse_set])
 	variable chan,pulse_set
 	
 	wave /t w_assembler = Core#WavTPackageSetting(module,"stimuli",GetChanName(chan),"assembler")
-	string assembler = w_assembler[pulse_set]
-	if(!strlen(assembler))
-		assembler = "Default_stim"
+	string assembler = "Default_stim"
+	if(numpnts(w_assembler) && strlen(w_assembler[pulse_set]))
+		assembler = w_assembler[pulse_set]
 	endif
 	
 	return removeending(assembler,"_stim")
