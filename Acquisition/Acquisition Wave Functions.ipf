@@ -2265,7 +2265,7 @@ function Frozen_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,swee
 	wave /z frozen=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
 	if(waveexists(frozen))
 		lastSample = min(lastSample,firstSample+numpnts(frozen)-1) // Only extend to the end of the pulse or the end of the frozen wave, whichever comes first.  
-		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample]
+		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample][sweepParity]
 	endif
 end
 
@@ -2284,7 +2284,7 @@ function FrozenPlusNegative_stim(Stimulus,chan,firstSample,lastSample,pulseNum,p
 	wave /z frozen=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
 	if(waveexists(frozen))
 		lastSample = min(lastSample,firstSample+numpnts(frozen)-1) // Only extend to the end of the pulse or the end of the frozen wave, whichever comes first.  
-		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample]
+		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample][sweepParity]
 		Stimulus[firstSample+numPulses*IPI*kHz,lastSample+numPulses*IPI*kHz][sweepParity][pulseSet]-=multiplier*frozen[p-firstSample-numPulses*IPI*kHz]
 	endif
 end
