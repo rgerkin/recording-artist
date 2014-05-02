@@ -1321,6 +1321,7 @@ function LoadTemplate(chan,w_name)
 			return -1
 		endif
 	endif
+	return 0
 end
 
 function SetListenHook(hook[,DAQ])
