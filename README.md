@@ -1,29 +1,14 @@
-# README #
+# Recording Artist for Igor Pro #
 
-This README would normally document whatever steps are necessary to get your application up and running.
+### What is it? ###
 
-### What is this repository for? ###
+"Recording Artist" is a software package for use with Igor Pro (http://www.wavemetrics.com) that enables the acquisition and analysis of electrophysiological and imaging data across a range of instruments.  
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+### Who uses it? ###
 
-### How do I get set up? ###
+14 research labs in 4 countries on 3 continents, including labs located at Stanford University, M.I.T., Northwestern University, and Carnegie Mellon.  
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+### How can I use it? ###
 
-### Contribution guidelines ###
-
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+You are free to download it, modify it, and redistribute it.  
+A paid support license can be obtained by contacting me at rgerkin at asu dot edu.
