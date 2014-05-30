@@ -167,7 +167,7 @@ Function GetBoardGain([DAQ])
 	
 	DAQ=selectstring(paramisdefault(DAQ),DAQ,MasterDAQ())
 	dfref daqDF=GetDaqDF(DAQ)
-	nvar /sdfr=df boardGain
+	nvar /sdfr=daqDF boardGain
 	return boardGain
 End
 

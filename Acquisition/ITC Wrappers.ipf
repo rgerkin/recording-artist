@@ -589,6 +589,9 @@ End
 static Function SetupDynamicClamp([DAQs])
 	string DAQs
 	
+	if(paramisdefault(DAQs) || !strlen(DAQs))
+		DAQs = GetDAQs()
+	endif
 	string DAQ = StringFromList(0,DAQs)
 	variable chan_=ADC2Chan("0")
 	if(chan_ != DAC2Chan("0")) // Dynamic clamp only works on ADC=0 and DAC=0.  	
@@ -666,7 +669,7 @@ static Function ExecuteDynamicClamp(DAQ)
 	variable inputGain=GetInputGain(chan,inf)
 	variable outputGain=GetOutputGain(chan,inf)
 	dfref daqDF=GetDaqDF(DAQ)
-	nvar /sdfr=itc lastDAQSweepT
+	nvar /sdfr=daqDF lastDAQSweepT
 
 	variable currSweep=GetCurrSweep()
 	wave divisor=GetDAQDivisor(DAQ)
