@@ -8,6 +8,11 @@
 
 strconstant sutter_loc="root:Packages:Sutter:"
 
+static Function IsDebuggerOn()
+	DebuggerOptions
+	return V_enable
+End
+
 static Function Init([port])
 	String port
 #if exists("VDT2")==4
