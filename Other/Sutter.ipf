@@ -179,7 +179,7 @@ Function SlowMove(dx,dy,dz,speed)
 	Variable duration=distance/speed
 	Variable /G maxMove=max(max(abs(dx),abs(dy)),abs(dz))/(duration*backgroundRate)
 	//Variable /G numMovesLeft=duration*10
-	CtrlNamedBackground SutterTimedMove proc=SutterLiveMove, period=(60/backgroundRate), start // Run 'backgroundRate' times per second.  
+	CtrlNamedBackground SutterTimedMove proc=Sutter#LiveMove, period=(60/backgroundRate), start // Run 'backgroundRate' times per second.  
 	SetDataFolder $currFolder
 End
 
