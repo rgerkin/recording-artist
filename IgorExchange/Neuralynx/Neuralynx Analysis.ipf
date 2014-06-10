@@ -2296,7 +2296,7 @@ function /wave TotalCorrelation(trials[,cycloHistograms,nonstationary,noCov])
 			variable numBins=dimsize(ch,0)
 			variable rate1=mean(w1) // Mean count per trials matrix bin.  
 			matrixop /free w_phase11A=mean(magsqr(col(ch,unit1)*rate1*numBins)) // *rate1*2*pi makes cyclohistogram pdf equal to cyclohistogram firing rate.  
-			w_phase11[i]=w_phase11A
+			w_phase11[i]=w_phase11A[0]
 		endfor
 		
 		for(unit2=0;unit2<unit1;unit2+=1)

@@ -1621,7 +1621,7 @@ function CorrelationByPhase(phase,dataDF[,diff,numPhaseBins])
 	make /o/n=(numUnits,numUnits,numPhaseBins) expected=m_xprojection[p][r]*m_xprojection[q][r] // Expected fraction of cycles in which both cells spiked.  
 	wavestat(w=expected)
 	make /o/n=(numUnits,numUnits,numPhaseBins) observed=0
-	for(i=0;i<cycles;i+=1)
+	for(i=0;i<numCycles;i+=1)
 		observed+=(SpikesPerCycle[i][p][r]>0 && SpikesPerCycle[i][q][r]>0)
 	endfor
 	make /o/n=(numUnits,numUnits,numPhaseBins) phaseSurprise=(statsbinomialcdf(observed,expected,cycles)+statsbinomialcdf(observed-1,expected,cycles))/2
@@ -1630,7 +1630,7 @@ function CorrelationByPhase(phase,dataDF[,diff,numPhaseBins])
 	
 	for(i=0;i<numpnts(phaseSurprise);i+=1)
 		if(phaseSurprise[i]==0 || numtype(phaseSurprise[i]))
-			printf "%f,%d,%f\r",phaseSurprise[i],observed[i],expected[i]*cycles
+			printf "%f,%d,%f\r",phaseSurprise[i],observed[i],expected[i]*numCycles
 		endif
 	endfor
 	
@@ -1640,7 +1640,7 @@ function CorrelationByPhase(phase,dataDF[,diff,numPhaseBins])
 	for(bin=0;bin<numPhaseBins;bin+=1)
 		duplicate /free phase,mask
 		mask=sin(phase+2*pi*i/numPhaseBins) > thresh
-		make /o/n=(cycles,numUnits) binSpikes=SpikesPerCycle[p][q][bin]
+		make /o/n=(numCycles,numUnits) binSpikes=SpikesPerCycle[p][q][bin]
 		matrixop /free binSpikesShift=rotaterows(binSpikes,1)
 		matrixop /free corrMatrix=((binSpikes^t x binSpikes) - (binSpikes^t x binSpikesShift)) / (cycles*sqrt(varcols(binSpikes)^t x varcols(binSpikes)))
 		totalCorrsByPhase[][][bin]=corrMatrix[p][q]
@@ -1896,6 +1896,7 @@ Function /WAVE RespiratoryPhase(RespWave[,IEoffset,maxRate,minAmpl,EIthresh1,EIt
 	if(numpnts(Anchors)<2) // Not enough anchor points to do interpolation.  
 		return PhaseWave
 	endif
+#if exists("Interpolate2")
 	Interpolate2 /Y=PhaseWave /T=1 Anchors
 	Variable firstIEpoint=x2pnt(PhaseWave,IEPoints[0])
 	Variable lastIEpoint=x2pnt(PhaseWave,IEPoints[numpnts(IEPoints)-1])
@@ -1905,6 +1906,9 @@ Function /WAVE RespiratoryPhase(RespWave[,IEoffset,maxRate,minAmpl,EIthresh1,EIt
 	PhaseWave=numtype(RespWave) || RespWave==0 ? NaN : PhaseWave // Get rid of points that didn't make sense in the source.  
 	KillWaves /Z IEPoints,EIPoints,DiffWave
 	return PhaseWave
+#else
+	return NULL
+#endif
 End
 
 // Set the negative peaks to be phase 0 and interpolate in between.  
@@ -1935,6 +1939,7 @@ Function /WAVE RespiratoryPhaseSimple(signalDF[,lo,hi,minAmpl])
 	if(numpnts(anchors)<2) // Not enough anchor points to do interpolation.  
 		return phases
 	endif
+#if exists("Intepolate2")
 	Interpolate2 /Y=phases /T=1 anchors
 	Variable firstIEpoint=x2pnt(phases,peaks[0])
 	Variable lastIEpoint=x2pnt(phases,peaks[numpnts(peaks)-1])
@@ -1944,6 +1949,9 @@ Function /WAVE RespiratoryPhaseSimple(signalDF[,lo,hi,minAmpl])
 	phases=numtype(filtered) || filtered==0 ? NaN : phases // Get rid of points that didn't make sense in the source.  
 	phases-=pi
 	return phases
+#else
+	return NULL
+#endif
 End
 
 // Set the negative peaks to be phase 0 and interpolate in between.  
@@ -2032,6 +2040,7 @@ Function /WAVE RespiratoryPhaseNew(RespWave[,thresh,dThresh,minFreq,maxFreq])
 	if(numpnts(Anchors)<2) // Not enough anchor points to do interpolation.  
 		return PhaseWave
 	endif
+#if exists("Interolate2")
 	Interpolate2 /Y=PhaseWave /T=1 Anchors
 	Variable firstBoundaryPoint=x2pnt(PhaseWave,boundaries[0])
 	Variable lastBoundaryPoint=x2pnt(PhaseWave,boundaries[numpnts(boundaries)-1])
@@ -2054,6 +2063,9 @@ Function /WAVE RespiratoryPhaseNew(RespWave[,thresh,dThresh,minFreq,maxFreq])
 	endfor
 	PhaseWave=numtype(RespWave) || RespWave==0 ? NaN : PhaseWave  
 	return PhaseWave
+#else
+	return NULL
+#endif
 End
 
 Function /wave OdorStimIdentity([epoch,message])

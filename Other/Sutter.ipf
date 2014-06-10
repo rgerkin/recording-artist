@@ -8,6 +8,11 @@
 
 strconstant sutter_loc="root:Packages:Sutter:"
 
+static Function IsDebuggerOn()
+	DebuggerOptions
+	return V_enable
+End
+
 static Function Init([port])
 	String port
 #if exists("VDT2")==4
@@ -127,6 +132,7 @@ End
 Function LiveUpdate(s)
 	STRUCT WMBackgroundStruct &s
 	Update()
+#if exists("UpdateLogPanelCoords")
 	Variable i
 	for(i=0;i<ItemsInList(sutterLocations);i+=1)
 		String location=StringFromList(i,sutterLocations)
@@ -135,16 +141,19 @@ Function LiveUpdate(s)
 			UpdateLogPanelCoords(location)
 		endif
 	endfor
+#endif
 	return 0
 End
 
 Function ToggleLive()
 	Variable i
 	Variable live=0
+#if exists("UpdateLogPanelCoords")
 	for(i=0;i<ItemsInList(sutterLocations);i+=1)
 		String location=StringFromList(i,sutterLocations)
 		ControlInfo /W=LogPanel $("Live_"+location); live+=V_Value
 	endfor
+#endif
 	if(live)
 		CtrlNamedBackground Sutter, period=30, proc=Sutter#LiveUpdate, start
 	else

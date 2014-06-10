@@ -372,7 +372,7 @@ static Function /wave MakePETH(dataDF,eventsDF,pethInstance[,show,mask,keepTrial
 			variable zStrict=0
 #endif
 			if(zStrict) // Compute variance over all trials, all baseline bins.  
-				make /free/n=(numUnits,numEventTypes,baselineBins,numTrials) baseline=Trials[baselineFirst+r][p][q][s] // Order units,eventTypes,bins,trials.  
+				make /free/n=(numUnits,numEventTypes,baselineBins[0],numTrials) baseline=Trials[baselineFirst+r][p][q][s] // Order units,eventTypes,bins,trials.  
 				redimension /e=1/n=(numUnits,numEventTypes,baselineBins[0]*numTrials) baseline
 				make /free/n=(numUnits,numEventTypes) layers=baselineBins[q]*TrialCounts[p][q] // Number of total bins for this {unit,eventType} combination.  
 			else // Compute variance over PETH baseline bins, i.e. averaged across trials first.  
@@ -1449,7 +1449,11 @@ function ExcludeBoundaryOutliers(df,electrode,clusterList,type[,destCluster])
 	endif
 	dfref pf=$PACKAGE_FOLDER
 	make /o/n=32 pf:interped /wave=boundary
+#if exists("Interpolate2")
 	interpolate2 /I=3 /T=1 /Y=boundary xx,yy
+#else
+	wave boundary = nan
+#endif
 	ExcludeSpikes(df,electrode,cluster,type,boundary,destCluster=destCluster)
 end
 
@@ -1676,16 +1680,16 @@ Function ViewerButtons(info)
 			endif
 			break
 		case "allClusters":
-			selWave[][1][0]=selWave | 16
+			selWave[][1][0]=selWave[p][1][0] | 16
 			ReplaceWaves(df,type)
 			break
 		case "assignedClusters":
-			selWave[0][1][0]=selWave & ~16
-			selWave[1,][1][0]=selWave | 16
+			selWave[0][1][0]=selWave[0][1][0] & ~16
+			selWave[1,][1][0]=selWave[p][1][0] | 16
 			ReplaceWaves(df,type)
 			break
 		case "noClusters":
-			selWave[][1][0]=selWave & ~16
+			selWave[][1][0]=selWave[p][1][0] & ~16
 			ReplaceWaves(df,type)
 			break
 		case "MahalPlots":
@@ -2977,7 +2981,9 @@ Function ClusterStats(df,clusterList)
 		matrixop /free stdev0=col(StDev,electrode)	
 		make /o/n=1000 meann1=nan
 		setscale x,0,dimdelta(data,0), meann1
+#if exists("Interpolate2")
 		Interpolate2 /Y=meann1 meann0 
+#endif
 		wavestats /q/m=1 meann1
 		variable maxx=v_max,minn=v_min
 		Ampl[electrode]=maxx*10^6 // In microV.  
