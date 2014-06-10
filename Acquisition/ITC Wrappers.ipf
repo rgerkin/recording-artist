@@ -625,9 +625,11 @@ static Function SetupDynamicClamp([DAQs])
 	Assemble(chan_,forcingWave,triparity=0)
 	Assemble(chan_,eWave,triparity=1)
 	Assemble(chan_,iWave,triparity=2)
+	//print mean(forcingWave)
 	string outputUnits=GetOutputUnits(chan_)
 	variable conversion=ConversionFactor(outputUnits,"S")
 	forcingWave*=conversion // nA to A (somehow actually pA to A).  
+	//print mean(forcingWave)
 	conversion=ConversionFactor(outputUnits,"mS")
 	eWave*=conversion // nS to mS
 	iWave*=conversion // nS to mS
@@ -708,7 +710,7 @@ static Function ExecuteDynamicClamp(DAQ)
 	endif
 	
 	string cmd
-	sprintf cmd,"ITC18RunDynamicClamp %s,%s,%s,%s,%s,%s, %s, 4, 2, 0, 10, %f, %f, %f, %f, %f, %f, %f",outWave1,outWave2,outWaveD,forcingWave,eWave,iWave,inWave,inputGain,outputGain/1e6,vE/1000,vI/1000,forcingGain,eGain,iGain
+	sprintf cmd,"ITC18RunDynamicClamp %s,%s,%s,%s,%s,%s, %s, 4, 2, 0, 10, %f, %.12f, %f, %f, %f, %f, %f",outWave1,outWave2,outWaveD,forcingWave,eWave,iWave,inWave,inputGain,outputGain/1e9,vE/1000,vI/1000,forcingGain,eGain,iGain
 	Execute /Q cmd
 	DemultiplexDynamicClamp(DAQ)
 	Execute /Q listenHook

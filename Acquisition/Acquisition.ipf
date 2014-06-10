@@ -551,17 +551,19 @@ Function StartSweep([DAQ])
 		waveformSweeps = 0
 	endif
 	
+	wave forcing = root:parameters:Acq:DAQs:daq0:forcingWave
+	
 	Variable err=FinalUpdate(DAQ=DAQ)
 	if(err)
 		return err
 	endif
+	
 	acquiring=1
 	Speak(1,outputWaves,SelectNumber(continuous,32,0),DAQs=DAQ)
 	Listen(1,boardGain,inputWaves,5,continuous,"CollectSweep("+DAQ+")","ErrorSweep()","",DAQs=DAQ)
 	if(InDynamicClamp())
 		LoadDynamicClampMode()
 	endif
-	
 	if(currSweep==0)
 		ResetExperimentClock()
 	endif
