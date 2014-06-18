@@ -1321,7 +1321,7 @@ Function /WAVE TimeFrequency(Source,winSize,winOverlap[,segmentSize,segmentOverl
 	endif
 	
 	Variable i
-	Variable numTransforms=numpnts(Source)*deltax(Source)/(winSize*(1-winOverlap))
+	Variable numTransforms=floor(numpnts(Source)*deltax(Source)/(winSize*(1-winOverlap)))
 	Variable winPoints=round(winSize/deltax(Source))
 	if(mod(winPoints,2)!=0)
 		winPoints-=1
@@ -1355,9 +1355,11 @@ Function /WAVE TimeFrequency(Source,winSize,winOverlap[,segmentSize,segmentOverl
 		if(smoothing)
 			Smooth smoothing,TFSpectrum
 		endif
+		//print dimsizes(TFSpectrum), dimsizes(Dest)
 		ImageTransform /D=TFSpectrum /G=(i) putRow, Dest
+		//print i,numTransforms
 		i+=1
-	While(finish<numpnts(Source))
+	While(i<numTransforms)
 	variable highest=wavemax(Dest)
 	//Dest=log(Dest/highest)*20 // Normalize to dB.  
 	Redimension /n=(i,-1) Dest
