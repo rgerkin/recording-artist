@@ -598,7 +598,7 @@ Function /wave DeIgorizeData(df)
 					if(WaveExists(Features))
 						NTTInfo.FeatureParams[j]=Features[i][j]
 					else
-						NTTInfo.FeatureParams[j]=MetaData
+						NTTInfo.FeatureParams[j]=MetaData[j]
 					endif
 				endfor
 				StructPut /B=3 NTTInfo, Raw[i] // Fill NTTInfoLength worth of Raw[i] with information about frame i.  
