@@ -677,7 +677,7 @@ static Function ExecuteDynamicClamp(DAQ)
 	wave divisor=GetDAQDivisor(DAQ)
 	variable lcm_=LCM(divisor)
 	lcm_=numtype(lcm_) ? 1 : lcm_
-	variable column=mod(currSweep,divisor)
+	variable column=mod(currSweep,lcm_)
 	duplicate /o/r=()(column,column) daqDF:forcingWave daqDF:forcingWaveNow /wave=forcingWaveNow
 	duplicate /o/r=()(column,column) daqDF:eWave daqDF:eWaveNow /wave=eWaveNow
 	duplicate /o/r=()(column,column) daqDF:iWave daqDF:iWaveNow /wave=iWaveNow
