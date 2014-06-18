@@ -309,6 +309,20 @@ Function Redim(w,dims)
 	endswitch
 End
 
+function Convolve2(kernel,w[,col])
+	wave kernel,w
+	variable col
+	
+	variable i,n_cols = max(1,dimsize(w,1))
+	for(i=0;i<n_cols;i+=1)
+		if(paramisdefault(col) || i==col)
+			duplicate /free/r=[][i,i] w,w_col
+			convolve kernel,w_col
+			w[][i] = w_col[p]
+		endif
+	endfor
+end
+
 Function PrintWave(w)
 	wave w
 	

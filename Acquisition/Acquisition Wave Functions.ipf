@@ -1367,7 +1367,6 @@ Function WaveUpdate([DAQ])
 		else
 			Assemble(i,raw)
 		endif
-		 
 		//if(WaveExists(StimulusName))
 		//	String stim_name=StimulusName[i]
 		//	Wave /Z StimWave=root:parameters:stimuli:$stim_name
@@ -2189,7 +2188,7 @@ Function Default_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,swe
 	
 	variable ampl=GetStimParam("Ampl",chan,pulseSet)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
-	Stimulus[firstSample,lastSample][sweepParity]+=ampl+dampl*pulseNum
+	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
 End
 
 // ------------------------ Some custom stimulus functions. ----------------------------------
@@ -2203,7 +2202,8 @@ function AlphaSynapse_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
-		Convolve AlphaSynapso(1,3,0,50),Stimulus
+		wave template = AlphaSynapso(1,3,0,50)
+		Convolve2(template,Stimulus,col=sweepParity)
 	endif
 end
 
@@ -2220,7 +2220,7 @@ function Template_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 	if(pulseNum==pulses-1)
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
-			Convolve template,Stimulus
+			Convolve2(template,Stimulus,col=sweepParity)
 		endif
 	endif
 end
@@ -2235,13 +2235,12 @@ function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,puls
 	variable width = GetStimParam("Width",chan,pulseSet)
 	variable loc=abs(enoise(0.001*width/dimdelta(Stimulus,0)))
 	loc += 0.001*begin/dimdelta(Stimulus,0)
-	
-	Stimulus[loc][sweepParity][pulseSet]+=ampl+dampl*pulseNum // Pulse of only one sample, to be convolved below.  
+	Stimulus[floor(loc)][sweepParity]+=ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
-			Convolve template,Stimulus
+			Convolve2(template,Stimulus,col=sweepParity)
 		endif
 	endif
 end
@@ -2301,7 +2300,8 @@ function PoissonAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	Stimulus[start,start+width][sweepParity][pulseSet]+=ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
 	if(pulseNum==pulses-1)
-		Convolve AlphaSynapso(1,3,0,50),Stimulus
+		wave template = AlphaSynapso(1,3,0,50)
+		Convolve2(template,Stimulus,col=sweepParity)
 	endif
 end
 
@@ -2379,7 +2379,7 @@ function Optimus1_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 					Stimulus[start,finish]+=sharedI[p-start]
 					break
 			endswitch
-			Convolve alpha,Stimulus
+			Convolve2(alpha,Stimulus,col=sweepParity)
 		endif
 		Redimension /n=(length,-1) Stimulus
 	else // For the bias, do the normal stuff.  
@@ -2444,7 +2444,7 @@ function Optimus2_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 			endif
 			if(!nvar_exists(poissonOnly) || !poissonOnly)
 				wave alpha=AlphaSynapso(ampl+dampl*pulseNum,width/kHz,0,width*10/kHz)
-				Convolve alpha,Stimulus
+				Convolve2(alpha,Stimulus,col=sweepParity)
 			endif
 		endif
 		Redimension /n=(length,-1) Stimulus
