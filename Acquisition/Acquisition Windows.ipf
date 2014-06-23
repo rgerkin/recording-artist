@@ -1146,11 +1146,12 @@ Function PreviewStimuliButtons(ctrlName)
 			if(StringMatch(S_Value,"IBW"))
 				WaveSave(chan,as=stimName)
 			else
-				string chanName=GetChanName(chan)
-				if(!stringmatch(stimName,chanName))
-					Core#CopyInstance(module,"stimuli",chanName,stimName)
-				endif
-				err=Core#SavePackageInstance("Acq","stimuli",stimName,special="CHAN:"+num2str(chan))
+				err = SaveStimulus(chan)
+				//string chanName=GetChanName(chan)
+				//if(!stringmatch(stimName,chanName))
+				//	Core#CopyInstance(module,"stimuli",chanName,stimName)
+				//endif
+				//err=Core#SavePackageInstance("Acq","stimuli",stimName,special="CHAN:"+num2str(chan))
 				if(!err)
 					printf "Stimulus '%s' on channel '%s' saved successfully.\r",stimName,labell
 				endif
