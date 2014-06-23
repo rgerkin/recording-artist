@@ -1349,7 +1349,6 @@ Function AnalysisWindow([instance]) : Graph
 	                       endif
 	                       variable red,green,blue
 	                       GetChanColor(j,red,green,blue)
-	                       //r=Red(post); g=Green(post); b=Blue(post)
 	                       string measurementName=CleanupName(analysisMethod,0)
 	                       dfref postChanDF=GetChanDF(j)        
 	                       wave /z/sdfr=postChanDF measurementWave=$measurementName
@@ -1365,8 +1364,10 @@ Function AnalysisWindow([instance]) : Graph
 	                       	else
 	                       		AppendToGraph /W=AnalysisWin /R=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][col][layer] /tn=$traceName vs root:SweepT
 	                       	endif
-	                       	ModifyGraph /Z /W=AnalysisWin marker($traceName)=marker[col] ? marker[col] : 19-col*11
-	                       	ModifyGraph /Z /W=AnalysisWin msize($traceName)=(WaveExists(msize) && msize[col]) ? msize[col] : 3
+	                       	variable n_traces = itemsinlist(tracenamelist("AnalysisWin",";",1))
+	                       	variable top_trace_num = n_traces - 1
+	                       	ModifyGraph /Z /W=AnalysisWin marker[top_trace_num]=marker[col] ? marker[col] : 19-col*11
+	                       	ModifyGraph /Z /W=AnalysisWin msize[top_trace_num]=(WaveExists(msize) && msize[col]) ? msize[col] : 3
 	                       endfor
 	                       appended+=1
 	               endfor
