@@ -169,6 +169,9 @@ static Function Speak(device,list,param[,now,DAQ])
 		string output_wave = stringfromlist(i,output_waves)
 		string name = stringfromlist(0,output_wave,",")
 		variable chan = str2num(stringfromlist(1,output_wave,","))
+		if(!IsChanActive(chan))
+			continue
+		endif
 		wave w = $name
 		wave /sdfr=df buffer = $("ch"+num2str(chan))
 		variable start = numpnts(buffer)
@@ -244,13 +247,16 @@ static function Listening(s)
 		string input_wave = stringfromlist(i,input_waves)
 		string name = stringfromlist(0,input_wave,",")
 		variable chan = str2num(stringfromlist(1,input_wave,","))
+		if(!IsChanActive(chan))
+			continue
+		endif
 		wave w = $name
-		wave /sdfr=df buffer = $("ch"+num2str(i))
+		wave /sdfr=df buffer = $("ch"+num2str(chan))
 		nvar /sdfr=df xx = $("x"+num2str(i))
 		if(numpnts(buffer)-xx >=numpnts(w))
 			w = buffer[p+xx]
 			xx += numpnts(w)
-			//printf "Listening read from the buffer...\r"
+			//printf "Reading from the buffer...\r"
 		endif
 		if(numpnts(buffer)>max_buffer_size)
 			PurgeInput(i)

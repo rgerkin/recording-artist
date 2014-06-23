@@ -550,9 +550,7 @@ Function StartSweep([DAQ])
 		waveformStartT= datetime - expStartT
 		waveformSweeps = 0
 	endif
-	
-	wave forcing = root:parameters:Acq:DAQs:daq0:forcingWave
-	
+		
 	Variable err=FinalUpdate(DAQ=DAQ)
 	if(err)
 		return err
