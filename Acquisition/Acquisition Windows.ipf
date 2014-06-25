@@ -2774,16 +2774,15 @@ Function AnalysisMethodSubSelections(axisNum)
 	dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
 	if(WinType("SweepsWin"))
 		String view=GetUserData("SweepsWin","SwitchView","")
-		nvar /z/sdfr=instanceDF x_left=$("x_left_"+view)
-		nvar /z/sdfr=instanceDF x_right=$("x_right_"+view)
-		if(NVar_Exists(x_left)) 
-			Variable focused=StringMatch(view,"Focused")
+		wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"cursorLocs")
+		if(waveexists(cursor_locs))
+			//Variable focused=StringMatch(view,"Focused")
 			String trace=LongestVisibleTrace(win="SweepsWin")
 			if(strlen(trace))
 				Variable offset=XOffset(trace,win="SweepsWin")
 				SetWindow SweepsWin hook=$""
-				Cursor /W=SweepsWin A,$trace,x_left-offset
-				Cursor /W=SweepsWin B,$trace,x_right-offset
+				Cursor /W=SweepsWin A,$trace,cursor_locs[0]-offset
+				Cursor /W=SweepsWin B,$trace,cursor_locs[1]-offset
 			endif
 		endif
 	endif	
@@ -3423,15 +3422,19 @@ function SweepsWinHook(info)
 				ControlInfo /W=$info.winname SwitchView; String view=S_userdata
 				Variable focused=StringMatch(view,"Focused")
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
-				strswitch(info.cursorName)
-					case "A":
-						variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win=info.winname) : xcsr(A,info.winname)
-						break
-					case "B":
-						variable /G instanceDF:$("x_right_"+view)=focused ? xcsr2("B",win=info.winname) : xcsr(B,info.winname)
-						break
+				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs")
+				if(waveexists(cursor_locs))
+					variable loc = focused ? xcsr2(info.cursorName,win=info.winname) : xcsr($(info.cursorName),info.winname)
+					strswitch(info.cursorName)
+						case "A":
+							cursor_locs[0] = loc
+							break
+						case "B":
+							cursor_locs[1] = loc
+							break
 					endswitch
 				endif
+			endif
 			break
 		case "resize":
 			if(!WinType(info.winname))
