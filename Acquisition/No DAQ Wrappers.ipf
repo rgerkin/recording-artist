@@ -274,7 +274,7 @@ static function Waiting(s)
 	string DAQ=MasterDAQ(type=DAQtype)
 	dfref df = GetDAQdf(DAQ)
 	nvar /sdfr=df lastDAQSweepT
-	nvar /sdfr=SealTestDF() sealTestOn
+	nvar /z/sdfr=SealTestDF() sealTestOn
 	lastDAQSweepT=StopMSTimer(-2)
 	
 	nvar /sdfr=$noDAQ_path t_init,t_update
@@ -318,7 +318,7 @@ static function Waiting(s)
 	//printf "Waiting executed once...\r"
 	t_update = now*1e6 + t_init
 	if(!first_sweep)
-		if(sealTestOn)
+		if(nvar_exists(sealTestOn) && sealTestOn)
 			SealTestCollectSweeps(DAQ)
 		else
 			CollectSweep(DAQ)
