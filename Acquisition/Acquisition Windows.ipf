@@ -981,15 +981,15 @@ Function /S PulseParamHelp(param)
 	return ""
 End
 
-Function PreviewStimuli([sweepNum])
-	Variable sweepNum
+Function PreviewStimuli([sweep_num])
+	Variable sweep_num
 	
 	variable currSweep=GetCurrSweep()
-	if(ParamIsDefault(sweepNum))
-		sweepNum=currSweep
+	if(ParamIsDefault(sweep_num))
+		sweep_num=currSweep
 	endif
 	
-	WaveUpdate() // Build the stimuli from the settings on the selector panel.  
+	WaveUpdate(sweep_num=sweep_num) // Build the stimuli from the settings on the selector panel.  
 	variable i,numChannels=GetNumChannels()
 	string channel
 	if(wintype("PreviewStimuliWin"))
@@ -1018,7 +1018,7 @@ Function PreviewStimuli([sweepNum])
 			wave /sdfr=daqDF LCM_
 			variable red,green,blue; GetChanColor(i,red,green,blue)
 			wave /sdfr=daqDF Raw=$("Raw_"+num2str(i))
-			Variable remainder=mod(sweepNum,LCM_[i])
+			Variable remainder=mod(sweep_num,LCM_[i])
 			string acqMode=GetAcqMode(i)
 			Variable modeNum=max(0,WhichListItem(acqMode,modeList))
 			if(IsDynamicClamp(acqMode))
@@ -1053,7 +1053,7 @@ Function PreviewStimuli([sweepNum])
 	Label /Z/W=PreviewStimuliWin bottom "Time (s)"
 	ModifyGraph /Z/W=PreviewStimuliWin lblPos=100
 	
-	SetVariable PossibleSweepNum, value=_NUM:sweepNum, limits={currSweep,Inf,1}, pos={5,30}, size={160,20}, proc=PreviewStimuliSetVariables, title="Preview Sweep Number", win=PreviewStimuliWin
+	SetVariable PossibleSweepNum, value=_NUM:sweep_num, limits={0,Inf,1}, pos={5,30}, size={160,20}, proc=PreviewStimuliSetVariables, title="Preview Sweep Number", win=PreviewStimuliWin
 	ControlInfo /W=PreviewStimuliWin Stagger
 	if(V_flag<=0)
 		Checkbox Stagger, value=0, pos={170,30}, title="Stagger View",proc=PreviewStimuliCheckboxes, win=PreviewStimuliWin
@@ -1127,7 +1127,7 @@ End
 Function PreviewStimuliSetVariables(info)
 	STRUCT WMSetVariableAction &info
 	if(info.eventCode>0)
-		PreviewStimuli(sweepNum=info.dval)
+		PreviewStimuli(sweep_num=info.dval)
 	endif
 End
 
