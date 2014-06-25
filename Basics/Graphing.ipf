@@ -2063,6 +2063,7 @@ Function SaveAxes(name,[win])
 			variable /G axisDF:min_=V_min
 			variable /G axisDF:max_=V_max
 			variable /G axisDF:autoscale=AxisAutoscale(axis_name,win=win)
+			variable /G axisDF:reverse_=AxisReverse(axis_name,win=win)
 		endif
 	endfor
 End
@@ -2087,9 +2088,13 @@ Function RestoreAxes(name,[win])
 		string axis_name=StringFromList(i,axis_list)
 		dfref axisDF=df:$axis_name
 		if(datafolderrefstatus(axisDF))
-			nvar /z/sdfr=axisDF autoscale,min_,max_
+			nvar /z/sdfr=axisDF autoscale,min_,max_,reverse_
 			if(min_==max_ || (nvar_exists(autoscale) && autoscale))
-				SetAxis /W=$win /A $axis_name
+				if(nvar_exists(reverse_) && reverse_)
+					SetAxis /W=$win /A/R $axis_name
+				else
+					SetAxis /W=$win /A $axis_name
+				endif
 			else
 				SetAxis /W=$win $axis_name min_,max_
 			endif
@@ -2107,6 +2112,15 @@ Function AxisAutoscale(axis[,win])
 		win=WinName(0,1)
 	endif
 	return StringMatch(StringByKey("SETAXISFLAGS",AxisInfo(win,axis)),"*/A*")
+End
+
+// Returns 1 if the axis is autoscaled and 0 if it is not.  
+Function AxisReverse(axis[,win])
+	String axis,win
+	if(ParamIsDefault(win))
+		win=WinName(0,1)
+	endif
+	return StringMatch(StringByKey("SETAXISFLAGS",AxisInfo(win,axis)),"*/R*")
 End
 
 // Returns a string with rgb values for each color used in a graph

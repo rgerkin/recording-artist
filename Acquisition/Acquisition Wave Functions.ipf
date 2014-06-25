@@ -143,7 +143,8 @@ End
 function IsChanActive(chan)
 	variable chan
 	
-	return Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active")
+	variable active = Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active",quiet=1)
+	return active>0
 end
 
 function IsChanAnalysisMethod(chan,method)
