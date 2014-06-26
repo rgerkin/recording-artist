@@ -3277,7 +3277,7 @@ Function NormalizeToRegion()
 	endif
 End
 
-// Applies Loess smoothing to the data in a region of a trace specified by the cursors.  
+// Applies smoothing to the data in a region of a trace specified by the cursors.  
 Function TrendRegion(method,options)
 	string method,options
 	
@@ -3288,11 +3288,11 @@ Function TrendRegion(method,options)
 	if(abs(finish-start)<=3) // If the range is insufficient.  
 		return -2
 	endif
-	wave /z data=CsrWaveRef(a)
+	wave /z data=CsrWaveRef(A,"AnalysisWin")
 	if(!waveexists(data))
 		return -3
 	endif
-	string trace=csrwave(a)
+	string trace = csrwave(A,"AnalysisWIn",1)
 	dfref df=getwavesdatafolderdfr(data)
 	wave /z Trend=df:$(nameofwave(data)+"_trend")
 	if(!waveexists(Trend))
@@ -3319,11 +3319,13 @@ Function TrendRegion(method,options)
 	
 	strswitch(method)
 		case "Remove":
-			tempTrend=NaN
+			Trend=NaN
 			variable red,green,blue
 			string channel = GetDataFolder(0,df)
 			GetChannelColor(channel,red,green,blue)
-			modifygraph /Z rgb($trace)=(red,green,blue)
+			modifygraph /Z/w=AnalysisWIn rgb($trace)=(red,green,blue)
+			removefromgraph /z/w=AnalysisWIn $(nameofwave(trend))
+			return 0
 			break
 		case "Linear Regression":
 			//SetScale /P x,first,1,$fitName
@@ -3364,15 +3366,15 @@ Function TrendRegion(method,options)
 		string appendedTrends=AppendedWave(Trend,dim1=value,dim2=pre,axis=activeAxis,win="AnalysisWin")
 		if(!strlen(appendedTrends))
 			GetTraceColor(trace,red,green,blue)
-			appendToGraph /c=(red,green,blue) /L=$activeAxis /B=time_axis Trend vs sweepT
-			modifyGraph /Z lsize($nameofwave(Trend))=0.5
-			//Wave W_Coef=W_coef; Wave W_Sigma=W_Sigma
-			//printf "For trace %s, the slope is %f +/- %f\r",trace,W_Coef(2),W_Sigma(2)
-		endif
-		if(stringmatch(method,"Decimation"))
-			modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
-			variable marker = numberbykey("marker(x)",traceinfo("",trace,0),"=")
-			modifyGraph /Z mode=3,marker=marker,lsize($nameofwave(Trend))=5
+			string y_axis_name = TraceYAxis(trace,win="AnalysisWin")
+			appendToGraph /c=(red,green,blue) /L=$y_axis_name /B=time_axis Trend vs sweepT
+			string trend_trace = TopTrace(win="AnalysisWin")
+			modifyGraph /Z lsize($trend_trace)=0.5
+			if(stringmatch(method,"Decimation"))
+				modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
+				variable marker = numberbykey("marker(x)",trace_info,"=")
+				modifyGraph /Z mode($trend_trace)=3,marker($trend_trace)=marker,lsize($trend_trace)=5
+			endif
 		endif
 	endif
 	killwaves /z tempTrend
