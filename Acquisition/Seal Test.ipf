@@ -324,13 +324,15 @@ Function SealTestWindow([DAQ])
 			sprintf resistanceTitle,"\K(%d,%d,%d)"+"M\F'Symbol'W ",red,green,blue
 			sprintf pressureTitle,"\K(%d,%d,%d)"+"mBar ",red,green,blue
 			Button $("Zap_"+channel) title="Zap", pos={5,10+count*yJump}, size={30,20}, proc=SealTestWinButtons
-			SetVariable $("ZapDuration_"+channel) title=" ", help={"Zap duration in ms"}, pos={35,12+count*yJump}, size={35,20}, limits={0.5,50,0.5}, value=_NUM:5
+			SetVariable $("ZapDuration_"+channel) title=" ", help={"Zap duration in ms"}, pos={38,12+count*yJump}, size={35,20}, limits={0.5,50,0.5}, value=_NUM:5
 			
 			string valName="inputRes_"+channel
-			ValDisplay $valName pos={85,8+count*yJump}, format="%.1f", fsize=18, disable=2
-			ValDisplay $valName bodywidth=70, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
-			Button $("Baseline_"+channel) title="Baseline", pos={195,10+count*yJump}, proc=SealTestWinButtons
-			SetVariable $("Range_"+channel) title="Range", pos={252,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
+			ValDisplay $valName pos={75,8+count*yJump}, format="%.1f", fsize=18, disable=0
+			ValDisplay $valName bodywidth=60, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
+			ValDisplay $("Aux_"+channel) pos={565,11}, format="%.1f", fsize=14, disable=1
+			
+			Button $("Baseline_"+channel) title="Baseline", pos={185,10+count*yJump}, proc=SealTestWinButtons
+			SetVariable $("Range_"+channel) title="Range", pos={242,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
 			//SetVariable $("Threshold_"+channel) title="Thresh %", pos={252,12+count*yJump}, size={85,20}, value=_NUM:0, proc=SealTestWinSetVariables
 			valName="seriesRes_"+channel
 			//ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
@@ -390,7 +392,7 @@ Function SealTestWindow([DAQ])
 	Label /Z seriesHistoryAxis "Series (M\\F'Symbol'W\\F'Default')"
 	Label /Z timeConstantHistoryAxis "Time Constant (ms)"
 	Label /Z pressureHistoryAxis "Pressure (mBar)"
-	xx=345; yy=10
+	xx=335; yy=10
 	GroupBox Controls frame=1, pos={xx,yy-5}, size={505,30}, title=""
 	xx+=5
 	PopupMenu Channels, pos={xx,yy}, userData(selected)=ChannelList(chanBits),mode=0, title="Channels",proc=SealTestWinPopupMenus
@@ -398,16 +400,16 @@ Function SealTestWindow([DAQ])
 	xx+=90
 	wave /sdfr=df ampl
 	nvar /sdfr=instanceDF gridOn,seriesOn,pressureOn,timeConstantOn
-	SetVariable Ampl,pos={xx,yy+2},size={80,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
-	xx+=90
-	SetVariable Freq,pos={xx,yy+2},size={80,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
-	xx+=90
+	SetVariable Ampl,pos={xx,yy+2},size={60,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
+	xx+=65
+	SetVariable Freq,pos={xx,yy+2},size={60,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
+	xx+=135
 	Checkbox Grid, pos={xx,yy+3},variable=gridOn, title="Grid",proc=SealTestWinCheckboxes
-	xx+=55
+	xx+=50
 	Checkbox Series, pos={xx,yy+3},variable=seriesOn, title="Series",proc=SealTestWinCheckboxes
-	xx+=55
+	xx+=50
 	Checkbox TimeConstant, pos={xx,yy+3},variable=timeConstantOn, title="Tau",proc=SealTestWinCheckboxes
-	xx+=55
+	xx+=50
 	Checkbox Pressure, pos={xx,yy+3},variable=pressureOn, title="Pressure",proc=SealTestWinCheckboxes
 	
 	Struct WMCheckboxAction info
@@ -555,11 +557,13 @@ Function SealTestAuxMeasurement(measurement,value)
 		Checkbox $measurement, value=0
 	endif
 	String DAQ=GetUserData("","","DAQ")
+	variable num_channels=GetNumChannels(DAQ=DAQ)
 	dfref df=SealTestDF()
+	nvar /sdfr=df chanBits
 	svar instance = df:instance
 	dfref instanceDF = df:$instance
 	String traces=TraceNameList("",";",1)
-	Variable i
+	Variable i,j
 	for(i=0;i<ItemsInList(traces);i+=1)
 		String trace=StringFromList(i,traces)
 		if(StringMatch(trace,measurement+"*"))
@@ -575,23 +579,40 @@ Function SealTestAuxMeasurement(measurement,value)
 	endfor
 	ModifyGraph tick($(measurement+"HistoryAxis"))=0*(value),noLabel($(measurement+"HistoryAxis"))=2*(!value),axThick($(measurement+"HistoryAxis"))=value
 	
-	nvar /sdfr=instanceDF seriesOn,pressureOn,timeConstantOn
-	if(pressureOn)
-		ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(pressureHistoryTAxis)={0.55,1}
-		ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(pressureHistoryAxis)={0,kwFraction}
-	elseif(seriesOn)
-		ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(seriesHistoryTAxis)={0.55,1}
-		ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(seriesHistoryAxis)={0,kwFraction}
-	elseif(timeConstantOn)
-		ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(timeConstantHistoryTAxis)={0.55,1}
-		ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(timeConstantHistoryAxis)={0,kwFraction}
-	else
+	nvar /sdfr=instanceDF pressureOn
+	ModifyControlList controlnamelist("",";","zero*") disable=!pressureOn
+	ModifyControlList controlnamelist("",";","Aux_*") disable=1
+	
+	string auxes = "series;timeConstant;pressure"
+	variable any_aux = 0
+	for(i=0;i<itemsinlist(auxes);i+=1)
+		string aux = stringfromlist(i,auxes)
+		nvar /sdfr=instanceDF on=$(aux+"On")		
+		any_aux += on
+		if(on)
+			ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab($(aux+"HistoryTAxis"))={0.55,1}
+			ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos($(aux+"HistoryAxis"))={0,kwFraction}
+			for(j=0;j<num_channels;j+=1)
+				if(chanBits & 2^j) // Seal test requested on this channel.  
+					dfref chanDF=SealTestChanDF(j)
+					string channel=num2str(j)
+					string var_name = aux
+					if(stringmatch(aux,"series"))
+						var_name = "seriesRes"
+					endif
+					ValDisplay $("Aux_"+channel) value=#JoinPath({getdatafolder(1,chanDF),var_name}), disable=0
+				endif
+			endfor
+		else
+			ModifyGraph freePos($(aux+"HistoryAxis"))={0.1,kwFraction} // Move it away so it is not overlapping the visible axis.  
+		endif
+	endfor		
+	if(!any_aux)
 		ModifyGraph axisEnab(inputHistoryTAxis)={0,1}
 		ModifyGraph freePos(inputHistoryAxis)={0,kwFraction}
 		//ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(seriesHistoryTAxis)={0.55,0.75},axisEnab(pressureHistoryTAxis)={0.8,1}
 		//ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(seriesHistoryAxis)={0.25,kwFraction},freePos(pressureHistoryAxis)={0,kwFraction}
 	endif
-	ModifyControlList controlnamelist("",";","zero*") disable=!pressureOn
 	//NVar sealTestOn=root:sealtest:sealTestOn
 	//if(sealTestOn) // If a seal test is running, restart it.  
 	//	SealTestStart(1,DAQ)
