@@ -796,15 +796,15 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			Cursors(win="SweepsWin")
 			return -1
 		endif
-		nvar /z/sdfr=postDF method_x1=$("x_left_"+view), method_x2=$("x_right_"+view)
-		if(!NVar_Exists(method_x1)) // If there is no analysis region set for this measurement method.  
+		wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"cursorLocs")
+		if(!waveexists(cursor_locs)) // If there is no analysis region set for this measurement method.  
 			// Use the current cursor positions.  
 			variable focused=StringMatch(view,"Focused")
 			x1=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
 			x2=focused ? xcsr2("B",win="SweepsWin") : xcsr(B,"SweepsWin")
 		else
-			x1=method_x1
-			x2=method_x2
+			x1=cursor_locs[0]
+			x2=cursor_locs[1]
 		endif
 		Variable flip_sign=max(0,Minimum[post]) // Flip the sign of the measurement if the bit is set.  
 		//Execute /Q "ProgressWindow open"

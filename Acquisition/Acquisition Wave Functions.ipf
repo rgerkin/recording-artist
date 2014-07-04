@@ -143,7 +143,8 @@ End
 function IsChanActive(chan)
 	variable chan
 	
-	return Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active")
+	variable active = Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active",quiet=1)
+	return active>0
 end
 
 function IsChanAnalysisMethod(chan,method)
@@ -1333,8 +1334,9 @@ function SetListenHook(hook[,DAQ])
 	string /g df:listenHook=hook
 end
 	
-Function WaveUpdate([DAQ])
+Function WaveUpdate([DAQ,sweep_num])
 	String DAQ
+	variable sweep_num
 	
 	DAQ=SelectString(ParamIsDefault(DAQ),DAQ,MasterDAQ())
 	variable i,numChannels=GetNumChannels()
@@ -1361,11 +1363,11 @@ Function WaveUpdate([DAQ])
 		make /o/n=(0,LCM_[i]) daqDF:$("Raw_"+num2str(i)) /wave=Raw
 		if(IsDynamicClamp(GetAcqMode(i)))
 			wave /sdfr=daqDF forcingWave,eWave,iWave
-			Assemble(i,forcingWave,triparity=0)
-			Assemble(i,eWave,triparity=1)
-			Assemble(i,iWave,triparity=2)
+			Assemble(i,forcingWave,triparity=0,sweep_num=sweep_num)
+			Assemble(i,eWave,triparity=1,sweep_num=sweep_num)
+			Assemble(i,iWave,triparity=2,sweep_num=sweep_num)
 		else
-			Assemble(i,raw)
+			Assemble(i,raw,sweep_num=sweep_num)
 		endif
 		//if(WaveExists(StimulusName))
 		//	String stim_name=StimulusName[i]
@@ -1674,11 +1676,13 @@ function /wave GetActiveChannels()
 end
 
 // Assemble the stimulus from components.  
-Function /S Assemble(chan,Stimulus[,triparity])
+Function /S Assemble(chan,Stimulus[,triparity,sweep_num])
 	variable chan
 	wave Stimulus // The wave that will be overwritten with the stimulus.  
 	variable triparity // Even (0) or odd (1).  
+	variable sweep_num
 	
+	variable curr_sweep_num = GetCurrSweep()
 	string stimulusName=GetStimulusName(chan)
 	
 	//dfref df=root:parameters
@@ -1694,7 +1698,25 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	wave LCM_=Core#WavPackageSetting(module,"DAQs",DAQ,"LCM_")
 	variable pulseSets=GetNumPulseSets(DAQ)
 	dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
-	wave /sdfr=df divisor,remainder,pulses,begin,IPI,width,testPulseOn
+	if(paramisdefault(sweep_num) || sweep_num>=curr_sweep_num)
+		wave /sdfr=df divisor,remainder,pulses,begin,IPI,width,testPulseOn
+	else
+		wave history = GetChanHistory(chan)
+		variable index = FindDimLabel(history,1,"Divisor")
+		make /free/n=(dimsize(history,2)) divisor = history[sweep_num][index][p]
+		index = FindDimLabel(history,1,"Remainder")
+		make /free/n=(dimsize(history,2)) remainder = history[sweep_num][index][p]
+		index = FindDimLabel(history,1,"Pulses")
+		make /free/n=(dimsize(history,2)) pulses = history[sweep_num][index][p]
+		index = FindDimLabel(history,1,"Begin")
+		make /free/n=(dimsize(history,2)) begin = history[sweep_num][index][p]
+		index = FindDimLabel(history,1,"IPI")
+		make /free/n=(dimsize(history,2)) IPI = history[sweep_num][index][p]
+		index = FindDimLabel(history,1,"Width")
+		make /free/n=(dimsize(history,2)) width = history[sweep_num][index][p]
+		index = FindDimLabel(history,1,"testPulseOn")
+		make /free/n=(dimsize(history,2)) testPulseOn = history[sweep_num][index][p]
+	endif
 	Redimension /n=(duration*kHz*1000,LCM_[chan]) Stimulus
 	SetScale /P x,0,1/(1000*kHz),Stimulus
 	Stimulus=0
