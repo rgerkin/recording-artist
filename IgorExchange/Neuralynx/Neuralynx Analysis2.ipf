@@ -2051,6 +2051,7 @@ Function ReplaceWaves(df,type[,computeIsolation])
 					logP=-log(1-statschicdf(d2,dof))
 				endif
 			elseif(computeIsolation)
+#if exists("ClusterIsolation")
 				string highlighted=SelectedClusters(option="highlighted")
 				if(itemsinlist(highlighted)==1) // One cluster highlighted.  
 					variable refCluster=str2num(stringfromlist(0,highlighted))
@@ -2077,6 +2078,7 @@ Function ReplaceWaves(df,type[,computeIsolation])
 						endif
 					endif
 				endif
+#endif
 			endif
 			make /free/n=100 appendedSpikes=0 // Index is cluster number.  
 			variable electrodes=dimsize(data,2)
@@ -2186,6 +2188,7 @@ Function ReplaceWaves(df,type[,computeIsolation])
 	return 0
 End
 
+#if exists("ClusterIsolation")
 Function PlotIsolation(df[,doClusters,regenerate])
 	dfref df
 	wave doClusters
@@ -2209,6 +2212,7 @@ Function PlotIsolation(df[,doClusters,regenerate])
 	ModifyImage /w=IsolationPlot isolation ctab= {0,1,Grays,1}
 	ModifyGraph /w=IsolationPlot manTick={0,1,0,0},manMinor={0,0}
 End
+#endif
 
 function /wave MahalDistanceMatrix(df[,units,plot])
 	dfref df
@@ -4771,3 +4775,96 @@ function DoStats([df])
 	DoWindow /K MannWhitneyTable 
 	Edit /K=1/N=MannWhitneyTable mannWhitneyResults.ld as "Mann-Whitney p-values"
 end
+
+// Returns two columns:
+// 1) The isolation distance, which is the maximum Mahalanobis distance from the center of the 'cluster' at which points in 'data' inside that distance are more likely 
+// to be members of 'cluster' than not.  K.D. Harris et al., 2001.  Equivalent to the value of D^2 for which the false discovery rate at threshold D^2 is equal to 0.5, where 
+// the existing cluster assignments are taken to be the ground truth.  
+// 2) The L-ratio, which is equal to sum(1-cdf(D^2)) for all spikes outside the cluster divided by the number of spikes in the cluster.  Similar to the ratio of false positives
+// to (true positives + true negatives).    
+Function /wave ClusterIsolation(df[,features,centeredClusters,nuisanceClusters])
+	dfref df
+	string features // e.g. "lambdas" to use the PCA coefficients.  
+	wave centeredClusters
+	wave nuisanceClusters // only do these clusters, e.g. "3-5".  
+	
+	features=selectstring(!paramisdefault(features),"lambdas",features)
+	wave clustersWithSpikez=NlxA#ClustersWithSpikes(df)
+	if(paramisdefault(centeredClusters))
+		centeredClusters=clustersWithSpikez
+	endif
+	if(paramisdefault(nuisanceClusters))
+		nuisanceClusters=clustersWithSpikez
+	endif
+	wave /z/sdfr=df clusters,values=$features
+	if(!waveexists(values))
+		printf "Features wave '%s' does not exist.\r",features
+		return NULL
+	endif
+	if(sum(values)==0)
+		printf "Features wave '%s' is full of zeroes.\r",features
+		return NULL
+	endif
+	wave d2s=MahalDistance(values,clusters,doClusters=centeredClusters)
+	make /o/n=(numpnts(centeredClusters),numpnts(nuisanceClusters)+2) df:isolation /wave=Isolation=nan//isolationDistances=nan, df:Lratios /wave=Lratios=nan
+	variable i=0
+	for(i=0;i<numpnts(centeredClusters);i+=1)
+		variable centeredCluster=centeredClusters[i]
+		string clusterName="U"+num2str(centeredCluster)
+		variable column=FindDimLabel(d2s,1,clusterName)
+		if(column<0)
+			continue
+		endif
+		SetDimLabel 0,i,$clusterName,Isolation
+		matrixop /free d2=col(d2s,column)
+	
+		dfref clusterDF=df:$clusterName
+		
+		duplicate /free clusters sortedclusters,sortedSelf
+		redimension /s sortedSelf // convert from unsigned int to single precision so values can be negative.  
+		sort d2,d2,sortedClusters,sortedSelf // sort so that cluster assignments are put in order of mahalanobis distance to cluster center.  
+		
+		// Compute isolation distance.  
+		sortedSelf=(sortedSelf==centeredCluster) ? 1 : -1 // 1 if a spike belongs to the cluster and -1 if it doesn't.  
+		integrate /p sortedSelf
+		findlevel /q/edge=2 sortedSelf,0 // find the farthest spike from the cluster center where only half of the spikes that are nearer belong to the cluster.  
+		if(!v_flag)
+			variable isolationDistance=d2[V_LevelX] // mahalanobis distance of this spike.  
+		elseif(sortedSelf[numpnts(sortedSelf)-1]<0)
+			isolationDistance=0
+		else
+			isolationDistance=Inf
+		endif
+		Isolation[centeredCluster][numpnts(nuisanceClusters)]=isolationDistance
+		variable /g clusterDF:isolationDistance=isolationDistance
+		
+		// Compute L-ratio.  
+		extract /free d2,d2nuisance,sortedclusters!=centeredCluster
+		variable dof=dimsize(values,1)
+		make /free/n=(numpnts(d2nuisance)) Lc=1-statschicdf(d2nuisance,dof) // Nuisance weights.  
+		variable spikesInCluster=numpnts(d2)-numpnts(d2nuisance)
+		variable Lratio=sum(Lc)/spikesinCluster
+		Isolation[%$clusterName][numpnts(nuisanceClusters)+1]=Lratio
+		variable /g clusterDF:Lratio=Lratio
+		
+		// Compute pairwise L-average.  
+		variable j
+		for(j=0;j<numpnts(nuisanceClusters);j+=1)
+			variable nuisanceCluster=nuisanceClusters[j]
+			string nuisanceClusterName="U"+num2str(nuisanceCluster)
+			SetDimLabel 1,j,$nuisanceClusterName,Isolation
+			extract /free d2,d2nuisance,sortedClusters==nuisanceCluster
+			make /free/n=(numpnts(d2nuisance)) Lc=1-statschicdf(d2nuisance,dof) // Nuisance weights.  
+			variable Lratio_pair=sum(Lc)/spikesinCluster
+			Isolation[%$clusterName][%$nuisanceClusterName]=Lratio_pair
+		endfor
+		
+		waveclear d2nuisance,sortedClusters,sortedSelf
+		//i+=1
+	endfor
+	toc()
+	isolation=numtype(isolation) ? nan : isolation
+	SetDimLabel 1,numpnts(nuisanceClusters),isoD,Isolation
+	SetDimLabel 1,numpnts(nuisanceClusters)+1,Lratio,Isolation
+	return Isolation
+End

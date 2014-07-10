@@ -4,7 +4,7 @@
 // $Date: 2013-03-15 17:17:39 -0700 (Fri, 15 Mar 2013) $
 
 #pragma rtGlobals=1		// Use modern global access method.
-#pragma ModuleName= Nlx
+#pragma ModuleName=Nlx
 static strconstant module=Nlx
 constant useSettings=1
 static strconstant panelName="NeuralynxPanel"

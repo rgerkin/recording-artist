@@ -1,5 +1,19 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
+#include "Symbols"
+#include "Settings"
+#include "Profiles"
+#include "Utilities"
+#include "List Functions"
+#include "Signal Processing"
+#include "Statistics"
+#include "Progress Window"
+#include "Wave Functions"
+#include "Load Neuralynx"
+#include "Neuralynx Analysis"
+#include "Neuralynx Analysis2"
+#include "Graphing"
+
 strconstant pathName = "PaulPath"
 strconstant animalPathName = "AnimalPath"
 constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list. 
