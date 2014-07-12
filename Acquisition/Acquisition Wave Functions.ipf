@@ -1540,6 +1540,19 @@ function /wave GetDAQDivisor(daq)
 	return daqDivisor
 end
 
+function /wave GetChanStimParam(param_name,chan[,sweepNum])
+	string param_name
+	variable chan,sweepNum
+	
+	if(paramisdefault(sweepNum))
+		wave ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param_name)
+	else
+		wave chanHistory=GetChanHistory(chan)
+		make /free/n=(dimsize(chanHistory,2)) param=chanHistory[sweepNum][%$param_name][p]
+	endif
+	return param
+end
+
 function /wave GetChanDivisor(chan[,sweepNum])
 	variable chan,sweepNum
 	
@@ -1612,6 +1625,36 @@ function /wave GetdAmpl(chan[,sweepNum])
 	return dAmpl
 end
 
+function GetEffectiveParam(param_name,chan[,sweepNum,pulseSet,pulseNum])
+	string param_name
+	variable chan,sweepNum,pulseSet,pulseNum
+	
+	wave param = GetChanStimParam(param_name,chan,sweepNum=sweepNum)
+	if(paramisdefault(pulseSet))
+		wave livePulseSets = GetLivePulseSets(chan,sweepNum=sweepNum)
+		pulseSet = livePulseSets[0] // First live pulse set.  
+	endif
+	variable result = param[pulseSet]
+	
+	return result
+end
+
+function /wave GetSweepsWithEffectiveParam(param_name,value,chan[,pulseNum])
+	string param_name
+	variable value,chan,pulseNum
+	
+	make /free/n=0 w_sweeps
+	variable i,num_sweeps = GetCurrSweep()
+	for(i=0;i<num_sweeps;i+=1)
+		variable sweep_value = GetEffectiveParam(param_name,chan,sweepNum=i,pulseNum=pulseNum)
+		if(value == sweep_value)
+			w_sweeps[numpnts(w_sweeps)] = {i}
+		endif
+	endfor
+	
+	return w_sweeps
+end
+
 function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	variable chan,sweepNum,pulseSet,pulseNum
 	
@@ -1627,6 +1670,7 @@ function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	for(k=0;k<numpnts(livePulseSets);k+=1)
 		result +=  (pulseNum<pulses[k]) * (ampl[livePulseSets[k]] +pulseNum*dampl[livePulseSets[k]])
 	endfor
+	
 	return result
 end
 
