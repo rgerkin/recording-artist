@@ -1658,6 +1658,8 @@ end
 function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	variable chan,sweepNum,pulseSet,pulseNum
 	
+	sweepNum  = paramisdefault(sweepNum) ? GetCurrSweep() : sweepNum
+	
 	wave ampl = GetAmpl(chan,sweepNum=sweepNum)
 	wave dampl = GetdAmpl(chan,sweepNum=sweepNum)
 	wave pulses = GetNumPulses(chan,sweepNum=sweepNum)
@@ -1677,9 +1679,11 @@ end
 function /wave GetLivePulseSets(chan[,sweepNum])
 	variable chan,sweepNum
 	
+	sweepNum  = paramisdefault(sweepNum) ? GetCurrSweep() : sweepNum
+	
 	wave divisor = GetChanDivisor(chan,sweepNum=sweepNum)
 	wave remainder = GetChanRemainder(chan,sweepNum=sweepNum)
-	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(divisor[p],sweepNum) & remainder[p]
+	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(sweepNum,divisor[p]) & remainder[p]
 	if(numpnts(divisor)==1)
 		pulseSetState = 1
 	endif
