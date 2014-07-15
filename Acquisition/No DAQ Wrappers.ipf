@@ -164,11 +164,15 @@ static Function Speak(device,list,param[,now,DAQ])
 	variable continuous = Core#VarPackageSetting(module,"DAQs",MasterDAQ(),"continuous")
 	dfref df = $output_path
 	string output_waves = Core#StrPackageSetting(module,"DAQs",MasterDAQ(),"outputWaves")
+	//print output_waves
 	variable i
 	for(i=0;i<min(num_outputs,itemsinlist(output_waves));i+=1)
 		string output_wave = stringfromlist(i,output_waves)
 		string name = stringfromlist(0,output_wave,",")
 		variable chan = str2num(stringfromlist(1,output_wave,","))
+		if(!IsChanActive(chan))
+			continue
+		endif
 		wave w = $name
 		wave /sdfr=df buffer = $("ch"+num2str(chan))
 		variable start = numpnts(buffer)
@@ -244,13 +248,16 @@ static function Listening(s)
 		string input_wave = stringfromlist(i,input_waves)
 		string name = stringfromlist(0,input_wave,",")
 		variable chan = str2num(stringfromlist(1,input_wave,","))
+		if(!IsChanActive(chan))
+			continue
+		endif
 		wave w = $name
-		wave /sdfr=df buffer = $("ch"+num2str(i))
+		wave /sdfr=df buffer = $("ch"+num2str(chan))
 		nvar /sdfr=df xx = $("x"+num2str(i))
 		if(numpnts(buffer)-xx >=numpnts(w))
 			w = buffer[p+xx]
 			xx += numpnts(w)
-			//printf "Listening read from the buffer...\r"
+			//printf "Reading from the buffer...\r"
 		endif
 		if(numpnts(buffer)>max_buffer_size)
 			PurgeInput(i)
@@ -267,6 +274,7 @@ static function Waiting(s)
 	string DAQ=MasterDAQ(type=DAQtype)
 	dfref df = GetDAQdf(DAQ)
 	nvar /sdfr=df lastDAQSweepT
+	nvar /z/sdfr=SealTestDF() sealTestOn
 	lastDAQSweepT=StopMSTimer(-2)
 	
 	nvar /sdfr=$noDAQ_path t_init,t_update
@@ -278,29 +286,43 @@ static function Waiting(s)
 	//variable points = Hz*elapsed/1e6
 	dfref inDF = $input_path
 	dfref outDF = $output_path
-	variable i,j
+	variable chan
 	
 	// Inputs matched up one-to-one to outputs.  
-	for(i=0;i<min(num_inputs,num_outputs);i+=1)	
-		wave /sdfr=outDF out = $("ch"+num2str(i))
-		nvar /sdfr=outDF out_x = $("x"+num2str(i))
+	for(chan=0;chan<min(num_inputs,num_outputs);chan+=1)	
+		if(!IsChanActive(chan))
+			continue
+		endif
+		wave /sdfr=outDF out = $("ch"+num2str(chan))
+		nvar /sdfr=outDF out_x = $("x"+num2str(chan))
+		//print wavemax(out),wavemin(out),out_x,numpnts(out)
 		wave response = IO(out,out_x)
 		out_x += numpnts(response)
-		wave /sdfr=inDF in = $("ch"+num2str(i))
-		concatenate /np {response},in
+		wave /sdfr=inDF in = $("ch"+num2str(chan))
+		if(numpnts(response))
+			//print wavemax(response)
+			concatenate /np {response},in
+		endif
 		//printf "Added %d points to the input buffer.\r",numpnts(response)
 	endfor
 	
 	// Extra inputs not matched up to any output.  
-	for(j=i;j<num_inputs;j+=1)	
-		wave /sdfr=inDF in = $("ch"+num2str(j))
+	for(chan=chan;chan<num_inputs;chan+=1)	
+		if(!IsChanActive(chan))
+			continue
+		endif
+		wave /sdfr=inDF in = $("ch"+num2str(chan))
 		in = gnoise(1)
 	endfor	
 	
 	//printf "Waiting executed once...\r"
 	t_update = now*1e6 + t_init
 	if(!first_sweep)
-		CollectSweep(DAQ)
+		if(nvar_exists(sealTestOn) && sealTestOn)
+			SealTestCollectSweeps(DAQ)
+		else
+			CollectSweep(DAQ)
+		endif
 	endif
 	return 0
 end
@@ -333,8 +355,14 @@ static function /wave IO(w,start)
 	expo /= summ // Normalize to a sum of 1.  
 	Convolve expo,convolved
 	copyscales /p w,convolved
-	duplicate /free/r=[start,] convolved,result
-	result += gnoise(0.0001)
-	result *= 1000
+	redimension /n=(numpnts(w)) convolved
+	if(start<numpnts(convolved))
+		duplicate /free/r=[start,] convolved,result
+		result += gnoise(0.0001)
+		result *= 1000
+		//print 1000*wavemax(convolved),wavemax(result)
+	else
+		make /free/n=0 result
+	endif
 	return result
 end

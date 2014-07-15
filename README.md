@@ -12,3 +12,4 @@
 
 You are free to download it, modify it, and redistribute it.  
 A paid support license can be obtained by contacting me at rgerkin at asu dot edu.
+You can also read the [documentation](http://goo.gl/Q9dbB).  

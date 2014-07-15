@@ -68,6 +68,7 @@ Function SealTest(chanBits[,instance,DAQ])
 			dfref chanDF=SealTestChanDF(i)
 			variable /G chanDF:inputRes
 			variable /G chanDF:seriesRes
+			variable /G chanDF:timeConstant
 			variable /G chanDF:pressure
 			variable /G chanDF:supplyVolts
 			nvar /sdfr=chanDF supplyVolts
@@ -76,7 +77,7 @@ Function SealTest(chanBits[,instance,DAQ])
 			endif
 			variable /G df:zap=0
 			variable historyPoints=10000/freq
-			make /D/o/n=(historyPoints) chanDF:InputHistory=nan,chanDF:SeriesHistory=nan,chanDF:PressureHistory=nan
+			make /D/o/n=(historyPoints) chanDF:InputHistory=nan,chanDF:SeriesHistory=nan,chanDF:PressureHistory=nan,chanDF:TimeConstantHistory=nan
 			if(useTelegraph)
 				SetAcqModeFromTelegraph(0)
 			endif
@@ -318,25 +319,30 @@ Function SealTestWindow([DAQ])
 			AppendToGraph /T=InputHistoryTaxis /R=InputHistoryAxis /C=(red,green,blue) chanDF:inputHistory vs df:thyme
 			AppendToGraph /T=SeriesHistoryTaxis /R=SeriesHistoryAxis /C=(red,green,blue) chanDF:seriesHistory vs df:thyme
 			AppendToGraph /T=PressureHistoryTaxis /R=PressureHistoryAxis /C=(red,green,blue) chanDF:pressureHistory vs df:thyme
+			AppendToGraph /T=TimeConstantHistoryTaxis /R=TimeConstantHistoryAxis /C=(red,green,blue) chanDF:timeConstantHistory vs df:thyme
 			String resistanceTitle,pressureTitle
 			sprintf resistanceTitle,"\K(%d,%d,%d)"+"M\F'Symbol'W ",red,green,blue
 			sprintf pressureTitle,"\K(%d,%d,%d)"+"mBar ",red,green,blue
 			Button $("Zap_"+channel) title="Zap", pos={5,10+count*yJump}, size={30,20}, proc=SealTestWinButtons
-			SetVariable $("ZapDuration_"+channel) title=" ", help={"Zap duration in ms"}, pos={35,12+count*yJump}, size={35,20}, limits={0.5,50,0.5}, value=_NUM:5
+			SetVariable $("ZapDuration_"+channel) title=" ", help={"Zap duration in ms"}, pos={38,12+count*yJump}, size={35,20}, limits={0.5,50,0.5}, value=_NUM:5
 			
 			string valName="inputRes_"+channel
-			ValDisplay $valName pos={85,8+count*yJump}, format="%.1f", fsize=18, disable=2
-			ValDisplay $valName bodywidth=70, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
-			Button $("Baseline_"+channel) title="Baseline", pos={195,10+count*yJump}, proc=SealTestWinButtons
-			SetVariable $("Range_"+channel) title="Range", pos={252,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
-			valName="seriesRes_"+channel
+			ValDisplay $valName pos={75,8+count*yJump}, format="%.1f", fsize=18, disable=0
+			ValDisplay $valName bodywidth=60, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
+			ValDisplay $("Aux_"+channel) pos={565,11}, format="%.1f", fsize=14, disable=1
+			
+			Button $("Baseline_"+channel) title="Baseline", pos={185,10+count*yJump}, proc=SealTestWinButtons
+			SetVariable $("Range_"+channel) title="Range", pos={242,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
 			//SetVariable $("Threshold_"+channel) title="Thresh %", pos={252,12+count*yJump}, size={85,20}, value=_NUM:0, proc=SealTestWinSetVariables
 			valName="seriesRes_"+channel
-			ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
-			ValDisplay $valName bodywidth=100, size={100,30}, title=resistanceTitle,value=#JoinPath({getdatafolder(1,chanDF),"seriesRes"})
+			//ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
+			//ValDisplay $valName bodywidth=100, size={100,30}, title=resistanceTitle,value=#JoinPath({getdatafolder(1,chanDF),"seriesRes"})
+			valName="timeConstant_"+channel
+			//ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
+			//ValDisplay $valName bodywidth=100, size={100,30}, title="ms",value=#JoinPath({getdatafolder(1,chanDF),"timeConstant"})
 			valName="pressure_"+channel
-			ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
-			ValDisplay $valName bodywidth=100, size={100,30}, title=pressureTitle,value=#JoinPath({getdatafolder(1,chanDF),"pressure"})
+			//ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
+			//ValDisplay $valName bodywidth=100, size={100,30}, title=pressureTitle,value=#JoinPath({getdatafolder(1,chanDF),"pressure"})
 			Button $("ZeroPressure_"+channel), proc=SealTestWinButtons, title="Zero"
 			string inputUnits=GetModeInputUnits(mode)
 			
@@ -351,9 +357,10 @@ Function SealTestWindow([DAQ])
 	endfor
 	
 	ControlBar /T 40+(count-1)*yJump
-	SetAxis /A/R InputhistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
-	SetAxis /A/R SerieshistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
-	SetAxis /A/R PressurehistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
+	SetAxis /A/R InputHistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
+	SetAxis /A/R SeriesHistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
+	SetAxis /A/R TimeConstantHistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
+	SetAxis /A/R PressureHistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
 	SetWindow SealTestWin hook=SealTestHook, hookevents=1 // mouse down events
 	//Wave AcqMode=root:parameters:AcqMode
 	//AcqMode[
@@ -361,46 +368,54 @@ Function SealTestWindow([DAQ])
 		SetAxis /A/R/Z inputHistoryTaxis 
 		SetAxis /A/R/Z seriesHistoryTaxis
 		SetAxis /A/R/Z pressureHistoryTaxis
+		SetAxis /A/R/Z timeConstantHistoryTAxis
 		SetAxis /Z inputHistoryAxis 1,2000
 		SetAxis /Z seriesHistoryAxis 1,200
 		SetAxis /Z pressureHistoryAxis -25,250
+		SetAxis /Z timeConstantHistoryAxis 0.1,100
 	endif
-	ModifyGraph /Z log(inputHistoryAxis)=1, log(seriesHistoryAxis)=1//, log(pressureHistoryAxis)=1
+	ModifyGraph /Z log(inputHistoryAxis)=1, log(seriesHistoryAxis)=1, log(timeConstantHistoryAxis)=1//, log(pressureHistoryAxis)=1
 	for(i=0;i<count;i+=1)
 		sweepAxis=stringfromlist(i,sweepAxes)
 		modifygraph /Z axisEnab($sweepAxis)={0.6*i/count,0.6*(i+1)/count-(count>0)*0.03}, lblPos($sweepAxis)=50
 	endfor
-	ModifyGraph /Z axisEnab(inputHistoryAxis)={0.62,1}, axisEnab(seriesHistoryAxis)={0.62,1}, axisEnab(pressureHistoryAxis)={0.62,1}
+	ModifyGraph /Z axisEnab(inputHistoryAxis)={0.62,1}, axisEnab(seriesHistoryAxis)={0.62,1}, axisEnab(pressureHistoryAxis)={0.62,1}, axisEnab(timeConstantHistoryAxis)={0.62,1}
 	ModifyGraph freePos(inputHistoryAxis)=0, freePos(inputHistoryTaxis)=-15
-	ModifyGraph freePos(inputHistoryAxis)=0, freePos(seriesHistoryTaxis)=-15, freePos(pressureHistoryTaxis)=-15
-	ModifyGraph /Z lblPos(inputHistoryAxis)=60, lblPos(seriesHistoryAxis)=60, lblPos(pressureHistoryAxis)=60
+	ModifyGraph freePos(inputHistoryAxis)=0, freePos(seriesHistoryTaxis)=-15, freePos(pressureHistoryTaxis)=-15, freePos(timeConstantHistoryTAxis)=-15
+	ModifyGraph /Z lblPos(inputHistoryAxis)=60, lblPos(seriesHistoryAxis)=60, lblPos(pressureHistoryAxis)=60, lblPos(timeConstantHistoryAxis)=42
 	ModifyGraph nticks(inputHistoryTaxis)=0,axThick(inputHistoryTaxis)=0
 	ModifyGraph nticks(seriesHistoryTaxis)=0,axThick(seriesHistoryTaxis)=0
+	ModifyGraph nticks(timeConstantHistoryTaxis)=0,axThick(timeConstantHistoryTaxis)=0
 	ModifyGraph nticks(pressureHistoryTaxis)=0,axThick(pressureHistoryTaxis)=0,btlen=2
 	//ModifyGraph live=1
 	Label inputHistoryAxis "Seal (M\\F'Symbol'W\\F'Default')"
 	Label /Z seriesHistoryAxis "Series (M\\F'Symbol'W\\F'Default')"
+	Label /Z timeConstantHistoryAxis "Time Constant (ms)"
 	Label /Z pressureHistoryAxis "Pressure (mBar)"
-	xx=345; yy=10
-	GroupBox Controls frame=1, pos={xx,yy-5}, size={445,30}, title=""
+	xx=335; yy=10
+	GroupBox Controls frame=1, pos={xx,yy-5}, size={505,30}, title=""
 	xx+=5
 	PopupMenu Channels, pos={xx,yy}, userData(selected)=ChannelList(chanBits),mode=0, title="Channels",proc=SealTestWinPopupMenus
 	PopupMenu Channels, value=#("PopupOptions(\"\",\"Channels\",ChannelCombos(\"sealtest\",\"\"),selected=ChannelList("+num2str(chanBits)+"))")
 	xx+=90
 	wave /sdfr=df ampl
-	nvar /sdfr=instanceDF gridOn,seriesOn,pressureOn
-	SetVariable Ampl,pos={xx,yy+2},size={80,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
-	xx+=90
-	SetVariable Freq,pos={xx,yy+2},size={80,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
-	xx+=90
+	nvar /sdfr=instanceDF gridOn,seriesOn,pressureOn,timeConstantOn
+	SetVariable Ampl,pos={xx,yy+2},size={60,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
+	xx+=65
+	SetVariable Freq,pos={xx,yy+2},size={60,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
+	xx+=135
 	Checkbox Grid, pos={xx,yy+3},variable=gridOn, title="Grid",proc=SealTestWinCheckboxes
-	xx+=55
+	xx+=50
 	Checkbox Series, pos={xx,yy+3},variable=seriesOn, title="Series",proc=SealTestWinCheckboxes
-	xx+=55
+	xx+=50
+	Checkbox TimeConstant, pos={xx,yy+3},variable=timeConstantOn, title="Tau",proc=SealTestWinCheckboxes
+	xx+=50
 	Checkbox Pressure, pos={xx,yy+3},variable=pressureOn, title="Pressure",proc=SealTestWinCheckboxes
 	
 	Struct WMCheckboxAction info
 	info.ctrlName="Series"; info.checked=seriesOn; info.userData="noRestart"
+	SealTestWinCheckboxes(info)
+	info.ctrlName="TimeConstant"; info.checked=timeConstantOn; info.userData="noRestart"
 	SealTestWinCheckboxes(info)
 	info.ctrlName="Pressure"; info.checked=pressureOn; info.userData="noRestart"
 	SealTestWinCheckboxes(info)
@@ -500,12 +515,21 @@ Function SealTestWinCheckboxes(info)
 			SealTestAuxMeasurement("Series",info.checked)
 			if(info.checked)
 				SealTestAuxMeasurement("Pressure",0)
+				SealTestAuxMeasurement("TimeConstant",0)
+			endif
+			break
+		case "TimeConstant":
+			SealTestAuxMeasurement("TimeConstant",info.checked)
+			if(info.checked)
+				SealTestAuxMeasurement("Series",0)
+				SealTestAuxMeasurement("Pressure",0)
 			endif
 			break
 		case "Pressure":
 			SealTestAuxMeasurement("Pressure",info.checked)
 			if(info.checked)
 				SealTestAuxMeasurement("Series",0)
+				SealTestAuxMeasurement("TimeConstant",0)
 			endif
 			//SealTestInput
 			//nvar /sdfr=DAQdf numChannels
@@ -529,12 +553,17 @@ Function SealTestAuxMeasurement(measurement,value)
 	String measurement
 	Variable value
 	
+	if(!value)
+		Checkbox $measurement, value=0
+	endif
 	String DAQ=GetUserData("","","DAQ")
+	variable num_channels=GetNumChannels(DAQ=DAQ)
 	dfref df=SealTestDF()
+	nvar /sdfr=df chanBits
 	svar instance = df:instance
 	dfref instanceDF = df:$instance
 	String traces=TraceNameList("",";",1)
-	Variable i
+	Variable i,j
 	for(i=0;i<ItemsInList(traces);i+=1)
 		String trace=StringFromList(i,traces)
 		if(StringMatch(trace,measurement+"*"))
@@ -550,21 +579,40 @@ Function SealTestAuxMeasurement(measurement,value)
 	endfor
 	ModifyGraph tick($(measurement+"HistoryAxis"))=0*(value),noLabel($(measurement+"HistoryAxis"))=2*(!value),axThick($(measurement+"HistoryAxis"))=value
 	
-	nvar /sdfr=instanceDF seriesOn,pressureOn
-	if(!seriesOn && !pressureOn)
+	nvar /sdfr=instanceDF pressureOn
+	ModifyControlList controlnamelist("",";","zero*") disable=!pressureOn
+	ModifyControlList controlnamelist("",";","Aux_*") disable=1
+	
+	string auxes = "series;timeConstant;pressure"
+	variable any_aux = 0
+	for(i=0;i<itemsinlist(auxes);i+=1)
+		string aux = stringfromlist(i,auxes)
+		nvar /sdfr=instanceDF on=$(aux+"On")		
+		any_aux += on
+		if(on)
+			ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab($(aux+"HistoryTAxis"))={0.55,1}
+			ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos($(aux+"HistoryAxis"))={0,kwFraction}
+			for(j=0;j<num_channels;j+=1)
+				if(chanBits & 2^j) // Seal test requested on this channel.  
+					dfref chanDF=SealTestChanDF(j)
+					string channel=num2str(j)
+					string var_name = aux
+					if(stringmatch(aux,"series"))
+						var_name = "seriesRes"
+					endif
+					ValDisplay $("Aux_"+channel) value=#JoinPath({getdatafolder(1,chanDF),var_name}), disable=0
+				endif
+			endfor
+		else
+			ModifyGraph freePos($(aux+"HistoryAxis"))={0.1,kwFraction} // Move it away so it is not overlapping the visible axis.  
+		endif
+	endfor		
+	if(!any_aux)
 		ModifyGraph axisEnab(inputHistoryTAxis)={0,1}
 		ModifyGraph freePos(inputHistoryAxis)={0,kwFraction}
-	elseif(!seriesOn)
-		ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(pressureHistoryTAxis)={0.55,1}
-		ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(pressureHistoryAxis)={0,kwFraction}
-	elseif(!pressureOn)
-		ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(seriesHistoryTAxis)={0.55,1}
-		ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(seriesHistoryAxis)={0,kwFraction}
-	else
-		ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(seriesHistoryTAxis)={0.55,0.75},axisEnab(pressureHistoryTAxis)={0.8,1}
-		ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(seriesHistoryAxis)={0.25,kwFraction},freePos(pressureHistoryAxis)={0,kwFraction}
+		//ModifyGraph axisEnab(inputHistoryTAxis)={0,0.45},axisEnab(seriesHistoryTAxis)={0.55,0.75},axisEnab(pressureHistoryTAxis)={0.8,1}
+		//ModifyGraph freePos(inputHistoryAxis)={0.55,kwFraction},freePos(seriesHistoryAxis)={0.25,kwFraction},freePos(pressureHistoryAxis)={0,kwFraction}
 	endif
-	ModifyControlList controlnamelist("",";","zero*") disable=!pressureOn
 	//NVar sealTestOn=root:sealtest:sealTestOn
 	//if(sealTestOn) // If a seal test is running, restart it.  
 	//	SealTestStart(1,DAQ)
@@ -769,8 +817,8 @@ Function SealTestCollectSweeps(DAQ)
 			string mode=GetAcqMode(i)
 			dfref chanDF=SealTestChanDF(i)
 			//string channel=num2str(i)
-			wave /sdfr=chanDF Sweep,InputHistory,SeriesHistory,PressureHistory
-			nvar /sdfr=chanDF inputRes,seriesRes,pressure
+			wave /sdfr=chanDF Sweep,InputHistory,SeriesHistory,TimeConstantHistory,PressureHistory
+			nvar /sdfr=chanDF inputRes,seriesRes,timeConstant,pressure
 			variable inputGain=GetModeInputGain(mode)
 		
 			String DAQType=Chan2DAQ(i)
@@ -802,14 +850,29 @@ Function SealTestCollectSweeps(DAQ)
 					ratio=NaN
 				endif
 				inputRes=ratio/1e6 // Convert from Ohms to Megaohms.  
-				ControlInfo /W=SealTestWin Series
-				if(V_Value && stringmatch(ratioString,"Voltage/Current"))
+				nvar /sdfr=instanceDF seriesOn,timeConstantOn
+				//ControlInfo /W=SealTestWin Series
+				if(seriesOn && stringmatch(ratioString,"Voltage/Current"))
 					Variable baseline=mean(sweep,0.01/freq,(1/6 - 0.01)/freq)
 					Variable peak=WaveMin(sweep,(1/6 - 0.01)/freq,(1/6 + 0.01)/freq)
 					Variable diff2=abs(peak-baseline)
 					seriesRes=1000*Ampl[i]/diff2
 				else
 					seriesRes=NaN
+				endif
+				if(timeConstantOn)
+					wavestats /q/m=1 sweep
+					variable v_fitoptions=4
+					variable start = x2pnt(sweep,v_minloc+0.005)
+					variable finish = x2pnt(sweep,v_minloc+0.02)
+					if(finish-start>10 && sweep[start])
+						curvefit /q exp sweep[start,finish]
+						timeConstant = 1000/K2
+					else
+						timeConstant = NaN
+					endif
+				else
+					timeConstant = NaN
 				endif
 			endif
 			
@@ -849,10 +912,11 @@ Function SealTestCollectSweeps(DAQ)
 #endif
 			
 			if(iteration>0)
-				Rotate 1, InputHistory,SeriesHistory,PressureHistory
+				Rotate 1, InputHistory,SeriesHistory,TimeConstantHistory,PressureHistory
 				//SetScale /P x,0,1, InputHistory,SeriesHistory
 				InputHistory[0]=inputRes
 				SeriesHistory[0]=seriesRes
+				TimeConstantHistory[0]=timeConstant
 				PressureHistory[0]=pressure
 			endif
 			if(0) // Autoscale.  TODO: Make into a checkbox preference.  

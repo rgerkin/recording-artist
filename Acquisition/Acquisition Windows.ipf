@@ -981,15 +981,15 @@ Function /S PulseParamHelp(param)
 	return ""
 End
 
-Function PreviewStimuli([sweepNum])
-	Variable sweepNum
+Function PreviewStimuli([sweep_num])
+	Variable sweep_num
 	
 	variable currSweep=GetCurrSweep()
-	if(ParamIsDefault(sweepNum))
-		sweepNum=currSweep
+	if(ParamIsDefault(sweep_num))
+		sweep_num=currSweep
 	endif
 	
-	WaveUpdate() // Build the stimuli from the settings on the selector panel.  
+	WaveUpdate(sweep_num=sweep_num) // Build the stimuli from the settings on the selector panel.  
 	variable i,numChannels=GetNumChannels()
 	string channel
 	if(wintype("PreviewStimuliWin"))
@@ -1018,7 +1018,7 @@ Function PreviewStimuli([sweepNum])
 			wave /sdfr=daqDF LCM_
 			variable red,green,blue; GetChanColor(i,red,green,blue)
 			wave /sdfr=daqDF Raw=$("Raw_"+num2str(i))
-			Variable remainder=mod(sweepNum,LCM_[i])
+			Variable remainder=mod(sweep_num,LCM_[i])
 			string acqMode=GetAcqMode(i)
 			Variable modeNum=max(0,WhichListItem(acqMode,modeList))
 			if(IsDynamicClamp(acqMode))
@@ -1053,7 +1053,7 @@ Function PreviewStimuli([sweepNum])
 	Label /Z/W=PreviewStimuliWin bottom "Time (s)"
 	ModifyGraph /Z/W=PreviewStimuliWin lblPos=100
 	
-	SetVariable PossibleSweepNum, value=_NUM:sweepNum, limits={currSweep,Inf,1}, pos={5,30}, size={160,20}, proc=PreviewStimuliSetVariables, title="Preview Sweep Number", win=PreviewStimuliWin
+	SetVariable PossibleSweepNum, value=_NUM:sweep_num, limits={0,Inf,1}, pos={5,30}, size={160,20}, proc=PreviewStimuliSetVariables, title="Preview Sweep Number", win=PreviewStimuliWin
 	ControlInfo /W=PreviewStimuliWin Stagger
 	if(V_flag<=0)
 		Checkbox Stagger, value=0, pos={170,30}, title="Stagger View",proc=PreviewStimuliCheckboxes, win=PreviewStimuliWin
@@ -1127,7 +1127,7 @@ End
 Function PreviewStimuliSetVariables(info)
 	STRUCT WMSetVariableAction &info
 	if(info.eventCode>0)
-		PreviewStimuli(sweepNum=info.dval)
+		PreviewStimuli(sweep_num=info.dval)
 	endif
 End
 
@@ -1146,11 +1146,12 @@ Function PreviewStimuliButtons(ctrlName)
 			if(StringMatch(S_Value,"IBW"))
 				WaveSave(chan,as=stimName)
 			else
-				string chanName=GetChanName(chan)
-				if(!stringmatch(stimName,chanName))
-					Core#CopyInstance(module,"stimuli",chanName,stimName)
-				endif
-				err=Core#SavePackageInstance("Acq","stimuli",stimName,special="CHAN:"+num2str(chan))
+				err = SaveStimulus(chan)
+				//string chanName=GetChanName(chan)
+				//if(!stringmatch(stimName,chanName))
+				//	Core#CopyInstance(module,"stimuli",chanName,stimName)
+				//endif
+				//err=Core#SavePackageInstance("Acq","stimuli",stimName,special="CHAN:"+num2str(chan))
 				if(!err)
 					printf "Stimulus '%s' on channel '%s' saved successfully.\r",stimName,labell
 				endif
@@ -1349,7 +1350,6 @@ Function AnalysisWindow([instance]) : Graph
 	                       endif
 	                       variable red,green,blue
 	                       GetChanColor(j,red,green,blue)
-	                       //r=Red(post); g=Green(post); b=Blue(post)
 	                       string measurementName=CleanupName(analysisMethod,0)
 	                       dfref postChanDF=GetChanDF(j)        
 	                       wave /z/sdfr=postChanDF measurementWave=$measurementName
@@ -1365,8 +1365,10 @@ Function AnalysisWindow([instance]) : Graph
 	                       	else
 	                       		AppendToGraph /W=AnalysisWin /R=$axisName /B=$axisTName /c=(red,green,blue) MeasurementWave[][col][layer] /tn=$traceName vs root:SweepT
 	                       	endif
-	                       	ModifyGraph /Z /W=AnalysisWin marker($traceName)=marker[col] ? marker[col] : 19-col*11
-	                       	ModifyGraph /Z /W=AnalysisWin msize($traceName)=(WaveExists(msize) && msize[col]) ? msize[col] : 3
+	                       	variable n_traces = itemsinlist(tracenamelist("AnalysisWin",";",1))
+	                       	variable top_trace_num = n_traces - 1
+	                       	ModifyGraph /Z /W=AnalysisWin marker[top_trace_num]=marker[col] ? marker[col] : 19-col*11
+	                       	ModifyGraph /Z /W=AnalysisWin msize[top_trace_num]=(WaveExists(msize) && msize[col]) ? msize[col] : 3
 	                       endfor
 	                       appended+=1
 	               endfor
@@ -2772,16 +2774,15 @@ Function AnalysisMethodSubSelections(axisNum)
 	dfref instanceDF=Core#InstanceHome(module,"analysisMethods",analysisMethod)
 	if(WinType("SweepsWin"))
 		String view=GetUserData("SweepsWin","SwitchView","")
-		nvar /z/sdfr=instanceDF x_left=$("x_left_"+view)
-		nvar /z/sdfr=instanceDF x_right=$("x_right_"+view)
-		if(NVar_Exists(x_left)) 
-			Variable focused=StringMatch(view,"Focused")
+		wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"cursorLocs")
+		if(waveexists(cursor_locs))
+			//Variable focused=StringMatch(view,"Focused")
 			String trace=LongestVisibleTrace(win="SweepsWin")
 			if(strlen(trace))
 				Variable offset=XOffset(trace,win="SweepsWin")
 				SetWindow SweepsWin hook=$""
-				Cursor /W=SweepsWin A,$trace,x_left-offset
-				Cursor /W=SweepsWin B,$trace,x_right-offset
+				Cursor /W=SweepsWin A,$trace,cursor_locs[0]-offset
+				Cursor /W=SweepsWin B,$trace,cursor_locs[1]-offset
 			endif
 		endif
 	endif	
@@ -3275,7 +3276,7 @@ Function NormalizeToRegion()
 	endif
 End
 
-// Applies Loess smoothing to the data in a region of a trace specified by the cursors.  
+// Applies smoothing to the data in a region of a trace specified by the cursors.  
 Function TrendRegion(method,options)
 	string method,options
 	
@@ -3286,11 +3287,11 @@ Function TrendRegion(method,options)
 	if(abs(finish-start)<=3) // If the range is insufficient.  
 		return -2
 	endif
-	wave /z data=CsrWaveRef(a)
+	wave /z data=CsrWaveRef(A,"AnalysisWin")
 	if(!waveexists(data))
 		return -3
 	endif
-	string trace=csrwave(a)
+	string trace = csrwave(A,"AnalysisWIn",1)
 	dfref df=getwavesdatafolderdfr(data)
 	wave /z Trend=df:$(nameofwave(data)+"_trend")
 	if(!waveexists(Trend))
@@ -3317,11 +3318,13 @@ Function TrendRegion(method,options)
 	
 	strswitch(method)
 		case "Remove":
-			tempTrend=NaN
+			Trend=NaN
 			variable red,green,blue
 			string channel = GetDataFolder(0,df)
 			GetChannelColor(channel,red,green,blue)
-			modifygraph /Z rgb($trace)=(red,green,blue)
+			modifygraph /Z/w=AnalysisWIn rgb($trace)=(red,green,blue)
+			removefromgraph /z/w=AnalysisWIn $(nameofwave(trend))
+			return 0
 			break
 		case "Linear Regression":
 			//SetScale /P x,first,1,$fitName
@@ -3362,15 +3365,15 @@ Function TrendRegion(method,options)
 		string appendedTrends=AppendedWave(Trend,dim1=value,dim2=pre,axis=activeAxis,win="AnalysisWin")
 		if(!strlen(appendedTrends))
 			GetTraceColor(trace,red,green,blue)
-			appendToGraph /c=(red,green,blue) /L=$activeAxis /B=time_axis Trend vs sweepT
-			modifyGraph /Z lsize($nameofwave(Trend))=0.5
-			//Wave W_Coef=W_coef; Wave W_Sigma=W_Sigma
-			//printf "For trace %s, the slope is %f +/- %f\r",trace,W_Coef(2),W_Sigma(2)
-		endif
-		if(stringmatch(method,"Decimation"))
-			modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
-			variable marker = numberbykey("marker(x)",traceinfo("",trace,0),"=")
-			modifyGraph /Z mode=3,marker=marker,lsize($nameofwave(Trend))=5
+			string y_axis_name = TraceYAxis(trace,win="AnalysisWin")
+			appendToGraph /c=(red,green,blue) /L=$y_axis_name /B=time_axis Trend vs sweepT
+			string trend_trace = TopTrace(win="AnalysisWin")
+			modifyGraph /Z lsize($trend_trace)=0.5
+			if(stringmatch(method,"Decimation"))
+				modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
+				variable marker = numberbykey("marker(x)",trace_info,"=")
+				modifyGraph /Z mode($trend_trace)=3,marker($trend_trace)=marker,lsize($trend_trace)=5
+			endif
 		endif
 	endif
 	killwaves /z tempTrend
@@ -3421,15 +3424,19 @@ function SweepsWinHook(info)
 				ControlInfo /W=$info.winname SwitchView; String view=S_userdata
 				Variable focused=StringMatch(view,"Focused")
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
-				strswitch(info.cursorName)
-					case "A":
-						variable /g instanceDF:$("x_left_"+view)=focused ? xcsr2("A",win=info.winname) : xcsr(A,info.winname)
-						break
-					case "B":
-						variable /G instanceDF:$("x_right_"+view)=focused ? xcsr2("B",win=info.winname) : xcsr(B,info.winname)
-						break
+				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs")
+				if(waveexists(cursor_locs))
+					variable loc = focused ? xcsr2(info.cursorName,win=info.winname) : xcsr($(info.cursorName),info.winname)
+					strswitch(info.cursorName)
+						case "A":
+							cursor_locs[0] = loc
+							break
+						case "B":
+							cursor_locs[1] = loc
+							break
 					endswitch
 				endif
+			endif
 			break
 		case "resize":
 			if(!WinType(info.winname))

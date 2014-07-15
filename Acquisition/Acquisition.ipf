@@ -550,7 +550,7 @@ Function StartSweep([DAQ])
 		waveformStartT= datetime - expStartT
 		waveformSweeps = 0
 	endif
-	
+		
 	Variable err=FinalUpdate(DAQ=DAQ)
 	if(err)
 		return err

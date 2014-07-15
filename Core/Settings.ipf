@@ -1299,13 +1299,18 @@ Function EditPackagesButtons(info) : ButtonControl
 		case "Add Row": // Increase wave size by 1.  
 		case "Subtract Row": // Decrease wave size by 1.  
 			wave w=WavPackageSetting(module,package,instance,object,sub=sub)
-			variable oldSize=dimsize(w,0)
+			variable old_size=dimsize(w,0)
 			variable delta=2*stringmatch(action,"Add Row")-1
-			redimension /n=(max(1,oldSize+delta),-1) w
-			if(oldSize>1 && delta<0)
-				string ctrlInfo=module+"_"+package+"_"+object+"_"+instance+"_"+num2str(oldSize-1)
-				string oldControl=Core#Hash32(ctrlInfo)
-				killcontrol $oldControl
+			variable new_size = old_size + delta
+			variable min_size = VarPackageSetting(module,package,instance,object,sub=sub,setting="min_size",default_=0)
+			if(new_size < min_size)
+				break
+			endif
+			redimension /n=(max(1,new_size),-1) w
+			if(old_size>1 && delta<0)
+				string ctrl_info=module+"_"+package+"_"+object+"_"+instance+"_"+num2str(old_size-1)
+				string old_control=Core#Hash32(ctrl_info)
+				killcontrol $old_control
 			endif
 			//variable freezeNew=stringmatch(instance,"_New_")
 			EditPackageInstances(module,package,freezeNew=1)//freezeNew)

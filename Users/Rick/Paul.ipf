@@ -1,5 +1,19 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
+#include "Symbols"
+#include "Settings"
+#include "Profiles"
+#include "Utilities"
+#include "List Functions"
+#include "Signal Processing"
+#include "Statistics"
+#include "Progress Window"
+#include "Wave Functions"
+#include "Load Neuralynx"
+#include "Neuralynx Analysis"
+#include "Neuralynx Analysis2"
+#include "Graphing"
+
 strconstant pathName = "PaulPath"
 strconstant animalPathName = "AnimalPath"
 constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list. 
@@ -1079,7 +1093,7 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 	return vta
 end
 
-function FormatBB(df,epoch)
+function /wave FormatBB(df,epoch)
 	dfref df 
 	variable epoch
 	
@@ -1103,7 +1117,7 @@ function FormatBB(df,epoch)
 	duplicate /o data_ eagDF:data // Overwrite data with formatted data.  
 	duplicate /o times_ eagDF:times // Overwrite data with formatted data.  
 	
-	return data
+	return data_
 end
 
 function /wave MergeBBs([subtract,merge_num])
@@ -1391,6 +1405,7 @@ function /wave MergePeriodograms(dfs[,condition,subtracted,merge_num])
 		printf "Merged into N%d\r" merge_num
 	endif
 	setdatafolder currDF
+	
 	return periodogram
 end
 
@@ -1455,6 +1470,7 @@ function /wave MergeSpectrograms(dfs[,condition,subtracted,merge_num])
 		printf "Merged into N%d\r" merge_num
 	endif
 	setdatafolder currDF
+	
 	return spectrogram
 end
 
@@ -1643,10 +1659,11 @@ function /s ClearData([depth])
 			killwaves /z w
 		endfor
 	endif
+	
 	return wave_list
 end
 
-function StartsDurations2ValveStates(starts,durations)
+function /wave StartsDurations2ValveStates(starts,durations)
 	wave starts,durations
 	
 	make /o/n=(starts[Inf]+durations[Inf]) valve_states = 0
@@ -1654,6 +1671,7 @@ function StartsDurations2ValveStates(starts,durations)
 	for(i=0;i<numpnts(starts);i+=1)
 		valve_states[starts[i],starts[i]+durations[i]-1] = 1
 	endfor
+	
 	return valve_states
 end
 
@@ -1768,7 +1786,7 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT,subtracted])
 	return coherence_mag
 end
 
-function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
+function /wave EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
 	wave EAG_bb,TiCl_bb
 	variable subtracted
 	
