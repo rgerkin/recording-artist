@@ -1339,6 +1339,7 @@ Function WaveUpdate([DAQ,sweep_num])
 	variable sweep_num
 	
 	DAQ=SelectString(ParamIsDefault(DAQ),DAQ,MasterDAQ())
+	sweep_num = paramisdefault(sweep_num) ? GetCurrSweep() : sweep_num
 	variable i,numChannels=GetNumChannels()
 	wave /T Labels=GetChanLabels()
 	dfref daqDF=GetDaqDF(DAQ)
