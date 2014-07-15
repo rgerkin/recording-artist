@@ -140,10 +140,10 @@ Function /S SweepAcqMode(chan,sweep[,quiet])
 	return mode
 End
 
-function IsChanActive(chan)
-	variable chan
+function IsChanActive(chan[,quiet])
+	variable chan,quiet
 	
-	return Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active")
+	return Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active",quiet=quiet)
 end
 
 function IsChanAnalysisMethod(chan,method)
@@ -1679,6 +1679,7 @@ Function /S Assemble(chan,Stimulus[,triparity])
 	wave Stimulus // The wave that will be overwritten with the stimulus.  
 	variable triparity // Even (0) or odd (1).  
 	
+	//print getrtstackinfo(2), triparity, getwavesdatafolder(Stimulus,2)
 	string stimulusName=GetStimulusName(chan)
 	
 	//dfref df=root:parameters
@@ -1735,7 +1736,7 @@ Function /S Assemble(chan,Stimulus[,triparity])
 					// Not using x2pnt because of a rounding bug in that function.  
 					if(lastSample>firstSample) // Pulse is at least one sample in duration and occurs before the end of the sweep.  
 						if(lastSample<dimsize(Stimulus,0))
-							StimFunc(Stimulus,chan,firstSample,lastSample,i,j,k)				
+							StimFunc(Stimulus,chan,firstSample,lastSample,i,j,k)
 						else
 							printf "A non-zero component to the stimulus extends beyond the stimulus duration.  Zeroing this component.\r" 
 						endif
@@ -2229,15 +2230,19 @@ function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,puls
 	wave Stimulus
 	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
 	
-	variable ampl=GetStimParam("Ampl",chan,pulseSet)
-	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
-	variable begin = GetStimParam("Begin",chan,pulseSet)
-	variable width = GetStimParam("Width",chan,pulseSet)
-	variable loc=abs(enoise(0.001*width/dimdelta(Stimulus,0)))
-	loc += 0.001*begin/dimdelta(Stimulus,0)
-	Stimulus[floor(loc)][sweepParity]+=ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
-	if(pulseNum==pulses-1)
+	if(pulseNum == pulses - 1)
+		variable ampl=GetStimParam("Ampl",chan,pulseSet)
+		variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
+		variable begin = GetStimParam("Begin",chan,pulseSet)
+		variable width = GetStimParam("Width",chan,pulseSet)
+		variable delta_x = dimdelta(Stimulus,0)
+		make /free/n=(pulses) locs=abs(enoise(0.001*width/delta_x))
+		locs += 0.001*begin/delta_x
+		variable i
+		for(i=0;i<numpnts(locs);i+=1)
+			Stimulus[floor(locs[i])][sweepParity]+=ampl+dampl*i
+		endfor
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
 			Convolve2(template,Stimulus,col=sweepParity)
