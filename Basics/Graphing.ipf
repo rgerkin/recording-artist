@@ -1372,16 +1372,7 @@ Function DisplayMeanTrace([win,error,name,type,keyTrace,x1,x2])
 	
 	string errorName=""
 	if(strlen(error))
-		if(paramisdefault(name))
-			if(minSweep==maxSweep)
-				sprintf errorName,"%s_%s"str,error
-			else
-				sprintf errorName,"%s_%d_%d_%s",keyChannel,minSweep,maxSweep,error
-			endif
-		else
-			errorName=removeending(meanName,type)+error
-		endif
-		
+		errorName=removeending(meanName,"_"+type)+"_"+error
 		Duplicate /o ErrorWave df:$CleanupName(errorName,0) /WAVE=ErrorWave2
 	endif
 	
