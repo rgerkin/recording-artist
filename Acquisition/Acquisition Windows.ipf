@@ -3358,7 +3358,7 @@ Function TrendRegion(method,options)
 	
 	if(!error)
 		if(stringmatch(method,"Decimation"))
-			Trend[start,finish][value][pre]=mod(p,neighbors)==floor((neighbors-1)/2) ? tempTrend[p-start] : nan
+			Trend[start,finish][value][pre] = mod(p,neighbors)==floor((neighbors-1)/2) ? tempTrend[p-start] : nan
 		else
 			Trend[start,finish][value][pre]=tempTrend[p-start]
 		endif
@@ -3366,7 +3366,7 @@ Function TrendRegion(method,options)
 		if(!strlen(appendedTrends))
 			GetTraceColor(trace,red,green,blue)
 			string y_axis_name = TraceYAxis(trace,win="AnalysisWin")
-			appendToGraph /c=(red,green,blue) /L=$y_axis_name /B=time_axis Trend vs sweepT
+			appendToGraph /c=(red,green,blue) /L=$y_axis_name /B=time_axis Trend[][value][pre] vs sweepT
 			string trend_trace = TopTrace(win="AnalysisWin")
 			modifyGraph /Z lsize($trend_trace)=0.5
 			if(stringmatch(method,"Decimation"))
