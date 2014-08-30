@@ -2967,6 +2967,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	if(sum(Features)==0)
 		Features[0]=1
 	endif
+	Features = Features[p] || numtype(Features[p]) ? 1 : 0
 	
 	string columnControls = ControlNameList("AnalysisWin",";","Column_*")
 	ModifyControlList /Z columnControls disable=1
@@ -3530,6 +3531,16 @@ function AnalysisWinHook(info)
 				Cursor /W=$info.winname B,$LongestVisibleTrace(win=info.winname),value+spacing
 				//Cursor /H=2/W=Membrane_Constants B,$LongestVisibleTrace(win="Membrane_Constants"),value+spacing
 			endif
+			string csr_info = CsrInfo($cursorName)
+			string trace = stringbykey("TNAME",csr_info)
+			string trace_info = TraceInfo(info.winname,trace,0)
+			string y_axis = stringbykey("YAXIS",trace_info)
+			print y_axis
+			variable axis_num
+			sscanf y_axis,"Axis_%d",axis_num
+			if(strlen(y_axis) && axis_num>=0)
+				AnalysisMethodSubSelections(axis_num) // Set analysis method.  
+			endif
 			break
 		case "mouseup":
 			Variable xpixel=info.mouseLoc.h
@@ -3543,7 +3554,7 @@ function AnalysisWinHook(info)
 				Variable axisNum
 				sscanf axisName,"Axis_%d",axisNum
 				if(strlen(axisName) && axisNum>=0)
-					AnalysisMethodSubSelections(axisNum)
+					AnalysisMethodSubSelections(axisNum) // Set analysis method.  
 				endif
 			endif
 			break
