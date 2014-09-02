@@ -2483,6 +2483,11 @@ function SweepsWinTextBoxUpdate()
 			timeStamp += "\\{secs2time(root:status:expStartT+60*GetSweepTime(GetCursorSweepNum(\""+curs+"\")),1)}"
 		endif
 	endfor
+	ControlInfo /W=SweepsWin Range; Variable range_on=V_Value
+	string highlighted_sweep = GetUserData("SweepsWin","","highlighted_sweep")
+	if(range_on && strlen(highlighted_sweep))
+		timeStamp += "\r[*]: "+highlighted_sweep
+	endif
 	if(lastOn && cursorOn)
 		timeStamp="\\Z08Last: "+timeStamp
 	endif
@@ -3417,6 +3422,7 @@ function SweepsWinHook(info)
 	if(info.eventCode==4)
 		return 0
 	endif
+	variable quiet = !Core#IsDev()
 	strswitch(info.eventName)
 		case "cursormoved":
 			string method=SelectedMethod()
@@ -3425,7 +3431,7 @@ function SweepsWinHook(info)
 				ControlInfo /W=$info.winname SwitchView; String view=S_userdata
 				Variable focused=StringMatch(view,"Focused")
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
-				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs")
+				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs",quiet=quiet)
 				if(waveexists(cursor_locs))
 					variable loc = focused ? xcsr2(info.cursorName,win=info.winname) : xcsr($(info.cursorName),info.winname)
 					strswitch(info.cursorName)
@@ -3504,6 +3510,35 @@ function SweepsWinHook(info)
 		case "mouseup":
 			structput /s info.mouseLoc str
 			SetWindow $info.winname userData(mouseUp)=str
+			break
+		case "keyboard":
+			ControlInfo /W=$info.winName Range
+			variable range_checked = v_value
+			if(range_checked && info.keyCode == 30 || info.keyCode == 31) // Highlight a sweep in the range and set it to the full channel color.  
+				variable highlighted_sweep = str2num(GetUserData(info.winName, "", "highlighted_sweep"))
+				if(numtype(highlighted_sweep))
+					highlighted_sweep = GetCursorSweepNum("A")
+				else
+					highlighted_sweep += -(info.keyCode*2 - 61)
+					highlighted_sweep = limit(highlighted_sweep,GetCursorSweepNum("A"),GetCursorSweepNum("B"))
+				endif
+				setwindow $info.winName userData(highlighted_sweep) = num2str(highlighted_sweep)
+				string traces = TraceNameList(info.winName,";",1)
+				ChannelColorCode(win=info.winName)
+				LightenTraces(2,except="input*",win=info.winName)
+				string matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
+				for(i=0;i<itemsinlist(matching_traces);i+=1)
+					string matching_trace = stringfromlist(i,matching_traces)
+					string channel = Trace2Channel(matching_trace,win=info.winName)
+					variable red,green,blue
+					GetChannelColor(channel,red,green,blue)
+					modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue)
+					Trace2Top(matching_trace,win=info.winName)
+				endfor
+				SweepsWinTextBoxUpdate()
+			endif
+			//print info.eventCode,info.eventName,info.eventMod,info.keyCode
+			//if(stringm
 			break
 	endswitch
 end
