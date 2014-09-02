@@ -4380,6 +4380,22 @@ function IsDisplayed(wave_name,win)
 	return v_flag
 end
 
+function Trace2Top(trace[,win])
+	string trace
+	string win
+	
+	if(!paramisdefault(win))
+		win = WinName(0,1)
+	endif
+	string traces = TraceNameList(win,";",1)
+	
+	variable j
+	for(j=0;j<itemsinlist(traces);j+=1)
+		string one_trace = stringfromlist(j,traces)
+		reordertraces /w=$win $trace,{$one_trace}
+	endfor
+end
+
 // Alison's graph style
 Function AlisonGraphStyle()
 	Label summary_left "\\Z14Width (ms)"
