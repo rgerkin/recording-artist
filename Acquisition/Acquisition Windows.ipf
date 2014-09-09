@@ -981,8 +981,8 @@ Function /S PulseParamHelp(param)
 	return ""
 End
 
-Function PreviewStimuli([sweep_num])
-	Variable sweep_num
+Function PreviewStimuli([sweep_num,no_show])
+	Variable sweep_num, no_show
 	
 	variable currSweep=GetCurrSweep()
 	if(ParamIsDefault(sweep_num))
@@ -993,7 +993,9 @@ Function PreviewStimuli([sweep_num])
 	variable i,numChannels=GetNumChannels()
 	string channel
 	if(wintype("PreviewStimuliWin"))
-		DoWindow /F PreviewStimuliWin
+		if(!no_show)
+			DoWindow /F PreviewStimuliWin
+		endif
 	else
 		Display /K=1/N=PreviewStimuliWin/W=(100,100,600,350) as "Stimulus Preview"
 		ControlBar /W=PreviewStimuliWin /T 55
@@ -1037,7 +1039,7 @@ Function PreviewStimuli([sweep_num])
 	endfor
 	
 	// Align and label axes.  
-	string axes=AxisList2("vertical")
+	string axes=AxisList2("vertical",win="PreviewStimuliWin")
 	for(i=0;i<itemsinlist(axes);i+=1)
 		string axis=stringfromlist(i,axes)
 		ModifyGraph /W=PreviewStimuliWin freePos($axis)={0.05,kwFraction},axisEnab($axis)={i/itemsinlist(axes),(i+1)/itemsinlist(axes)-0.02}
@@ -3532,10 +3534,13 @@ function SweepsWinHook(info)
 					string channel = Trace2Channel(matching_trace,win=info.winName)
 					variable red,green,blue
 					GetChannelColor(channel,red,green,blue)
-					modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue)
+					modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue), lsize=1, lsize($matching_trace)=2
 					Trace2Top(matching_trace,win=info.winName)
 				endfor
 				SweepsWinTextBoxUpdate()
+				if(WinType("PreviewStimuliWin"))
+					PreviewStimuli(sweep_num=highlighted_sweep,no_show=1)
+				endif
 			endif
 			//print info.eventCode,info.eventName,info.eventMod,info.keyCode
 			//if(stringm
