@@ -1005,6 +1005,9 @@ Function PreviewStimuli([sweep_num,no_show])
 		SetVariable StimName value=stimulus, title="as", disable=0, pos={280,3},size={100,15}, win=PreviewStimuliWin
 		PopupMenu StimType value="Pulses;IBW", title="as type", pos={390,0}, win=PreviewStimuliWin
 	endif
+	if(!paramisdefault(sweep_num))
+		SaveAxes("default_",win="PreviewStimuliWin")
+	endif
 	RemoveTraces(win="PreviewStimuliWin")
 	//Wave LCM_=root:parameters:LCM_
 	
@@ -1054,6 +1057,10 @@ Function PreviewStimuli([sweep_num,no_show])
 	SetAxis /Z/W=PreviewStimuliWin /A/Z bottom
 	Label /Z/W=PreviewStimuliWin bottom "Time (s)"
 	ModifyGraph /Z/W=PreviewStimuliWin lblPos=100
+	
+	if(!paramisdefault(sweep_num))
+		RestoreAxes("default_",win="PreviewStimuliWin")
+	endif
 	
 	SetVariable PossibleSweepNum, value=_NUM:sweep_num, limits={0,Inf,1}, pos={5,30}, size={160,20}, proc=PreviewStimuliSetVariables, title="Preview Sweep Number", win=PreviewStimuliWin
 	ControlInfo /W=PreviewStimuliWin Stagger
