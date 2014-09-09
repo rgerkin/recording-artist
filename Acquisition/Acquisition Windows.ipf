@@ -3516,30 +3516,41 @@ function SweepsWinHook(info)
 		case "keyboard":
 			ControlInfo /W=$info.winName Range
 			variable range_checked = v_value
-			if(range_checked && info.keyCode == 30 || info.keyCode == 31) // Highlight a sweep in the range and set it to the full channel color.  
+			if(range_checked)
 				variable highlighted_sweep = str2num(GetUserData(info.winName, "", "highlighted_sweep"))
-				if(numtype(highlighted_sweep))
-					highlighted_sweep = GetCursorSweepNum("A")
-				else
-					highlighted_sweep += -(info.keyCode*2 - 61)
-					highlighted_sweep = limit(highlighted_sweep,GetCursorSweepNum("A"),GetCursorSweepNum("B"))
-				endif
-				setwindow $info.winName userData(highlighted_sweep) = num2str(highlighted_sweep)
 				string traces = TraceNameList(info.winName,";",1)
-				ChannelColorCode(win=info.winName)
-				LightenTraces(2,except="input*",win=info.winName)
-				string matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
-				for(i=0;i<itemsinlist(matching_traces);i+=1)
-					string matching_trace = stringfromlist(i,matching_traces)
-					string channel = Trace2Channel(matching_trace,win=info.winName)
-					variable red,green,blue
-					GetChannelColor(channel,red,green,blue)
-					modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue), lsize=1, lsize($matching_trace)=2
-					Trace2Top(matching_trace,win=info.winName)
-				endfor
-				SweepsWinTextBoxUpdate()
-				if(WinType("PreviewStimuliWin"))
-					PreviewStimuli(sweep_num=highlighted_sweep,no_show=1)
+				if(info.keyCode == 30 || info.keyCode == 31) // Up or down arrow.  This will change the thickness of a sweep and set it to full channel color.   
+					if(numtype(highlighted_sweep))
+						highlighted_sweep = GetCursorSweepNum("A")
+					else
+						highlighted_sweep += -(info.keyCode*2 - 61)
+						highlighted_sweep = limit(highlighted_sweep,GetCursorSweepNum("A"),GetCursorSweepNum("B"))
+					endif
+					setwindow $info.winName userData(highlighted_sweep) = num2str(highlighted_sweep)
+					ChannelColorCode(win=info.winName)
+					LightenTraces(2,except="input*",win=info.winName)
+					string matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
+					for(i=0;i<itemsinlist(matching_traces);i+=1)
+						string matching_trace = stringfromlist(i,matching_traces)
+						string channel = Trace2Channel(matching_trace,win=info.winName)
+						variable red,green,blue
+						GetChannelColor(channel,red,green,blue)
+						modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue), lsize=1, lsize($matching_trace)=2
+						Trace2Top(matching_trace,win=info.winName)
+					endfor
+					SweepsWinTextBoxUpdate()
+					if(WinType("PreviewStimuliWin"))
+						PreviewStimuli(sweep_num=highlighted_sweep,no_show=1)
+					endif
+				elseif(info.keyCode == 8) // Delete key.  This will remove a sweep from the plot.  
+					if(!numtype(highlighted_sweep))
+						matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
+						for(i=0;i<itemsinlist(matching_traces);i+=1)
+							matching_trace = stringfromlist(i,matching_traces)
+							RemoveFromGraph /z/w=$info.winName $matching_trace
+							Execute /P/Q "DoWindow /F "+info.winName // Move the Sweeps window back to the front at the very end, since the command window gets in the way.  
+						endfor
+					endif
 				endif
 			endif
 			//print info.eventCode,info.eventName,info.eventMod,info.keyCode
