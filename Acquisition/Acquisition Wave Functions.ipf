@@ -1358,7 +1358,7 @@ Function WaveUpdate([DAQ,sweep_num])
 		wave /sdfr=daqDF input=$("input_"+num2str(i))
 		redimension /n=(round(duration*kHz*1000)) input // Round because default action is to floor.  
 		
-		wave channelDivisor=GetChanDivisor(i)
+		wave channelDivisor=GetChanDivisor(i,sweepNum=sweep_num)
 		LCM_[i]=LCM(channelDivisor)
 		LCM_[i]=numtype(LCM_[i]) ? 1 : LCM_[i]
 		make /o/n=(0,LCM_[i]) daqDF:$("Raw_"+num2str(i)) /wave=Raw
