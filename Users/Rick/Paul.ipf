@@ -23,8 +23,8 @@ function All([i,j,k,no_delete])
 	variable i,j,k,no_delete
 	
 	tic()
-	string animals = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
-	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	string animals = "ticl;"//locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = ";"//hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
 	string stimuli = "bb;ff"
 	
 	wave /t/sdfr=root: active_list = active_experiments_list
@@ -99,8 +99,9 @@ function Go()
 	svar /sdfr=root: stimulus,animal
 	wave /t/sdfr=root: active_experiments_list
 	CleanData()
-//	MakeAllVTAs()
-	FormatData()
+	MakeAllVTAs()
+	return 0
+//	FormatData()
 //	MakeAllPeriodograms()
 //	MakeAllSpectrograms()
 	if(stringmatch(stimulus,"BB"))
@@ -1991,10 +1992,14 @@ function /wave GetVTAdfs()
 		string name = GetIndexedObjNameDFR(df,4,i)
 		if(stringmatch(name,"*_ff_*"))
 			dfref dfi = df:$name
-			dfref dfii = dfi:x_0th_sub
+			if(stringmatch(name,"ticl*"))
+				dfref dfii = dfi:x_0th
+			else
+				dfii = dfi:x_0th_sub
+			endif
 			if(datafolderrefstatus(dfii))
 				dfs[numpnts(dfs)] = {dfii}
-				endif
+			endif
 		endif
 	endfor
 	return dfs
@@ -2044,12 +2049,26 @@ function VTAonsets([mode,threshold])
 			if(mode==0)
 				stdev_onset *= (n_individuals-1) // jackknife correction.  
 			endif
+			variable minn = v_min
+			variable maxx = v_max
+			variable n_bad = v_numnans
+			if(numpnts(sample_onsets)>=3)
+				statsquantiles /q sample_onsets
+				variable med = v_median
+				if(numpnts(sample_onsets)>=5)
+					variable v25 = v_q25
+					variable v75 = v_q75
+				else
+					v25 = nan
+					v75 = nan
+				endif
+			endif
 		endif
 		mean_onset -= 3.96
 		avg_onset -= 3.96
 		mean_onsets[i] = mean_onset
 		avg_onsets[i] = avg_onset
-		printf "%s = %.1f (%.1f +/- %.1f) (n=%d)\r",name,mean_onset,avg_onset,stdev_onset,n_individuals
+		printf "%s = %.1f (%.1f +/- %.1f) [%.0f - %.0f - %.0f - %.0f - %.0f], (%d, %d)\r",name,mean_onset,avg_onset,stdev_onset,minn,v25,med,v75,maxx,n_individuals,n_bad
 	endfor
 end
 
@@ -2062,9 +2081,21 @@ function VTAonset(vta[,threshold])
 	copyscales /p vta,vta_
 	wavestats /q/r=(0,0.003) vta_
 	variable thresh = v_avg + threshold*v_sdev
-	findlevel /q/r=(0,) vta_,thresh
+	findlevels /q/r=(0,) vta_,thresh
+	wave w_findlevels
+	variable i = 0
+	do
+		if(i >= numpnts(w_findlevels) - 1) // If last level crossing.  
+			break
+		endif
+		if(w_findlevels[i+1] - w_findlevels[i] > 0.001) // If level crossing lasts at least 10 ms.  
+			break
+		endif
+		i+=2
+	while(1)
+	variable xx = w_findlevels[i]
 	
-	variable onset = v_levelx * 1000 // Convert to ms.  
+	variable onset = xx * 1000 // Convert to ms.  
 	return onset
 end
 
@@ -2075,6 +2106,7 @@ function LowestResolvablePeaks([mode,method])
 	string species = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
 	string odors = "hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
 	variable i,j,k
+	make /o/n=0 means,avgs
 	for(i=0;i<itemsinlist(species);i+=1)
 		string specie = stringfromlist(i,species)
 		for(j=0;j<itemsinlist(odors);j+=1)
@@ -2091,7 +2123,7 @@ function LowestResolvablePeaks([mode,method])
 						values[k] = LowestResolvablePeak(df,antenna=k,method=method)
 					endif
 				endfor
-				variable m = Nan, s = NaN, minn=NaN, maxx=NaN
+				variable m = Nan, s = NaN, minn = NaN, maxx = NaN, v25 = nan, v75 = nan
 				variable value = LowestResolvablePeak(df,method=method) // Mean antenna.  
 				if(n_individuals>1)
 					wavestats /q values
@@ -2102,9 +2134,17 @@ function LowestResolvablePeaks([mode,method])
 					endif
 					minn = v_min
 					maxx = v_max
+					variable nans = v_numnans
 					variable med = statsmedian(values)
+					if(n_individuals>=5)
+						statsquantiles /q values
+						v25 = v_q25
+						v75 = v_q75
+					endif
 				endif
-				printf "%s, %s: %.0f, %.1f +/- %.1f, [%.0f - %.0f - %.0f], (%d)\r",specie,odor,value,m,s,minn,med,maxx,n_individuals
+				means[numpnts(means)] = {value}
+				avgs[numpnts(avgs)] = {m}
+				printf "%s, %s: %.0f, %.1f +/- %.1f, [%.0f - %.0f - %.0f - %.0f - %.0f], (%d,%d)\r",specie,odor,value,m,s,minn,v25,med,v75,maxx,n_individuals,nans
 			endif
 		endfor
 	endfor
@@ -2116,7 +2156,7 @@ function LowestResolvablePeak(df[,antenna,jack_sample,method])
 	variable jack_sample // Calculate for the jacknife sample with this index (i.e. excluding the antenna with this index).  
 	variable method // 0 for a comparison using SEM, any other value for a comparison just using the mean, with the value as log-threshold.  
 	
-	variable result = 200
+	variable result = nan
 	wave /sdfr=df periodogram,periodogram_sem
 	if(!paramisdefault(jack_sample))
 		wave /sdfr=df periodogram_jack
@@ -2134,11 +2174,18 @@ function LowestResolvablePeak(df[,antenna,jack_sample,method])
 	endif
 	make /free/n=9 ms_values = {6,8,10,12,15,20,30,50,100}
 	variable i
+	//print getdatafolder(1,df)
 	for(i=0;i<numpnts(ms_values);i+=1)
 		variable ms = ms_values[i]
 		if(CanResolvePeak(ms,periodogram,periodogram_sem,method=method))
 			result = ms
+			//if(ms>=50)
+			//	print "Yes:"+num2str(ms)
+			//endif
 			break
+		endif
+		if(ms==100)
+			//print "No:"+num2str(ms)
 		endif
 	endfor
 	return result
@@ -2149,7 +2196,7 @@ function CanResolvePeak(ms,periodogram,periodogram_sem[,method])
 	wave periodogram, periodogram_sem
 	
 	variable peak_range = 0
-	variable trough_range = 0.2
+	variable trough_range = 0.5
 	variable result = nan
 	string conditions = "100ms;50ms;30ms;20ms;15ms;12ms;10ms;8ms;6ms;cont"
 	variable col_ = whichlistitem(num2str(ms)+"ms",conditions)
@@ -2178,8 +2225,22 @@ function CanResolvePeak(ms,periodogram,periodogram_sem[,method])
 			endif
 		else
 			maxx = periodogram_(hz) // highest mean - sem.  
-			wavestats /q/r=(hz*(1-trough_range),hz*(1+trough_range)) periodogram_
-			meann = v_avg
+			//wavestats /q/r=(hz*(1-trough_range),hz*(1+trough_range)) periodogram_
+			//meann = v_avg
+			variable trough_range_ = trough_range
+			do
+				duplicate /free/r=(hz*(1-trough_range_),hz*(1+trough_range_)) periodogram_,w
+				if(numpnts(w)<3)
+					trough_range_ *= 1.1
+				else
+					break
+				endif
+			while(1)
+			//dspdetrend /f=line w
+			//wave w = w_detrend
+			maxx = w(hz)
+			wavestats /q w
+			meann = (v_avg*v_npnts - maxx)/(v_npnts-1) // Mean not counting peak.  
 			if(maxx > (meann + method) && maxx > 0)
 				result = 1
 			else
@@ -2212,7 +2273,7 @@ function MaxCoherences()
 					wave /sdfr=antenna_df coherence_mag_k = coherence_sub
 					values[k] = MaxCoherence(coherence_mag_k,coherence_mag_shuffled,coherence_mag_shuffled_sd)
 				endfor
-				variable m = Nan, s = NaN, minn=NaN, maxx=NaN
+				variable m = Nan, s = NaN, minn=NaN, maxx=NaN, v25=NaN, v75=Nan, bad=0
 				variable value = MaxCoherence(coherence_mag,coherence_mag_shuffled,coherence_mag_shuffled_sd) // Mean antenna.  
 				if(n_individuals>1)
 					wavestats /q values
@@ -2220,11 +2281,18 @@ function MaxCoherences()
 					s = v_sdev
 					minn = v_min
 					maxx = v_max
-					variable med = statsmedian(values)
+					bad = v_numnans
+					extract /free values, good_values, numtype(values)==0
+					variable med = statsmedian(good_values)
+					if(numpnts(good_values)>=5)
+						statsquantiles /q good_values
+						v25 = v_q25
+						v75 = v_q75
+					endif
 				endif
 				//print values
 				//sort values,values
-				printf "%s, %s: %.0f, %.0f +/- %.0f, [%.0f - %.0f - %.0f], (%d)\r",specie,odor,value,m,s,minn,med,maxx,n_individuals
+				printf "%s, %s: %.0f, %.0f +/- %.0f, [%.0f - %.0f - %.0f - %.0f - %.0f], (%d,%d)\r",specie,odor,value,m,s,minn,v25,med,v75,maxx,n_individuals,bad
 				if(v_min > value || v_max < value)
 					//print value,values
 				endif
@@ -2245,8 +2313,8 @@ function MaxCoherence(meann,shuffle,shuffle_sd[,threshold])
 	diff -= (shuffle + threshold*shuffle_sd)
 	smooth 101,diff
 	findlevel /q/edge=2 diff, 0
-	if(numtype(v_levelx)) // If no downward level crossing found.  
-		v_levelx = 0 // Then it must be below the threshold throughout, so set to 0 (no coherence).  
+	if(numtype(v_levelx) || diff[0] < 0 && diff[1] < 0 && diff[2] < 0) // If no downward level crossing found.  
+		v_levelx = NaN // Then it must be below the threshold throughout, so set to 0 (no coherence).  
 	endif
 	return v_levelx
 end
