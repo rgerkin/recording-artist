@@ -382,7 +382,7 @@ function CleanData()
 				endif
 			endfor
 			wave /sdfr=eagDF data
-			if(stringmatch(notes,"inverted!"))
+			if(stringmatch(notes,"*inverted!"))
 				data *= -1
 				printf "Inverted epoch %s in experiment %s.\r",epoch,name
 			endif
@@ -1817,5 +1817,441 @@ function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
 	setdatafolder currDF
 	
 	return coherogram_mag
+end
+
+// Merge VTAs within an animal, across pulse trains.  
+function MergeVTAs2([nth,subtracted])
+	variable nth
+	variable subtracted // 1 if they are air subtracted (they should have "_subtracted" in the name). 
+											// -1 if they are just air.  0 otherwise.   
+	
+	string species = "locust;ant;bee;cockroach;moth;orangeroach;"
+	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	string conditions = "100ms;50ms;30ms;20ms;15ms;12ms;10ms;8ms;6ms;cont"
+	newdatafolder /o root:vta_individual
+	variable i,j,k,m
+	string loaded = ""
+	string suffix1 = "", suffix2 = "", suffix3 = ""
+	if(!paramisdefault(nth) && nth>=0)
+		suffix2 = "_"+num2str(nth)+"th"
+	endif
+	if(subtracted > 0)
+		suffix3 = "_sub"
+	elseif(subtracted < 0)
+		suffix3 = "_air"
+	endif
+	string suffix = suffix2 + suffix3
+	variable n_species = itemsinlist(species)
+	for(i=0;i<n_species;i+=1)
+		Prog("Species",i,n_species)
+		string specie = stringfromlist(i,species)
+		variable n_odors = itemsinlist(odors)
+		for(j=0;j<n_odors;j+=1)
+			Prog("Odors",j,n_odors)
+			string odor = stringfromlist(j,odors)
+			Init(specie,"FF",odor)
+			LoadAllEpochs(no_sparse=1)
+			CleanData()
+			//FormatData()
+			//loaded += name+";"
+			MakeAllVTAs(no_merge=1)	
+			wave /t/sdfr=root: list = active_experiments_list
+			variable n_individuals = dimsize(list,0)
+			string folder_name = "root:vta_individual:"+cleanupname(Environment(),0)
+			newdatafolder /o $folder_name
+			dfref individual_df = $folder_name
+			make /o/n=(1,n_individuals) individual_df:$("vta"+suffix) /wave=vta_matrix
+			for(k=0;k<n_individuals;k+=1) // k is the individual.  
+				string name = list[k][0]
+				dfref animal_df = $("root:"+name+":EAG")
+				string odorEpoch = list[k][1]
+				variable odorEpoch_ = str2num(odorEpoch[1,strlen(odorEpoch)-1])
+				string airEpoch = list[k][2]
+				variable airEpoch_ = str2num(airEpoch[1,strlen(airEpoch)-1])
+				if(subtracted > 0)
+					dfref df = animal_df:$odorEpoch
+				elseif(subtracted < 0)
+					dfref df = animal_df:$airEpoch
+				else
+					dfref df = animal_df:$odorEpoch
+				endif
+				for(m=0;m<itemsinlist(conditions);m+=1)
+					string condition = stringfromlist(m,conditions)
+					wave vta_condition = df:$("vta_"+condition+suffix)
+					if(m==0)
+						duplicate /o vta_condition df:$("vta_ff"+suffix) /wave=vta_ff
+						redimension /n=(-1,itemsinlist(conditions)) vta_ff
+					else
+						vta_ff[][m] = vta_condition[p]
+					endif
+				endfor
+				matrixop /free vta_ff_ = meancols(vta_ff^t)
+				copyscales vta_ff,vta_ff_
+				wavestats /q/r=[0,x2pnt(vta_ff_,0)-1] vta_ff_
+				variable baseline = v_avg
+				vta_ff_ -= baseline
+				duplicate /o vta_ff_ df:$("vta_ff"+suffix)
+				redimension /n=(dimsize(vta_ff_,0),-1) vta_matrix
+				vta_matrix[][k] = vta_ff_[p]
+				copyscales vta_ff_,vta_matrix
+			endfor
+			KillRecurse("ps*")
+		endfor
+	endfor
+end
+
+function ExportVTAs()
+	newpath /o/q desktop SpecialDirPath("Desktop",0,0,0)
+	wave /df dfs = GetVTAdfs()
+	variable i
+	for(i=0;i<numpnts(dfs);i+=1)
+		dfref df = dfs[i]
+		wave /sdfr=df vta_jack
+		if(numpnts(vta_jack) > 1)
+			matrixop /free flat = meancols(vta_jack^t) // Average across conditions (inter-pulse intervals).  
+			copyscales /p vta_jack,flat
+			string name = VTA2Name(df)
+			save /j/o/p=desktop flat as name+".dat"
+		endif
+	endfor
+end
+
+function /wave GetVTAdfs()
+	dfref df = root:vta
+	variable i
+	make /free/df/n=0 dfs
+	for(i=0;i<CountObjectsDFR(df,4);i+=1)
+		string name = GetIndexedObjNameDFR(df,4,i)
+		if(stringmatch(name,"*_ff_*"))
+			dfref dfi = df:$name
+			if(stringmatch(name,"ticl*"))
+				dfref dfii = dfi:x_0th
+			else
+				dfii = dfi:x_0th_sub
+			endif
+			if(datafolderrefstatus(dfii))
+				dfs[numpnts(dfs)] = {dfii}
+			endif
+		endif
+	endfor
+	return dfs
+end
+
+function /s VTA2Name(df)
+	dfref df
+	
+	string name = getdatafolder(1,df)
+	name = replacestring("root:vta:",name,"")
+	name = replacestring("'",name,"")
+	name = cleanupname(name,0)
+
+	return name
+end
+
+function VTAonsets([mode,threshold])
+	variable mode // 0 for jackknife, 1 for individual antennae.  
+	variable threshold // Default is 5 S.D.'s.  Always use 5 for mean antenna.  
+	
+	threshold = paramisdefault(threshold) ? 5 : threshold
+	wave /df dfs = GetVTAdfs()
+	variable i,j
+	make /o/n=(numpnts(dfs)) mean_onsets,avg_onsets
+	for(i=0;i<numpnts(dfs);i+=1)
+		dfref df = dfs[i]
+		string name = VTA2name(df)
+		wave /sdfr=df vta,vta_jack
+		variable mean_onset = VTAonset(vta,threshold=5)
+		variable n_individuals = dimsize(vta_jack,2)
+		variable avg_onset = NaN, stdev_onset = NaN
+		if(n_individuals>1)
+			make /free/n=(n_individuals) sample_onsets
+			for(j=0;j<n_individuals;j+=1)
+				wave vta_jack_i = layer(vta_jack,j)
+				if(mode == 1)
+					duplicate /free vta, vta_i
+					vta_i = (vta * n_individuals) - (vta_jack_i * (n_individuals-1))
+					//if(stringmatch(name,"ticl_ff__x_0th_"))
+					//	duplicate /o vta_i $("ticl_"+num2str(j))
+					//endif
+					sample_onsets[j] = VTAonset(vta_i,threshold=threshold)
+				else
+					sample_onsets[j] = VTAonset(vta_jack_i,threshold=threshold)
+				endif
+			endfor
+			wavestats /q sample_onsets
+			avg_onset = v_avg
+			stdev_onset = v_sdev
+			if(mode==0)
+				stdev_onset *= (n_individuals-1) // jackknife correction.  
+			endif
+			variable minn = v_min
+			variable maxx = v_max
+			variable n_bad = v_numnans
+			if(numpnts(sample_onsets)>=3)
+				extract /free sample_onsets,sample_onsets_,numtype(sample_onsets[p])==0
+				statsquantiles /q sample_onsets_
+				variable med = v_median
+				if(numpnts(sample_onsets_)>=5)
+					variable v25 = v_q25
+					variable v75 = v_q75
+				else
+					v25 = nan
+					v75 = nan
+				endif
+			endif
+		endif
+		//mean_onset -= 3.96
+		//avg_onset -= 3.96
+		mean_onsets[i] = mean_onset
+		avg_onsets[i] = avg_onset
+		printf "%s = %.2f (%.2f +/- %.2f) [%.2f - %.2f - %.2f - %.2f - %.2f], (%d, %d)\r",name,mean_onset,avg_onset,stdev_onset,minn,v25,med,v75,maxx,n_individuals,n_bad
+	endfor
+end
+
+function VTAonset(vta[,threshold])
+	wave vta
+	variable threshold
+	
+	threshold = paramisdefault(threshold) ? 5 : threshold
+	matrixop /free vta_ = meancols(vta^t)
+	copyscales /p vta,vta_
+	wavestats /q/r=(0,0.003) vta_
+	variable thresh = v_avg + threshold*v_sdev
+	findlevels /q/r=(0,) vta_,thresh
+	wave w_findlevels
+	variable i = 0
+	do
+		if(i >= numpnts(w_findlevels) - 1) // If last level crossing.  
+			break
+		endif
+		if(w_findlevels[i+1] - w_findlevels[i] > 0.001) // If level crossing lasts at least 10 ms.  
+			break
+		endif
+		i+=2
+	while(1)
+	variable xx = w_findlevels[i]
+	
+	variable onset = xx * 1000 // Convert to ms.  
+	return onset
+end
+
+function LowestResolvablePeaks([mode,method])
+	variable mode // 0 to use the jackknife groups of antennas, 1 to use the individual antennas.  
+	variable method // 0 for a comparison using SEM, any other value for a comparison just using the mean, with the value as log-threshold.  
+	
+	string species = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = "hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	variable i,j,k
+	make /o/n=0 means,avgs
+	for(i=0;i<itemsinlist(species);i+=1)
+		string specie = stringfromlist(i,species)
+		for(j=0;j<itemsinlist(odors);j+=1)
+			string odor = stringfromlist(j,odors)
+			dfref df = root:periodograms:$(specie+"_ff_"+odor):x_sub
+			if(datafolderrefstatus(df))
+				wave /sdfr=df periodogram_jack
+				variable n_individuals = max(1,dimsize(periodogram_jack,2))
+				make /free/n=(n_individuals) values
+				for(k=0;k<n_individuals;k+=1)
+					if(mode == 0)
+						values[k] = LowestResolvablePeak(df,jack_sample=k,method=method)
+					elseif(mode == 1)
+						values[k] = LowestResolvablePeak(df,antenna=k,method=method)
+					endif
+				endfor
+				variable m = Nan, s = NaN, minn = NaN, maxx = NaN, v25 = nan, v75 = nan
+				variable value = LowestResolvablePeak(df,method=method) // Mean antenna.  
+				if(n_individuals>1)
+					wavestats /q values
+					m = v_avg
+					s = v_sdev
+					if(mode == 0)
+						 s *= (n_individuals-1) // jackknife correction.  
+					endif
+					minn = v_min
+					maxx = v_max
+					variable nans = v_numnans
+					variable med = statsmedian(values)
+					if(n_individuals>=5)
+						statsquantiles /q values
+						v25 = v_q25
+						v75 = v_q75
+					endif
+				endif
+				means[numpnts(means)] = {value}
+				avgs[numpnts(avgs)] = {m}
+				printf "%s, %s: %.0f, %.1f +/- %.1f, [%.0f - %.0f - %.0f - %.0f - %.0f], (%d,%d)\r",specie,odor,value,m,s,minn,v25,med,v75,maxx,n_individuals,nans
+			endif
+		endfor
+	endfor
+end
+
+function LowestResolvablePeak(df[,antenna,jack_sample,method])
+	dfref df
+	variable antenna // Calculate for the antenna with this index.  
+	variable jack_sample // Calculate for the jacknife sample with this index (i.e. excluding the antenna with this index).  
+	variable method // 0 for a comparison using SEM, any other value for a comparison just using the mean, with the value as log-threshold.  
+	
+	variable result = nan
+	wave /sdfr=df periodogram,periodogram_sem
+	if(!paramisdefault(jack_sample))
+		wave /sdfr=df periodogram_jack
+		copyscales /p periodogram,periodogram_jack // This may not have been done in MergePeriodograms()
+		wave periodogram = layer(periodogram_jack,jack_sample)
+	endif
+	if(!paramisdefault(antenna))
+		wave /sdfr=df periodogram_jack
+		copyscales /p periodogram,periodogram_jack // This may not have been done in MergePeriodograms()
+		wave periodogram_jack_i = layer(periodogram_jack,antenna)
+		variable n_antennae = max(1,dimsize(periodogram_jack,2))
+		duplicate /free periodogram, periodogram_i
+		periodogram_i = (periodogram * n_antennae) - (periodogram_jack_i * (n_antennae-1))
+		wave periodogram = periodogram_i
+	endif
+	make /free/n=9 ms_values = {6,8,10,12,15,20,30,50,100}
+	variable i
+	//print getdatafolder(1,df)
+	for(i=0;i<numpnts(ms_values);i+=1)
+		variable ms = ms_values[i]
+		if(CanResolvePeak(ms,periodogram,periodogram_sem,method=method))
+			result = ms
+			//if(ms>=50)
+			//	print "Yes:"+num2str(ms)
+			//endif
+			break
+		endif
+		if(ms==100)
+			//print "No:"+num2str(ms)
+		endif
+	endfor
+	return result
+end
+
+function CanResolvePeak(ms,periodogram,periodogram_sem[,method])
+	variable ms, method
+	wave periodogram, periodogram_sem
+	
+	variable peak_range = 0
+	variable trough_range = 0.5
+	variable result = nan
+	string conditions = "100ms;50ms;30ms;20ms;15ms;12ms;10ms;8ms;6ms;cont"
+	variable col_ = whichlistitem(num2str(ms)+"ms",conditions)
+	if(col_ >= 0)
+		variable hz = 1000/ms
+		wave periodogram_ = col(periodogram,col_)
+		if(method==0)
+			wave periodogram_sem_ = col(periodogram_sem,col_)
+			duplicate /free periodogram_,periodogram_lower,periodogram_higher
+			periodogram_lower -= periodogram_sem_
+			periodogram_higher += periodogram_sem_
+			
+			//wavestats /q/r=(hz*(1-peak_range),hz*(1+peak_range)) periodogram_
+			//variable meann = periodogram_(v_maxloc)
+			//variable maxx = periodogram_lower(v_maxloc) // highest mean - sem.  
+			variable meann = periodogram_(hz)
+			variable maxx = periodogram_lower(hz) // highest mean - sem.  
+			wavestats /q/r=(hz*(1-trough_range),hz) periodogram_higher
+			variable minn_left = v_min
+			wavestats /q/r=(hz,hz*(1+trough_range)) periodogram_higher
+			variable minn_right = v_min // lowest mean + sem.  
+			if(maxx > minn_left && maxx > minn_right && meann > 0)
+				result = 1
+			else
+				result = 0
+			endif
+		else
+			maxx = periodogram_(hz) // highest mean - sem.  
+			//wavestats /q/r=(hz*(1-trough_range),hz*(1+trough_range)) periodogram_
+			//meann = v_avg
+			variable trough_range_ = trough_range
+			do
+				duplicate /free/r=(hz*(1-trough_range_),hz*(1+trough_range_)) periodogram_,w
+				if(numpnts(w)<3)
+					trough_range_ *= 1.1
+				else
+					break
+				endif
+			while(1)
+			//dspdetrend /f=line w
+			//wave w = w_detrend
+			maxx = w(hz)
+			wavestats /q w
+			meann = (v_avg*v_npnts - maxx)/(v_npnts-1) // Mean not counting peak.  
+			if(maxx > (meann + method) && maxx > 0)
+				result = 1
+			else
+				result = 0
+			endif
+		endif
+	endif
+	return result
+end
+
+function MaxCoherences()
+	string species = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = "hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	variable i,j,k
+	make /o/n=0 avgs,means
+	for(i=0;i<itemsinlist(species);i+=1)
+		string specie = stringfromlist(i,species)
+		for(j=0;j<itemsinlist(odors);j+=1)
+			string odor = stringfromlist(j,odors)
+			dfref df = root:coherence:X1_9_9:$((specie+"_bb_"+odor)):x_sub
+			if(datafolderrefstatus(df))
+				wave /sdfr=df coherence_mag,coherence_mag_shuffled,coherence_mag_shuffled_sd
+				Init(specie,"bb",odor)
+				wave /t active_experiments_list
+				variable n_individuals = max(1,dimsize(active_experiments_list,0))
+				make /free/n=(n_individuals) values
+				for(k=0;k<n_individuals;k+=1)
+					string name = active_experiments_list[k][0]
+					dfref antenna_df = $("root:"+name+":EAG")
+					wave /sdfr=antenna_df coherence_mag_k = coherence_sub
+					values[k] = MaxCoherence(coherence_mag_k,coherence_mag_shuffled,coherence_mag_shuffled_sd)
+				endfor
+				variable m = Nan, s = NaN, minn=NaN, maxx=NaN, v25=NaN, v75=Nan, bad=0
+				variable value = MaxCoherence(coherence_mag,coherence_mag_shuffled,coherence_mag_shuffled_sd) // Mean antenna.  
+				if(n_individuals>1)
+					wavestats /q values
+					m = v_avg
+					s = v_sdev
+					minn = v_min
+					maxx = v_max
+					bad = v_numnans
+					extract /free values, good_values, numtype(values)==0
+					variable med = statsmedian(good_values)
+					if(numpnts(good_values)>=5)
+						statsquantiles /q good_values
+						v25 = v_q25
+						v75 = v_q75
+					endif
+				endif
+				//print values
+				//sort values,values
+				printf "%s, %s: %.0f, %.0f +/- %.0f, [%.0f - %.0f - %.0f - %.0f - %.0f], (%d,%d)\r",specie,odor,value,m,s,minn,v25,med,v75,maxx,n_individuals,bad
+				if(v_min > value || v_max < value)
+					//print value,values
+				endif
+				avgs[numpnts(avgs)] = {m}
+				means[numpnts(means)] = {value}
+			endif
+		endfor
+	endfor
+end
+
+function MaxCoherence(meann,shuffle,shuffle_sd[,threshold])
+	wave meann,shuffle,shuffle_sd
+	variable threshold
+	
+	threshold = paramisdefault(threshold) ? 5 : threshold
+	
+	duplicate /free meann, diff
+	diff -= (shuffle + threshold*shuffle_sd)
+	smooth 101,diff
+	findlevel /q/edge=2 diff, 0
+	if(numtype(v_levelx) || diff[0] < 0 && diff[1] < 0 && diff[2] < 0) // If no downward level crossing found.  
+		v_levelx = NaN // Then it must be below the threshold throughout, so set to 0 (no coherence).  
+	endif
+	return v_levelx
 end
 
