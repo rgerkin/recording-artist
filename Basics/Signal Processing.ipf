@@ -1326,7 +1326,7 @@ Function /WAVE TimeFrequency(Source,winSize,winOverlap[,segmentSize,segmentOverl
 	if(mod(winPoints,2)!=0)
 		winPoints-=1
 	endif
-	variable segmentPoints=winPoints*segmentSize
+	variable segmentPoints=floor(winPoints*segmentSize)
 	if(mod(segmentPoints,2)!=0)
 		segmentPoints-=1
 	endif
@@ -1366,12 +1366,16 @@ Function /WAVE TimeFrequency(Source,winSize,winOverlap[,segmentSize,segmentOverl
 	SetScale /P x,leftx(Source)+winSize/2,winSize*(1-winOverlap), Dest
 	variable interval=1/(deltax(Source)*(segmentSize ? segmentPoints : winPoints))
 	SetScale /P y,-0.5*interval,interval, Dest
-	if(fractional)
-		matrixop /o Dest=powR(normalizecols(sqrt(Dest)),2)
-	endif
 	if(maxFreq)
 		variable maxFreqPoint=(maxFreq-dimoffset(Dest,1))/dimdelta(Dest,1)
 		redimension /n=(-1,ceil(maxFreqPoint)) Dest
+	endif
+	if(fractional)
+		//redimension /d dest
+		matrixop /free sums=sumcols(Dest^t)
+		//print sums
+		Dest /= sums[p]//
+		//Matrixop /o Dest = powR(normalizecols(sqrt(Dest)),2)
 	endif
 	if(logg)
 		Dest=log(Dest)

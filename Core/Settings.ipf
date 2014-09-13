@@ -698,12 +698,13 @@ function LongestPackageObjectTitle(module,package)
 	return longest
 end
 
-function /s PackageObjectTitle(module,package,object)
+function /s PackageObjectTitle(module,package,object[,quiet])
 	string module,package,object
+	variable quiet
 	
 	string title=""
 	dfref packageDF=PackageManifest(module,package)
-	if(!datafolderrefstatus(packageDF))
+	if(!datafolderrefstatus(packageDF) && !quiet)
 		printf "Could not find the title of object %s in package %s because the package manifest could not be found.\r",object,package  
 	else
 		title=strvarordefault(getdatafolder(1,packageDF)+object+":title",object)

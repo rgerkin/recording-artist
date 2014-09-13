@@ -611,7 +611,8 @@ static Function SetupDynamicClamp([DAQs])
 	variable outputGain=GetOutputGain(chan_,inf)
 	
 	dfref daqDF=GetDaqDF(DAQ)
-	make /o/n=(points) daqDF:forcingWave /wave=forcingWave,daqDF:eWave /wave=eWave,daqDF:iWave /wave=iWave
+	wave LCM_=Core#WavPackageSetting(module,"DAQs",DAQ,"LCM_")
+	make /o/n=(points,LCM_[chan_]) daqDF:forcingWave /wave=forcingWave,daqDF:eWave /wave=eWave,daqDF:iWave /wave=iWave
 	make /o/n=(points*4) daqDF:InputMultiplex /wave=InputMultiplex
 	setscale x,0,duration,forcingWave,eWave,iWave
 	setscale x,0,duration*4,InputMultiplex
@@ -622,9 +623,11 @@ static Function SetupDynamicClamp([DAQs])
 	variable /g df:iGain=1
 	
 	// Assemble dynamic clamp channel.  
-	Assemble(chan_,forcingWave,triparity=0)
-	Assemble(chan_,eWave,triparity=1)
-	Assemble(chan_,iWave,triparity=2)
+	if(0)
+		Assemble(chan_,forcingWave,triparity=0)
+		Assemble(chan_,eWave,triparity=1)
+		Assemble(chan_,iWave,triparity=2)
+	endif
 	//print mean(forcingWave)
 	string outputUnits=GetOutputUnits(chan_)
 	variable conversion=ConversionFactor(outputUnits,"S")
@@ -640,7 +643,7 @@ static Function SetupDynamicClamp([DAQs])
 	for(i=0;i<itemsinlist(channels);i+=1)
 		string channel=stringfromlist(i,channels)
 		chan_ =DAC2Chan(channel) 
-		if(numtype(chan_))
+		if(numtype(chan_) || !IsChanActive(chan_))
 			continue
 		endif
 		wave /sdfr=daqDF Raw=$("Raw_"+num2str(chan_))
@@ -690,28 +693,29 @@ static Function ExecuteDynamicClamp(DAQ)
 	variable out1=DAC2Chan("1")
 	variable out2=DAC2Chan("2")
 	variable outD=DAC2Chan("D")
-	if(numtype(out1))
+	if(!IsChanActive(out1,quiet=1) || numtype(out1))
 		string outWave1="NIL"
 	else
 		wave stim=daqDF:$("Stimulus_"+num2str(out1))
 		outWave1=getwavesdatafolder(stim,2)
 	endif
-	if(numtype(out2))
+	if(!IsChanActive(out2,quiet=1) || numtype(out2))
 		string outWave2="NIL"
 	else
 		wave stim=daqDF:$("Stimulus_"+num2str(out2))
 		outWave2=getwavesdatafolder(stim,2)
 	endif
-	if(numtype(outD) || (!stringmatch(outWave1,"NIL") && !stringmatch(outWave2,"NIL"))) // If there is no diigital output channel or if the both analog outputs are set.  
+	if(!IsChanActive(outD,quiet=1) || numtype(outD) || (!stringmatch(outWave1,"NIL") && !stringmatch(outWave2,"NIL"))) // If there is no diigital output channel or if the both analog outputs are set.  
 		string outWaveD="NIL"
 	else
 		wave stim=daqDF:$("Stimulus_"+num2str(outD))
 		outWaveD=getwavesdatafolder(stim,2)
 	endif
-	
 	string cmd
 	sprintf cmd,"ITC18RunDynamicClamp %s,%s,%s,%s,%s,%s, %s, 4, 2, 0, 10, %f, %.12f, %f, %f, %f, %f, %f",outWave1,outWave2,outWaveD,forcingWave,eWave,iWave,inWave,inputGain,outputGain/1e9,vE/1000,vI/1000,forcingGain,eGain,iGain
+	tic(msg="Run Dynamic Clamp")
 	Execute /Q cmd
+	toc()
 	DemultiplexDynamicClamp(DAQ)
 	Execute /Q listenHook
 End
@@ -894,14 +898,12 @@ static Function StartClock(isi[,DAQ])
 		period=GetPeriod(DAQ)
 	endif
 	String out=joinpath({getdatafolder(1,df),"OutputMultiplex"})
-	
 	//NVar inPoints=root:status:inPoints
 	//inPoints=0
 	//Execute /Q "ITC18Reset"
 	
 	String seq=Sequence(DAQ)
 	nvar /sdfr=df continuous
-	
 	variable dynamic=InDynamicClamp() && !sealTestOn
 	if(!dynamic && numpnts($out))
 		Stim(DAQ)
@@ -927,12 +929,14 @@ static Function StartClock(isi[,DAQ])
 	nvar /sdfr=df lastDAQSweepT
 	sprintf command,"ITC18StartAcq %d,%d,0",period/numInputs,bits
 	lastDAQSweepT=StopMSTimer(-2)
+	tac()
 	if(dynamic)
 		SetupDynamicClamp(DAQs=DAQ)
 		ExecuteDynamicClamp(DAQ)
 	else
 		Execute /Q command
 	endif
+	toc()
 End
 
 static Function SpeakAndListenBkg(s)

@@ -1372,16 +1372,7 @@ Function DisplayMeanTrace([win,error,name,type,keyTrace,x1,x2])
 	
 	string errorName=""
 	if(strlen(error))
-		if(paramisdefault(name))
-			if(minSweep==maxSweep)
-				sprintf errorName,"%s_%s"str,error
-			else
-				sprintf errorName,"%s_%d_%d_%s",keyChannel,minSweep,maxSweep,error
-			endif
-		else
-			errorName=removeending(meanName,type)+error
-		endif
-		
+		errorName=removeending(meanName,"_"+type)+"_"+error
 		Duplicate /o ErrorWave df:$CleanupName(errorName,0) /WAVE=ErrorWave2
 	endif
 	
@@ -4387,6 +4378,22 @@ function IsDisplayed(wave_name,win)
 	wave w=$wave_name
 	CheckDisplayed /W=$win w
 	return v_flag
+end
+
+function Trace2Top(trace[,win])
+	string trace
+	string win
+	
+	if(!paramisdefault(win))
+		win = WinName(0,1)
+	endif
+	string traces = TraceNameList(win,";",1)
+	
+	variable j
+	for(j=0;j<itemsinlist(traces);j+=1)
+		string one_trace = stringfromlist(j,traces)
+		reordertraces /w=$win $trace,{$one_trace}
+	endfor
 end
 
 // Alison's graph style

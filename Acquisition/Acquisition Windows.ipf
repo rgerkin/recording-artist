@@ -981,8 +981,8 @@ Function /S PulseParamHelp(param)
 	return ""
 End
 
-Function PreviewStimuli([sweep_num])
-	Variable sweep_num
+Function PreviewStimuli([sweep_num,no_show])
+	Variable sweep_num, no_show
 	
 	variable currSweep=GetCurrSweep()
 	if(ParamIsDefault(sweep_num))
@@ -993,7 +993,9 @@ Function PreviewStimuli([sweep_num])
 	variable i,numChannels=GetNumChannels()
 	string channel
 	if(wintype("PreviewStimuliWin"))
-		DoWindow /F PreviewStimuliWin
+		if(!no_show)
+			DoWindow /F PreviewStimuliWin
+		endif
 	else
 		Display /K=1/N=PreviewStimuliWin/W=(100,100,600,350) as "Stimulus Preview"
 		ControlBar /W=PreviewStimuliWin /T 55
@@ -1002,6 +1004,9 @@ Function PreviewStimuli([sweep_num])
 		svar stimulus=$Core#PackageSettingLoc(module,"channelConfigs",GetChanName(0),"stimulus")
 		SetVariable StimName value=stimulus, title="as", disable=0, pos={280,3},size={100,15}, win=PreviewStimuliWin
 		PopupMenu StimType value="Pulses;IBW", title="as type", pos={390,0}, win=PreviewStimuliWin
+	endif
+	if(!paramisdefault(sweep_num))
+		SaveAxes("default_",win="PreviewStimuliWin")
 	endif
 	RemoveTraces(win="PreviewStimuliWin")
 	//Wave LCM_=root:parameters:LCM_
@@ -1037,7 +1042,7 @@ Function PreviewStimuli([sweep_num])
 	endfor
 	
 	// Align and label axes.  
-	string axes=AxisList2("vertical")
+	string axes=AxisList2("vertical",win="PreviewStimuliWin")
 	for(i=0;i<itemsinlist(axes);i+=1)
 		string axis=stringfromlist(i,axes)
 		ModifyGraph /W=PreviewStimuliWin freePos($axis)={0.05,kwFraction},axisEnab($axis)={i/itemsinlist(axes),(i+1)/itemsinlist(axes)-0.02}
@@ -1052,6 +1057,10 @@ Function PreviewStimuli([sweep_num])
 	SetAxis /Z/W=PreviewStimuliWin /A/Z bottom
 	Label /Z/W=PreviewStimuliWin bottom "Time (s)"
 	ModifyGraph /Z/W=PreviewStimuliWin lblPos=100
+	
+	if(!paramisdefault(sweep_num))
+		RestoreAxes("default_",win="PreviewStimuliWin")
+	endif
 	
 	SetVariable PossibleSweepNum, value=_NUM:sweep_num, limits={0,Inf,1}, pos={5,30}, size={160,20}, proc=PreviewStimuliSetVariables, title="Preview Sweep Number", win=PreviewStimuliWin
 	ControlInfo /W=PreviewStimuliWin Stagger
@@ -2483,6 +2492,11 @@ function SweepsWinTextBoxUpdate()
 			timeStamp += "\\{secs2time(root:status:expStartT+60*GetSweepTime(GetCursorSweepNum(\""+curs+"\")),1)}"
 		endif
 	endfor
+	ControlInfo /W=SweepsWin Range; Variable range_on=V_Value
+	string highlighted_sweep = GetUserData("SweepsWin","","highlighted_sweep")
+	if(range_on && strlen(highlighted_sweep))
+		timeStamp += "\r[*]: "+highlighted_sweep
+	endif
 	if(lastOn && cursorOn)
 		timeStamp="\\Z08Last: "+timeStamp
 	endif
@@ -2967,6 +2981,7 @@ Function AnalysisMethodSubSelections(axisNum)
 	if(sum(Features)==0)
 		Features[0]=1
 	endif
+	Features = Features[p] || numtype(Features[p]) ? 1 : 0
 	
 	string columnControls = ControlNameList("AnalysisWin",";","Column_*")
 	ModifyControlList /Z columnControls disable=1
@@ -3276,7 +3291,7 @@ Function NormalizeToRegion()
 	endif
 End
 
-// Applies Loess smoothing to the data in a region of a trace specified by the cursors.  
+// Applies smoothing to the data in a region of a trace specified by the cursors.  
 Function TrendRegion(method,options)
 	string method,options
 	
@@ -3287,11 +3302,11 @@ Function TrendRegion(method,options)
 	if(abs(finish-start)<=3) // If the range is insufficient.  
 		return -2
 	endif
-	wave /z data=CsrWaveRef(a)
+	wave /z data=CsrWaveRef(A,"AnalysisWin")
 	if(!waveexists(data))
 		return -3
 	endif
-	string trace=csrwave(a)
+	string trace = csrwave(A,"AnalysisWIn",1)
 	dfref df=getwavesdatafolderdfr(data)
 	wave /z Trend=df:$(nameofwave(data)+"_trend")
 	if(!waveexists(Trend))
@@ -3318,11 +3333,13 @@ Function TrendRegion(method,options)
 	
 	strswitch(method)
 		case "Remove":
-			tempTrend=NaN
+			Trend=NaN
 			variable red,green,blue
 			string channel = GetDataFolder(0,df)
 			GetChannelColor(channel,red,green,blue)
-			modifygraph /Z rgb($trace)=(red,green,blue)
+			modifygraph /Z/w=AnalysisWIn rgb($trace)=(red,green,blue)
+			removefromgraph /z/w=AnalysisWIn $(nameofwave(trend))
+			return 0
 			break
 		case "Linear Regression":
 			//SetScale /P x,first,1,$fitName
@@ -3356,22 +3373,22 @@ Function TrendRegion(method,options)
 	
 	if(!error)
 		if(stringmatch(method,"Decimation"))
-			Trend[start,finish][value][pre]=mod(p,neighbors)==floor((neighbors-1)/2) ? tempTrend[p-start] : nan
+			Trend[start,finish][value][pre] = mod(p,neighbors)==floor((neighbors-1)/2) ? tempTrend[p-start] : nan
 		else
 			Trend[start,finish][value][pre]=tempTrend[p-start]
 		endif
 		string appendedTrends=AppendedWave(Trend,dim1=value,dim2=pre,axis=activeAxis,win="AnalysisWin")
 		if(!strlen(appendedTrends))
 			GetTraceColor(trace,red,green,blue)
-			appendToGraph /c=(red,green,blue) /L=$activeAxis /B=time_axis Trend vs sweepT
-			modifyGraph /Z lsize($nameofwave(Trend))=0.5
-			//Wave W_Coef=W_coef; Wave W_Sigma=W_Sigma
-			//printf "For trace %s, the slope is %f +/- %f\r",trace,W_Coef(2),W_Sigma(2)
-		endif
-		if(stringmatch(method,"Decimation"))
-			modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
-			variable marker = numberbykey("marker(x)",traceinfo("",trace,0),"=")
-			modifyGraph /Z mode=3,marker=marker,lsize($nameofwave(Trend))=5
+			string y_axis_name = TraceYAxis(trace,win="AnalysisWin")
+			appendToGraph /c=(red,green,blue) /L=$y_axis_name /B=time_axis Trend[][value][pre] vs sweepT
+			string trend_trace = TopTrace(win="AnalysisWin")
+			modifyGraph /Z lsize($trend_trace)=0.5
+			if(stringmatch(method,"Decimation"))
+				modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
+				variable marker = numberbykey("marker(x)",trace_info,"=")
+				modifyGraph /Z mode($trend_trace)=3,marker($trend_trace)=marker,lsize($trend_trace)=5
+			endif
 		endif
 	endif
 	killwaves /z tempTrend
@@ -3414,6 +3431,7 @@ function SweepsWinHook(info)
 	if(info.eventCode==4)
 		return 0
 	endif
+	variable quiet = !Core#IsDev()
 	strswitch(info.eventName)
 		case "cursormoved":
 			string method=SelectedMethod()
@@ -3422,7 +3440,7 @@ function SweepsWinHook(info)
 				ControlInfo /W=$info.winname SwitchView; String view=S_userdata
 				Variable focused=StringMatch(view,"Focused")
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
-				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs")
+				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs",quiet=quiet)
 				if(waveexists(cursor_locs))
 					variable loc = focused ? xcsr2(info.cursorName,win=info.winname) : xcsr($(info.cursorName),info.winname)
 					strswitch(info.cursorName)
@@ -3502,6 +3520,49 @@ function SweepsWinHook(info)
 			structput /s info.mouseLoc str
 			SetWindow $info.winname userData(mouseUp)=str
 			break
+		case "keyboard":
+			ControlInfo /W=$info.winName Range
+			variable range_checked = v_value
+			if(range_checked)
+				variable highlighted_sweep = str2num(GetUserData(info.winName, "", "highlighted_sweep"))
+				string traces = TraceNameList(info.winName,";",1)
+				if(info.keyCode == 30 || info.keyCode == 31) // Up or down arrow.  This will change the thickness of a sweep and set it to full channel color.   
+					if(numtype(highlighted_sweep))
+						highlighted_sweep = GetCursorSweepNum("A")
+					else
+						highlighted_sweep += -(info.keyCode*2 - 61)
+						highlighted_sweep = limit(highlighted_sweep,GetCursorSweepNum("A"),GetCursorSweepNum("B"))
+					endif
+					setwindow $info.winName userData(highlighted_sweep) = num2str(highlighted_sweep)
+					ChannelColorCode(win=info.winName)
+					LightenTraces(2,except="input*",win=info.winName)
+					string matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
+					for(i=0;i<itemsinlist(matching_traces);i+=1)
+						string matching_trace = stringfromlist(i,matching_traces)
+						string channel = Trace2Channel(matching_trace,win=info.winName)
+						variable red,green,blue
+						GetChannelColor(channel,red,green,blue)
+						modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue), lsize=1, lsize($matching_trace)=2
+						Trace2Top(matching_trace,win=info.winName)
+					endfor
+					SweepsWinTextBoxUpdate()
+					if(WinType("PreviewStimuliWin"))
+						PreviewStimuli(sweep_num=highlighted_sweep,no_show=1)
+					endif
+				elseif(info.keyCode == 8) // Delete key.  This will remove a sweep from the plot.  
+					if(!numtype(highlighted_sweep))
+						matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
+						for(i=0;i<itemsinlist(matching_traces);i+=1)
+							matching_trace = stringfromlist(i,matching_traces)
+							RemoveFromGraph /z/w=$info.winName $matching_trace
+							Execute /P/Q "DoWindow /F "+info.winName // Move the Sweeps window back to the front at the very end, since the command window gets in the way.  
+						endfor
+					endif
+				endif
+			endif
+			//print info.eventCode,info.eventName,info.eventMod,info.keyCode
+			//if(stringm
+			break
 	endswitch
 end
 
@@ -3528,6 +3589,16 @@ function AnalysisWinHook(info)
 				Cursor /W=$info.winname B,$LongestVisibleTrace(win=info.winname),value+spacing
 				//Cursor /H=2/W=Membrane_Constants B,$LongestVisibleTrace(win="Membrane_Constants"),value+spacing
 			endif
+			string csr_info = CsrInfo($cursorName)
+			string trace = stringbykey("TNAME",csr_info)
+			string trace_info = TraceInfo(info.winname,trace,0)
+			string y_axis = stringbykey("YAXIS",trace_info)
+			print y_axis
+			variable axis_num
+			sscanf y_axis,"Axis_%d",axis_num
+			if(strlen(y_axis) && axis_num>=0)
+				AnalysisMethodSubSelections(axis_num) // Set analysis method.  
+			endif
 			break
 		case "mouseup":
 			Variable xpixel=info.mouseLoc.h
@@ -3541,7 +3612,7 @@ function AnalysisWinHook(info)
 				Variable axisNum
 				sscanf axisName,"Axis_%d",axisNum
 				if(strlen(axisName) && axisNum>=0)
-					AnalysisMethodSubSelections(axisNum)
+					AnalysisMethodSubSelections(axisNum) // Set analysis method.  
 				endif
 			endif
 			break

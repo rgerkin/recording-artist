@@ -140,8 +140,8 @@ Function /S SweepAcqMode(chan,sweep[,quiet])
 	return mode
 End
 
-function IsChanActive(chan)
-	variable chan
+function IsChanActive(chan[,quiet])
+	variable chan,quiet
 	
 	variable active = Core#VarPackageSetting(module,"channelConfigs",GetChanName(chan),"active",quiet=1)
 	return active>0
@@ -1339,6 +1339,7 @@ Function WaveUpdate([DAQ,sweep_num])
 	variable sweep_num
 	
 	DAQ=SelectString(ParamIsDefault(DAQ),DAQ,MasterDAQ())
+	sweep_num = paramisdefault(sweep_num) ? GetCurrSweep() : sweep_num
 	variable i,numChannels=GetNumChannels()
 	wave /T Labels=GetChanLabels()
 	dfref daqDF=GetDaqDF(DAQ)
@@ -1357,7 +1358,7 @@ Function WaveUpdate([DAQ,sweep_num])
 		wave /sdfr=daqDF input=$("input_"+num2str(i))
 		redimension /n=(round(duration*kHz*1000)) input // Round because default action is to floor.  
 		
-		wave channelDivisor=GetChanDivisor(i)
+		wave channelDivisor=GetChanDivisor(i,sweepNum=sweep_num)
 		LCM_[i]=LCM(channelDivisor)
 		LCM_[i]=numtype(LCM_[i]) ? 1 : LCM_[i]
 		make /o/n=(0,LCM_[i]) daqDF:$("Raw_"+num2str(i)) /wave=Raw
@@ -1540,6 +1541,19 @@ function /wave GetDAQDivisor(daq)
 	return daqDivisor
 end
 
+function /wave GetChanStimParam(param_name,chan[,sweepNum])
+	string param_name
+	variable chan,sweepNum
+	
+	if(paramisdefault(sweepNum))
+		wave ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param_name)
+	else
+		wave chanHistory=GetChanHistory(chan)
+		make /free/n=(dimsize(chanHistory,2)) param=chanHistory[sweepNum][%$param_name][p]
+	endif
+	return param
+end
+
 function /wave GetChanDivisor(chan[,sweepNum])
 	variable chan,sweepNum
 	
@@ -1612,8 +1626,40 @@ function /wave GetdAmpl(chan[,sweepNum])
 	return dAmpl
 end
 
+function GetEffectiveParam(param_name,chan[,sweepNum,pulseSet,pulseNum])
+	string param_name
+	variable chan,sweepNum,pulseSet,pulseNum
+	
+	wave param = GetChanStimParam(param_name,chan,sweepNum=sweepNum)
+	if(paramisdefault(pulseSet))
+		wave livePulseSets = GetLivePulseSets(chan,sweepNum=sweepNum)
+		pulseSet = livePulseSets[0] // First live pulse set.  
+	endif
+	variable result = param[pulseSet]
+	
+	return result
+end
+
+function /wave GetSweepsWithEffectiveParam(param_name,value,chan[,pulseNum])
+	string param_name
+	variable value,chan,pulseNum
+	
+	make /free/n=0 w_sweeps
+	variable i,num_sweeps = GetCurrSweep()
+	for(i=0;i<num_sweeps;i+=1)
+		variable sweep_value = GetEffectiveParam(param_name,chan,sweepNum=i,pulseNum=pulseNum)
+		if(value == sweep_value)
+			w_sweeps[numpnts(w_sweeps)] = {i}
+		endif
+	endfor
+	
+	return w_sweeps
+end
+
 function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	variable chan,sweepNum,pulseSet,pulseNum
+	
+	sweepNum  = paramisdefault(sweepNum) ? GetCurrSweep() : sweepNum
 	
 	wave ampl = GetAmpl(chan,sweepNum=sweepNum)
 	wave dampl = GetdAmpl(chan,sweepNum=sweepNum)
@@ -1627,15 +1673,18 @@ function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	for(k=0;k<numpnts(livePulseSets);k+=1)
 		result +=  (pulseNum<pulses[k]) * (ampl[livePulseSets[k]] +pulseNum*dampl[livePulseSets[k]])
 	endfor
+	
 	return result
 end
 
 function /wave GetLivePulseSets(chan[,sweepNum])
 	variable chan,sweepNum
 	
+	sweepNum  = paramisdefault(sweepNum) ? GetCurrSweep() : sweepNum
+	
 	wave divisor = GetChanDivisor(chan,sweepNum=sweepNum)
 	wave remainder = GetChanRemainder(chan,sweepNum=sweepNum)
-	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(divisor[p],sweepNum) & remainder[p]
+	make /free/n=(numpnts(divisor)) pulseSetState = 2^mod(sweepNum,divisor[p]) & remainder[p]
 	if(numpnts(divisor)==1)
 		pulseSetState = 1
 	endif
@@ -1757,7 +1806,7 @@ Function /S Assemble(chan,Stimulus[,triparity,sweep_num])
 					// Not using x2pnt because of a rounding bug in that function.  
 					if(lastSample>firstSample) // Pulse is at least one sample in duration and occurs before the end of the sweep.  
 						if(lastSample<dimsize(Stimulus,0))
-							StimFunc(Stimulus,chan,firstSample,lastSample,i,j,k)				
+							StimFunc(Stimulus,chan,firstSample,lastSample,i,j,k)
 						else
 							printf "A non-zero component to the stimulus extends beyond the stimulus duration.  Zeroing this component.\r" 
 						endif
@@ -2251,15 +2300,19 @@ function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,puls
 	wave Stimulus
 	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity
 	
-	variable ampl=GetStimParam("Ampl",chan,pulseSet)
-	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
-	variable begin = GetStimParam("Begin",chan,pulseSet)
-	variable width = GetStimParam("Width",chan,pulseSet)
-	variable loc=abs(enoise(0.001*width/dimdelta(Stimulus,0)))
-	loc += 0.001*begin/dimdelta(Stimulus,0)
-	Stimulus[floor(loc)][sweepParity]+=ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
-	if(pulseNum==pulses-1)
+	if(pulseNum == pulses - 1)
+		variable ampl=GetStimParam("Ampl",chan,pulseSet)
+		variable dAmpl=GetStimParam("dAmpl",chan,pulseSet)
+		variable begin = GetStimParam("Begin",chan,pulseSet)
+		variable width = GetStimParam("Width",chan,pulseSet)
+		variable delta_x = dimdelta(Stimulus,0)
+		make /free/n=(pulses) locs=abs(enoise(0.001*width/delta_x))
+		locs += 0.001*begin/delta_x
+		variable i
+		for(i=0;i<numpnts(locs);i+=1)
+			Stimulus[floor(locs[i])][sweepParity]+=ampl+dampl*i
+		endfor
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
 			Convolve2(template,Stimulus,col=sweepParity)

@@ -1,16 +1,30 @@
 #pragma rtGlobals=1		// Use modern global access method.
 
+#include "Symbols"
+#include "Settings"
+#include "Profiles"
+#include "Utilities"
+#include "List Functions"
+#include "Signal Processing"
+#include "Statistics"
+#include "Progress Window"
+#include "Wave Functions"
+#include "Load Neuralynx"
+#include "Neuralynx Analysis"
+#include "Neuralynx Analysis2"
+#include "Graphing"
+
 strconstant pathName = "PaulPath"
 strconstant animalPathName = "AnimalPath"
 constant epoch_offset = 3 // Column number of epoch 0 in all_experiments_list. 
 constant n_shuffles = 125
 
-function All([i,j,k])
-	variable i,j,k
+function All([i,j,k,no_delete])
+	variable i,j,k,no_delete
 	
 	tic()
-	string animals = "ticl;locust;ant;bee;cockroach;moth;orangeroach;laser;"
-	string odors = ";hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
+	string animals = "ticl;"//locust;ant;bee;cockroach;moth;orangeroach;laser;"
+	string odors = ";"//hpn;hpn0.1;hpn0.01;hpn0.001;hx;hx0.1;nol;iso;lem;lio;bom;6me;"
 	string stimuli = "bb;ff"
 	
 	wave /t/sdfr=root: active_list = active_experiments_list
@@ -67,7 +81,9 @@ function All([i,j,k])
 		endfor
 		j=0
 		cd root:
-		KillRecurse("ps*")
+		if(!no_delete)
+			KillRecurse("ps*")
+		endif
 	endfor
 	toc()
 	print "Done"
@@ -81,37 +97,58 @@ function Go()
 		return -1
 	endif
 	svar /sdfr=root: stimulus,animal
+	wave /t/sdfr=root: active_experiments_list
 	CleanData()
-	FormatData()
 	MakeAllVTAs()
-	MakeAllPeriodograms()
-	MakeAllSpectrograms()
+	return 0
+//	FormatData()
+//	MakeAllPeriodograms()
+//	MakeAllSpectrograms()
 	if(stringmatch(stimulus,"BB"))
 		wave eag_bb = MergeBBs(subtract=0) // Odor epochs.  
 		if(!stringmatch(animal,"TiCl"))
+			make /free ranges = {{1,9.9}}//{0.01,1},{5,10}}
 			wave ticl_bb = root:bb:ticl_bb_:x:bb
-			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1)
-			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10)
-			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
-			
-			wave eag_bb = MergeBBs(subtract=-1) // Air epochs.  
-			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=-1)
-			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=-1)
-			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=-1)
+			variable i,j
+//			for(i=0;i<dimsize(ranges,1);i+=1)
+//				EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=ranges[0][i],endT=ranges[1][i])
+//			endfor
+//			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb)
+//			
+//			wave eag_bb = MergeBBs(subtract=-1) // Air epochs.  
+//			for(i=0;i<dimsize(ranges,1);i+=1)
+//				EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=ranges[0][i],endT=ranges[1][i],subtracted=-1)
+//			endfor
+//			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=-1)
 			
 			wave eag_bb = MergeBBs(subtract=1) // Air-subtracted odor epochs.  
-			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=0.01,endT=1,subtracted=1)
-			EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=5,endT=10,subtracted=1)
-			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=1)
+			for(i=0;i<dimsize(ranges,1);i+=1)
+				for(j=0;j<dimsize(active_experiments_list,0);j+=1)
+					string name = active_experiments_list[j][0]
+					dfref df = root:$(name):EAG
+					string odor_epoch_ = active_experiments_list[j][1]
+					string air_epoch_ = active_experiments_list[j][2]
+					dfref odor_epoch = df:$odor_epoch_
+					dfref air_epoch = df:$air_epoch_
+					wave /sdfr=odor_epoch odor = data
+					wave /sdfr=air_epoch air = data
+					duplicate /free odor, bb
+					bb -= air
+					wave antenna_coherence = EAG_TiCl_Coherence(bb,TiCl_bb,startT=ranges[0][i],endT=ranges[1][i],subtracted=1,no_shuffles=1)
+					duplicate /o antenna_coherence df:$"coherence_sub"
+				endfor
+				EAG_TiCl_Coherence(EAG_bb,TiCl_bb,startT=ranges[0][i],endT=ranges[1][i],subtracted=1)
+			endfor
+//			EAG_TiCl_Coherogram(EAG_bb,TiCl_bb,subtracted=1)
 		endif
 	endif
-	if(stringmatch(stimulus,"FF"))
-		wave eag_ff = MergeFFs(subtract=0) // Odor epochs.  
-		if(!stringmatch(animal,"TiCl"))
-			wave eag_ff = MergeFFs(subtract=-1) // Air epochs.  
-			wave eag_ff = MergeFFs(subtract=1) // Air-subtracted odor epochs.  
-		endif
-	endif
+//	if(stringmatch(stimulus,"FF"))
+//		wave eag_ff = MergeFFs(subtract=0) // Odor epochs.  
+//		if(!stringmatch(animal,"TiCl"))
+//			wave eag_ff = MergeFFs(subtract=-1) // Air epochs.  
+//			wave eag_ff = MergeFFs(subtract=1) // Air-subtracted odor epochs.  
+//		endif
+//	endif
 end
 
 function Init(animal,stimulus,odor[,set_path])
@@ -393,7 +430,9 @@ function CleanData()
 	Prog("Clean",0,0)
 end
 
-function MakeAllVTAs()
+function MakeAllVTAs([no_merge])
+	variable no_merge
+	
 	variable i,j,k
 	wave /t/sdfr=root: list = active_experiments_list
 	svar /sdfr=root: stimulus, animal
@@ -428,21 +467,21 @@ function MakeAllVTAs()
 		endfor
 	endfor
 	Prog("VTA",0,0)
-	string dfs = GetDFs()
-	for(j=0;j<itemsinlist(conditions);j+=1)
-			condition = stringfromlist(j,conditions)
-			for(k=0;k<itemsinlist(nths);k+=1)
-				nth = str2num(stringfromlist(k,nths))
-				if(!stringmatch(animal,"TiCl"))
-					wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=1,pool_errors=1)
-					VTAStats(vta)
-					wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=-1,pool_errors=1)
-					VTAStats(vta)
-				endif
-				wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=0,pool_errors=1)
+	
+	if(!no_merge)
+		string dfs = GetDFs()
+		for(k=0;k<itemsinlist(nths);k+=1)
+			nth = str2num(stringfromlist(k,nths))
+			if(!stringmatch(animal,"TiCl"))
+				wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=1,pool_errors=1)
 				VTAStats(vta)
-			endfor
-	endfor
+				wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=-1,pool_errors=1)
+				VTAStats(vta)
+			endif
+			wave vta = MergeVTAs(dfs,conditions=conditions,nth=nth,subtracted=0,pool_errors=1)
+			VTAStats(vta)
+		endfor
+	endif
 end
 
 // Formats data into a matrix. Requires odor_name and odor_code, which defines how e.g. "o1" maps onto an odor name.    
@@ -533,7 +572,7 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 	variable seg_length = round(n_pnts/5)
 	seg_length -= mod(seg_length,2)==0 ? 0 : 1
 	variable seg_overlap = round(seg_length*0.99)
-	variable start = n_pnts/10
+	variable start = round(n_pnts/10)
 	variable i,j
 	string suffix = ""
 	if(!paramisdefault(subtractEpoch))
@@ -549,8 +588,18 @@ function /wave MakePeriodograms(df,epoch[,subtractEpoch])
 		prog("Freq",i,n_freqs)
 		duplicate /free/r=[][i,i] data trial
 		copyscales /p data,trial
-		DSPPeriodogram /NODC=1 /Q /SEGN={(seg_length),(seg_overlap)} /R=[(start),(n_pnts)] /WIN=Hanning trial 
+		redimension /d trial
+		DSPPeriodogram /NODC=1 /Q /SEGN={(seg_length),(seg_overlap)} /R=[(start),(n_pnts-1)] /WIN=Hanning trial 
 		wave w_periodogram
+		if(numtype(w_periodogram[0]))
+			duplicate /o trial,root:trial_
+			duplicate /o data,root:data_
+			print start,n_pnts,i,seg_length,seg_overlap
+			DoAlert 1,"Periodogram had a bad value in it. Stop?"
+			if(v_flag==1)
+				abort
+			endif
+		endif
 		redimension /n=(numpnts(w_periodogram),-1) periodograms
 		copyscales /p w_periodogram,periodograms
 		periodograms[][i] = log(w_periodogram[p])
@@ -649,13 +698,13 @@ function MakeAllPeriodograms()
 	svar /sdfr=root: stimulus, animal
 	strswitch(stimulus)
 		case "ff":
-			string conditions = "100ms;30ms;15ms;6ms"
+			//string conditions = "100ms;50ms;30ms;20ms;15ms;12ms;10ms;8ms;6ms;cont"
 			break
 		case "bb":
-			conditions = ";"
+			//conditions = ";"
 			break
 		default:
-			conditions = ""
+			//conditions = ""
 	endswitch
 	variable i
 	for(i=0;i<dimsize(list,0);i+=1)
@@ -860,15 +909,15 @@ function /wave MakeVTA(df,epoch[,subtractEpoch,t_min,t_max,e_min,e_max,condition
 	// Set defaults.  
 	if(!paramisdefault(e_min))
 		dfref e_minDF = eagDF:$("E"+num2str(e_min))
-		wave /sdfr=e_minDF times
-		t_min = times[0]-1
+		wave /sdfr=e_minDF min_times = times
+		t_min = min_times[0]-1
 	else
 		t_min = paramisdefault(e_min) ? -Inf : e_min
 	endif
 	if(!paramisdefault(e_max))
 		dfref e_maxDF = eagDF:$("E"+num2str(e_max))
-		wave /sdfr=e_maxDF times
-		t_max = times[numpnts(times)-1]+1
+		wave /sdfr=e_maxDF max_times = times
+		t_max = max_times[numpnts(max_times)-1]+1
 	else
 		t_max = paramisdefault(t_max) ? Inf : t_max
 	endif
@@ -876,8 +925,7 @@ function /wave MakeVTA(df,epoch[,subtractEpoch,t_min,t_max,e_min,e_max,condition
 	
 	// Find valve-opening times. 
 	wave /t/sdfr=eventsDF desc
-	wave /sdfr=eventsDF times
-	wave event_times = times
+	wave /sdfr=eventsDF event_times = times
 	make /free/n=0 valve_open_times
 	if(!paramisdefault(condition))
 		variable i = 0, trial = 0
@@ -1016,6 +1064,7 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 	endif
 	string suffix = suffix2 + suffix3
 	variable i,j
+	variable num_individuals = itemsinlist(dfs)
 	newdatafolder /o/s root:vta
 	newdatafolder /o/s $Environment()
 	if(paramisdefault(merge_num))
@@ -1028,7 +1077,7 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 	variable /g $"nth" = nth
 	variable /g $"subtracted" = subtracted
 	variable /g $"pool_errors" = pool_errors
-	make /o/n=0 vta,vta_sd,vta_sem
+	make /o/n=0 vta,vta_sd,vta_sem,vta_jack
 	
 	conditions = selectstring(!paramisdefault(conditions),";",conditions)
 	for(j=0;j<itemsinlist(conditions);j+=1)
@@ -1038,7 +1087,7 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 		endif
 		suffix = suffix1 + suffix2 + suffix3
 		make /free/n=0 vta_,vta_sd_,vta_sem_	
-		for(i=0;i<itemsinlist(dfs);i+=1)
+		for(i=0;i<num_individuals;i+=1)
 			string df_names = stringfromlist(i,dfs)
 			string odor_df_name = stringfromlist(0,df_names,",")
 			string air_df_name = stringfromlist(1,df_names,",")
@@ -1062,13 +1111,19 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 			matrixop /free vta_sem__ = vta_sd_/sqrt(i)
 		endif
 		matrixop /free vta__ = meancols(vta_^t)
+		make /free/n=(dimsize(vta_,0),dimsize(vta_,1)) vta_jack__ = vta__[p] * num_individuals // Sum instead of overage.  
+		vta_jack__ -= vta_[p][q]
+		vta_jack__ /= (num_individuals - 1)
 		wavestats /q/r=[0,dimsize(vta__,0)/2] vta__
 		vta__ -= v_avg
+		vta_jack__ -= v_avg
 		concatenate {vta__},vta
 		concatenate {vta_sd__},vta_sd
 		concatenate {vta_sem__},vta_sem
+		redimension /n=(dimsize(vta_,0),dimsize(vta_jack,1)+1,dimsize(vta_,1)) vta_jack
+		vta_jack[][j][] = vta_jack__[p][r]
 	endfor
-	copyscales /p vtai,vta,vta_sd,vta_sem
+	copyscales /p vtai,vta,vta_sd,vta_sem,vta_jack
 	if(paramisdefault(merge_num))
 		printf "Merged into vta%s\r",suffix
 	else
@@ -1079,7 +1134,7 @@ function /wave MergeVTAs(dfs[,conditions,nth,subtracted,pool_errors,merge_num])
 	return vta
 end
 
-function FormatBB(df,epoch)
+function /wave FormatBB(df,epoch)
 	dfref df 
 	variable epoch
 	
@@ -1103,7 +1158,7 @@ function FormatBB(df,epoch)
 	duplicate /o data_ eagDF:data // Overwrite data with formatted data.  
 	duplicate /o times_ eagDF:times // Overwrite data with formatted data.  
 	
-	return data
+	return data_
 end
 
 function /wave MergeBBs([subtract,merge_num])
@@ -1379,18 +1434,25 @@ function /wave MergePeriodograms(dfs[,condition,subtracted,merge_num])
 		matrixop /o periodogram_sd = sqrt(sumbeams(periodogram2_)/i - powR(sumbeams(periodogram_)/i,2))
 		matrixop /o periodogram_sem = periodogram_sd/sqrt(i)
 		matrixop /o periodogram = sumbeams(periodogram_)/i
+		variable rows = dimsize(periodogram_,0)
+		variable cols = dimsize(periodogram_,1)
+		variable layers = dimsize(periodogram_,2)
+		make /o/n=(rows,cols,layers) periodogram_jack = periodogram[p][q]*i
+		periodogram_jack -= periodogram_[p][q][r]
+		periodogram_jack /= i
 	else // For BB trials = 1 (or 0, i.e. just M x N).  
 		matrixop /o periodogram_sd = sqrt(meancols(periodogram2_^t) - powR(meancols(periodogram_^t),2))
 		matrixop /o periodogram_sem = periodogram_sd/sqrt(i)
 		matrixop /o periodogram = meancols(periodogram_^t)
 	endif
-	copyscales /p periodogrami,periodogram,periodogram_sd,periodogram_sem
+	copyscales /p periodogrami,periodogram,periodogram_jack,periodogram_sd,periodogram_sem
 	if(paramisdefault(merge_num))
 		printf "Merged into x%s\r",suffix
 	else
 		printf "Merged into N%d\r" merge_num
 	endif
 	setdatafolder currDF
+	
 	return periodogram
 end
 
@@ -1455,6 +1517,7 @@ function /wave MergeSpectrograms(dfs[,condition,subtracted,merge_num])
 		printf "Merged into N%d\r" merge_num
 	endif
 	setdatafolder currDF
+	
 	return spectrogram
 end
 
@@ -1643,10 +1706,11 @@ function /s ClearData([depth])
 			killwaves /z w
 		endfor
 	endif
+	
 	return wave_list
 end
 
-function StartsDurations2ValveStates(starts,durations)
+function /wave StartsDurations2ValveStates(starts,durations)
 	wave starts,durations
 	
 	make /o/n=(starts[Inf]+durations[Inf]) valve_states = 0
@@ -1654,6 +1718,7 @@ function StartsDurations2ValveStates(starts,durations)
 	for(i=0;i<numpnts(starts);i+=1)
 		valve_states[starts[i],starts[i]+durations[i]-1] = 1
 	endfor
+	
 	return valve_states
 end
 
@@ -1700,9 +1765,9 @@ function EventTimes2EAGSegment(df,epoch)
 	setscale /p x,times(start),deltax(data),segment
 end
 
-function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT,subtracted])
+function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT,subtracted,no_shuffles])
 	wave EAG_bb,TiCl_bb
-	variable startT,endT,subtracted
+	variable startT,endT,subtracted,no_shuffles
 	
 	startT = paramisdefault(startT) ? 0 : startT
 	endT = paramisdefault(endT) ? Inf : endT
@@ -1727,7 +1792,7 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT,subtracted])
 	duplicate /free TiCl_bb,ticl
 	
 	variable points = min(numpnts(eag),numpnts(ticl))
-	redimension /n=(points) eag,ticl
+	redimension /d/n=(points) eag,ticl
 	variable scale = dimdelta(eag,0)/dimdelta(ticl,0)
 	if(scale != 1)
 		if(abs(scale-1)<1e-10)
@@ -1747,28 +1812,31 @@ function /wave EAG_TiCl_Coherence(EAG_bb,TiCl_bb[,startT,endT,subtracted])
 	matrixop /o coherence_mag = abs(w_periodogram)
 	smooth 101,coherence_mag
 	copyscales /p w_periodogram,coherence_mag
-	variable i
-	make /free/n=(numpnts(coherence_mag),n_shuffles) shuffles
-	for(i=0;i<n_shuffles;i+=1)
-		prog("Shuffle",i,n_shuffles)
-		wave eag_shuffled = eag
-		wave ticl_shuffled = RandomPhases(ticl)
-		dspperiodogram /q/cohr /r=[(startP),(endP)] /segn={(seg_length),(seg_overlap)} eag_shuffled,ticl_shuffled
-		matrixop /free coherence_mag_shuffle = abs(w_periodogram)
-		smooth 101,coherence_mag_shuffle
-		shuffles[][i] = coherence_mag_shuffle[p]
-	endfor
-	prog("Shuffle",0,0)
-	matrixop /o coherence_mag_shuffled = meancols(shuffles^t)
-	matrixop /o coherence_mag_shuffled_sd = sqrt(varcols(shuffles^t)^t)
-	copyscales /p w_periodogram,coherence_mag,coherence_mag_shuffled,coherence_mag_shuffled_sd
+	if(!no_shuffles)
+		variable i
+		make /free/n=(numpnts(coherence_mag),n_shuffles) shuffles
+		for(i=0;i<n_shuffles;i+=1)
+			prog("Shuffle",i,n_shuffles)
+			wave eag_shuffled = eag
+			wave ticl_shuffled = RandomPhases(ticl)
+			dspperiodogram /q/cohr /r=[(startP),(endP)] /segn={(seg_length),(seg_overlap)} eag_shuffled,ticl_shuffled
+			matrixop /free coherence_mag_shuffle = abs(w_periodogram)
+			smooth 101,coherence_mag_shuffle
+			shuffles[][i] = coherence_mag_shuffle[p]
+		endfor
+		prog("Shuffle",0,0)
+		matrixop /o coherence_mag_shuffled = meancols(shuffles^t)
+		matrixop /o coherence_mag_shuffled_sd = sqrt(varcols(shuffles^t)^t)
+		copyscales /p w_periodogram,coherence_mag_shuffled,coherence_mag_shuffled_sd
+	endif
+	copyscales /p w_periodogram,coherence_mag
 	killwaves /z w_periodogram
 	setdatafolder currDF
 	
 	return coherence_mag
 end
 
-function EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
+function /wave EAG_TiCl_Coherogram(EAG_bb,TiCl_bb[,subtracted])
 	wave EAG_bb,TiCl_bb
 	variable subtracted
 	
@@ -1970,9 +2038,6 @@ function VTAonsets([mode,threshold])
 				if(mode == 1)
 					duplicate /free vta, vta_i
 					vta_i = (vta * n_individuals) - (vta_jack_i * (n_individuals-1))
-					//if(stringmatch(name,"ticl_ff__x_0th_"))
-					//	duplicate /o vta_i $("ticl_"+num2str(j))
-					//endif
 					sample_onsets[j] = VTAonset(vta_i,threshold=threshold)
 				else
 					sample_onsets[j] = VTAonset(vta_jack_i,threshold=threshold)
@@ -2000,11 +2065,10 @@ function VTAonsets([mode,threshold])
 				endif
 			endif
 		endif
-		//mean_onset -= 3.96
-		//avg_onset -= 3.96
 		mean_onsets[i] = mean_onset
 		avg_onsets[i] = avg_onset
 		printf "%s = %.2f (%.2f +/- %.2f) [%.2f - %.2f - %.2f - %.2f - %.2f], (%d, %d)\r",name,mean_onset,avg_onset,stdev_onset,minn,v25,med,v75,maxx,n_individuals,n_bad
+		printf "%s = %.1f (%.1f +/- %.1f) [%.0f - %.0f - %.0f - %.0f - %.0f], (%d, %d)\r",name,mean_onset,avg_onset,stdev_onset,minn,v25,med,v75,maxx,n_individuals,n_bad
 	endfor
 end
 
@@ -2254,4 +2318,3 @@ function MaxCoherence(meann,shuffle,shuffle_sd[,threshold])
 	endif
 	return v_levelx
 end
-
