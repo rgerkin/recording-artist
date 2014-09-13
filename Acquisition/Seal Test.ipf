@@ -377,7 +377,7 @@ Function SealTestWindow([DAQ])
 	ModifyGraph /Z log(inputHistoryAxis)=1, log(seriesHistoryAxis)=1, log(timeConstantHistoryAxis)=1//, log(pressureHistoryAxis)=1
 	for(i=0;i<count;i+=1)
 		sweepAxis=stringfromlist(i,sweepAxes)
-		modifygraph /Z axisEnab($sweepAxis)={0.6*i/count,0.6*(i+1)/count-(count>0)*0.03}, lblPos($sweepAxis)=50
+		modifygraph /Z axisEnab($sweepAxis)={0.6*(count-i-1)/count,0.6*(count-i)/count-(count>0)*0.03}, lblPos($sweepAxis)=50
 	endfor
 	ModifyGraph /Z axisEnab(inputHistoryAxis)={0.62,1}, axisEnab(seriesHistoryAxis)={0.62,1}, axisEnab(pressureHistoryAxis)={0.62,1}, axisEnab(timeConstantHistoryAxis)={0.62,1}
 	ModifyGraph freePos(inputHistoryAxis)=0, freePos(inputHistoryTaxis)=-15
