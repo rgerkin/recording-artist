@@ -266,10 +266,18 @@ function GetKHz(daq)
 	return Core#VarPackageSetting(module,"DAQs",DAQ,"kHz")
 end
 
-function GetNumPulseSets(daq)
+function GetNumPulseSets(daq[,chan])
 	string daq
+	variable chan
 	
-	return Core#VarPackageSetting(module,"DAQs",DAQ,"pulseSets")
+	if(paramisdefault(chan))
+		variable result = Core#VarPackageSetting(module,"DAQs",DAQ,"pulseSets")
+	else
+		wave history = GetChanHistory(chan)
+		result = dimsize(history,2)
+	endif
+	
+	return result
 end
 
 Function /S Chan2DAQ(chan)
@@ -281,6 +289,7 @@ Function /S Chan2DAQ(chan)
 	else
 		DAQ=MasterDAQ()
 	endif
+	
 	return DAQ
 End
 

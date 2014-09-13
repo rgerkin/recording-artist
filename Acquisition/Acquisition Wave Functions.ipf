@@ -1745,7 +1745,11 @@ Function /S Assemble(chan,Stimulus[,triparity,sweep_num])
 	variable duration=GetDuration(DAQ)
 	variable kHz=GetKhZ(DAQ)
 	wave LCM_=Core#WavPackageSetting(module,"DAQs",DAQ,"LCM_")
-	variable pulseSets=GetNumPulseSets(DAQ)
+	if(paramisdefault(sweep_num) || sweep_num>=curr_sweep_num)
+		variable pulseSets = GetNumPulseSets(DAQ)
+	else
+		pulseSets = GetNumPulseSets(DAQ,chan=chan)
+	endif
 	dfref df=Core#InstanceHome(module,"stimuli",GetChanName(chan))
 	if(paramisdefault(sweep_num) || sweep_num>=curr_sweep_num)
 		wave /sdfr=df divisor,remainder,pulses,begin,IPI,width,testPulseOn
