@@ -45,7 +45,7 @@ End
 Function DragAndDropHook(info)
 	struct WMWinHookStruct &info
 	
- 	dfref df=root:Packages:DragAndDropTraces
+	dfref df=root:Packages:DragAndDropTraces
  	if(!datafolderrefstatus(df))
 		return -1
 	endif
@@ -68,6 +68,8 @@ Function DragAndDropHook(info)
 				string /g df:trace=stringbykey("TRACE",trace_info1), df:source=info.winName
 				svar /sdfr=df trace
 				string trace_info2=traceinfo(info.winName,trace,0)
+				string /g df:wav = getwavesdatafolder(tracenametowaveref(info.winName,trace),2)
+				string /g df:axis_flags = stringbykey("AXISFLAGS",trace_info2)
 				variable /g df:lsize=numberbykey("lsize(x)",trace_info2,"=")
 				nvar /sdfr=df lsize
 				if(numtype(lsize))
@@ -78,16 +80,22 @@ Function DragAndDropHook(info)
 			break
 		case 5: // Mouse up.  
 			nvar /sdfr=df lsize
-			svar /sdfr=df trace,source
+			svar /z/sdfr=df trace,source,wav,axis_flags
+			if(!svar_exists(trace) || !strlen(trace))
+				return -2
+			endif
 			if(strlen(trace) && strlen(source) && lsize)
 				modifygraph /z/w=$source lsize($trace)=lsize
 			endif
 			if(!stringmatch(source,info.winName)) // Dragged from another window.  
-				wave w=tracenametowaveref(source,trace)
 				removefromgraph /z/w=$source $trace
-				appendtograph /w=$info.winName w
+				string cmd
+				sprintf cmd,"appendtograph %s/w=%s %s",axis_flags,info.winname,wav 
+				execute /q cmd
+				trace=""
+				wav = ""
+				axis_flags = ""
 			endif
-			trace=""
 			break
 	endswitch
 End
