@@ -3443,6 +3443,7 @@ function SweepsWinHook(info)
 				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs",quiet=quiet)
 				if(waveexists(cursor_locs))
 					variable loc = focused ? xcsr2(info.cursorName,win=info.winname) : xcsr($(info.cursorName),info.winname)
+					redimension /n=(max(numpnts(cursor_locs),2)) cursor_locs
 					strswitch(info.cursorName)
 						case "A":
 							cursor_locs[0] = loc
