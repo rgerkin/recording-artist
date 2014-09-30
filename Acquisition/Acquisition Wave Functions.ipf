@@ -1557,7 +1557,8 @@ function /wave GetChanStimParam(param_name,chan[,sweepNum])
 	string param_name
 	variable chan,sweepNum
 	
-	if(paramisdefault(sweepNum))
+	variable curr_sweep_num = GetCurrSweep()
+	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
 		wave ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param_name)
 	else
 		wave chanHistory=GetChanHistory(chan)
@@ -1570,16 +1571,17 @@ function /wave GetChanDivisor(chan[,sweepNum])
 	variable chan,sweepNum
 	
 	string channel = GetChanName(chan)
-	if(paramisdefault(sweepNum))
+	variable curr_sweep_num = GetCurrSweep()
+	if(!paramisdefault(sweepNum) && sweepNum < curr_sweep_num)
+		wave chanHistory = GetChanHistory(chan)
+		make /free/n=(dimsize(chanHistory,2)) divisor=chanHistory[sweepNum][%$"divisor"][p]
+	else
 		wave /z divisor = Core#WavPackageSetting(module,"stimuli",channel,"divisor")
 		if(!waveexists(divisor))
 			string daq = Chan2DAQ(chan)
 			variable numPulseSets=GetNumPulseSets(daq)
 			make /free/n=(numPulseSets) divisor = 1
 		endif
-	else
-		wave chanHistory = GetChanHistory(chan)
-		make /free/n=(dimsize(chanHistory,2)) divisor=chanHistory[sweepNum][%$"divisor"][p]
 	endif
 	return divisor
 end
@@ -1588,16 +1590,17 @@ function /wave GetChanRemainder(chan[,sweepNum])
 	variable chan,sweepNum
 	
 	string channel = GetChanName(chan)
-	if(paramisdefault(sweepNum))
+	variable curr_sweep_num = GetCurrSweep()
+	if(!paramisdefault(sweepNum) && sweepNum < curr_sweep_num)
+		wave chanHistory = GetChanHistory(chan)
+		make /free/n=(dimsize(chanHistory,2)) remainder=chanHistory[sweepNum][%$"remainder"][p]
+	else
 		wave /z remainder = Core#WavPackageSetting(module,"stimuli",channel,"remainder")
 		if(!waveexists(remainder))
 			string daq = Chan2DAQ(chan)
 			variable numPulseSets=GetNumPulseSets(daq)
 			make /free/n=(numPulseSets) remainder = 2^p
 		endif
-	else
-		wave chanHistory = GetChanHistory(chan)
-		make /free/n=(dimsize(chanHistory,2)) remainder=chanHistory[sweepNum][%$"remainder"][p]
 	endif
 	return remainder
 end
@@ -1605,7 +1608,8 @@ end
 function /wave GetNumPulses(chan[,sweepNum])
 	variable chan,sweepNum
 	
-	if(paramisdefault(sweepNum))
+	variable curr_sweep_num = GetCurrSweep()
+	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
 		wave numPulses=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"pulses")
 	else
 		wave chanHistory=GetChanHistory(chan)
@@ -1617,7 +1621,8 @@ end
 function /wave GetAmpl(chan[,sweepNum])
 	variable chan,sweepNum
 	
-	if(paramisdefault(sweepNum))
+	variable curr_sweep_num = GetCurrSweep()
+	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
 		wave ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"ampl")
 	else
 		wave chanHistory=GetChanHistory(chan)
@@ -1629,7 +1634,8 @@ end
 function /wave GetdAmpl(chan[,sweepNum])
 	variable chan,sweepNum
 	
-	if(paramisdefault(sweepNum))
+	variable curr_sweep_num = GetCurrSweep()
+	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
 		wave dAmpl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"dAmpl")
 	else
 		wave chanHistory=GetChanHistory(chan)
