@@ -316,7 +316,7 @@ Function RemoveStimulusArtifacts(channel,sweep[,w,left,right,channels])
 	for(i=0;i<itemsinlist(channels);i+=1)
 		string source=stringfromlist(i,channels)
 		dfref df=GetChannelDF(source)
-		wave /sdfr=df SweepParams=GetChannelHistory(source)
+		wave SweepParams=GetChannelHistory(source)
 		if(SweepParams[sweep][%Ampl]>0)
 			variable pulses=SweepParams[sweep][%Pulses]
 			variable begin=SweepParams[sweep][%Begin]/1000
@@ -331,7 +331,7 @@ Function RemoveStimulusArtifacts(channel,sweep[,w,left,right,channels])
 		endif
 	endfor
 	dfref df=GetChannelDF(channel)
-	wave /sdfr=df SweepParams=GetChannelHistory(channel)
+	wave SweepParams=GetChannelHistory(channel)
 	if(SweepParams[sweep][%TestPulseOn]>0)
 		variable chan=Label2Chan(channel)
 		string mode=SweepAcqMode(chan,sweep)
