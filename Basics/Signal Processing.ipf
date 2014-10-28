@@ -1344,7 +1344,7 @@ Function /WAVE TimeFrequency(Source,winSize,winOverlap[,segmentSize,segmentOverl
 		if(mod(numpnts(TFWindow),2)!=0)
 			redimension /n=(numpnts(TFWindow)-1) TFWindow
 		endif
-		if(segmentSize)
+		if(segmentSize && segmentPoints < numpnts(TFWindow))
 			DSPPeriodogram /Q/NODC=1 /WIN=Hanning /SEGN={(segmentPoints),(segmentOverlap)} TFWindow
 		else
 			DSPPeriodogram /Q/NODC=1 /WIN=Hanning TFWindow
@@ -1363,7 +1363,7 @@ Function /WAVE TimeFrequency(Source,winSize,winOverlap[,segmentSize,segmentOverl
 	variable highest=wavemax(Dest)
 	//Dest=log(Dest/highest)*20 // Normalize to dB.  
 	Redimension /n=(i,-1) Dest
-	SetScale /P x,leftx(Source)+winSize/2,winSize*(1-winOverlap), Dest
+	SetScale /P x,leftx(Source),winSize*(1-winOverlap), Dest
 	variable interval=1/(deltax(Source)*(segmentSize ? segmentPoints : winPoints))
 	SetScale /P y,-0.5*interval,interval, Dest
 	if(maxFreq)
