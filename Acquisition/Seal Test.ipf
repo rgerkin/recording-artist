@@ -303,7 +303,7 @@ Function SealTestWindow([DAQ])
 		return -1
 	endif
 	
-	Variable xStart=0,yStart=0,xJump=0,yJump=25,xx=xStart,yy=yStart
+	Variable xStart=0,yStart=0,xJump=0,yJump=30,xx=xStart,yy=yStart
 	Variable i,count=0; String modes,mode="",sweepAxes=""
 	for(i=0;i<numChannels;i+=1)
 		if(chanBits & 2^i) // Seal test requested on this channel.  
@@ -329,7 +329,7 @@ Function SealTestWindow([DAQ])
 			string valName="inputRes_"+channel
 			ValDisplay $valName pos={75,8+count*yJump}, format="%.1f", fsize=18, disable=0
 			ValDisplay $valName bodywidth=60, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
-			ValDisplay $("Aux_"+channel) pos={565,11}, format="%.1f", fsize=14, disable=1
+			ValDisplay $("Aux_"+channel) pos={565,10+count*yJump}, format="%.1f", fsize=14, disable=1
 			
 			Button $("Baseline_"+channel) title="Baseline", pos={185,10+count*yJump}, proc=SealTestWinButtons
 			SetVariable $("Range_"+channel) title="Range", pos={242,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
