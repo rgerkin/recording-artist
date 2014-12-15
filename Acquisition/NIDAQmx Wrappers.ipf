@@ -16,10 +16,10 @@ static strconstant pin_prefix = "PFI"
 // If we want the NIDAQ device to control the start times of each sweep. 
 // Overridden in Acq/DAQs/[name]/startTrigger  
 
-static constant pin_in=4 
+static constant pin_in=4
 
 // Device timer will send pulses out to this pin.  
-static constant pin_out=6 
+static constant pin_out=4
 
 strconstant DAQType="NIDAQmx"
 strconstant module="Acq"
@@ -277,13 +277,14 @@ static Function StartClock(isi[,DAQ])
 	if(!paramisdefault(DAQ))
 		string deviceName=DAQ2Device(DAQ)
 	else
-		deviceName="dev1"
+		deviceName="Dev1"
 	endif
 	fDAQmx_CTR_Finished(deviceName,0)
 	string trig_out
-	sprintf trig_out,"%s%d",pin_prefix,pin_out
-	DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=0 /OUT=trig_out 0
-	return fDAQmx_CTR_Start(deviceName,0)
+	sprintf trig_out,"/%s/%s%d",deviceName,pin_prefix,pin_out
+	DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=1 /OUT=trig_out 0 // Set STRT=1 because /STRT=0 starts anyway.  
+	//variable result = fDAQmx_CTR_Start(deviceName,0)
+	return 0
 End
 
 static Function StopClock([DAQ])
@@ -340,7 +341,6 @@ static Function SlaveHook(DAQ)
 			else
 				Hz=NaN
 			endif
-			//print 60*Hz // Pulses per minute.  
 		else
 			Duplicate /free Sweep,CardiacCorr
 			Correlate /NODC /AUTO CardiacCorr,CardiacCorr
@@ -403,7 +403,6 @@ static Function DynamicClampLagTest(tau)
 	//endfor
 	fft /out=3 /dest=mag /rx=(0.025,0.05) vm
 	fft /out=5 /dest=phase  /rx=(0.025,0.05) vm
-	print mag(params[0]),phase(params[0])
 	if(tau==0)
 		duplicate /o vm,vm2
 	endif
@@ -417,7 +416,6 @@ Function dcODE(pw, xx, yw, dydx)
 	Wave dydx	// wave to receive dy[i]/dx (output)	
 
 	wave vm
-	//print xx,pw[1],vm(xx-pw[1])
 	dydx[0] = 1000*cos(2*pi*pw[0]*xx) + 1000*vm(xx-pw[1])*sin(2*pi*pw[0]*xx) - 100*vm(xx-pw[1])
 	
 	return 0
