@@ -419,7 +419,7 @@ function CleanData()
 				endif
 			endfor
 			wave /sdfr=eagDF data
-			if(stringmatch(notes,"inverted!"))
+			if(stringmatch(notes,"*inverted!"))
 				data *= -1
 				printf "Inverted epoch %s in experiment %s.\r",epoch,name
 			endif
@@ -2053,9 +2053,10 @@ function VTAonsets([mode,threshold])
 			variable maxx = v_max
 			variable n_bad = v_numnans
 			if(numpnts(sample_onsets)>=3)
-				statsquantiles /q sample_onsets
+				extract /free sample_onsets,sample_onsets_,numtype(sample_onsets[p])==0
+				statsquantiles /q sample_onsets_
 				variable med = v_median
-				if(numpnts(sample_onsets)>=5)
+				if(numpnts(sample_onsets_)>=5)
 					variable v25 = v_q25
 					variable v75 = v_q75
 				else
@@ -2064,10 +2065,9 @@ function VTAonsets([mode,threshold])
 				endif
 			endif
 		endif
-		mean_onset -= 3.96
-		avg_onset -= 3.96
 		mean_onsets[i] = mean_onset
 		avg_onsets[i] = avg_onset
+		printf "%s = %.2f (%.2f +/- %.2f) [%.2f - %.2f - %.2f - %.2f - %.2f], (%d, %d)\r",name,mean_onset,avg_onset,stdev_onset,minn,v25,med,v75,maxx,n_individuals,n_bad
 		printf "%s = %.1f (%.1f +/- %.1f) [%.0f - %.0f - %.0f - %.0f - %.0f], (%d, %d)\r",name,mean_onset,avg_onset,stdev_onset,minn,v25,med,v75,maxx,n_individuals,n_bad
 	endfor
 end

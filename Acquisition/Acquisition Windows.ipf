@@ -2285,8 +2285,16 @@ Function SwitchView(view)
 	variable currSweep=GetCurrSweep()
 	
 	// Remove the old traces
-	String sweepsToRemove=TraceNameList("SweepsWin",";",3)
-	sweepsToRemove=SortList(sweepsToRemove,";",16)
+	ControlInfo /W=SweepsWin Range; Variable range=V_Value
+	String traces_shown=TraceNameList("SweepsWin",";",3)
+	string traces_to_remove=""
+	for(i=0;i<itemsinlist(traces_shown);i+=1)
+		string trace = stringfromlist(i,traces_shown)
+		if(!range || grepstring(trace,"Sweep[0-9]+"))
+			traces_to_remove += trace+";"
+		endif
+	endfor
+	string sweepsToRemove=SortList(traces_to_remove,";",16)
 	for(i=ItemsInList(sweepsToRemove)-1;i>=0;i-=1)
 		String sweep=StringFromList(i,sweepsToRemove)
 		Wave RemovedWave=TraceNameToWaveRef("SweepsWin",sweep)
@@ -2314,7 +2322,7 @@ Function SwitchView(view)
 				ControlInfo /W=SweepsWin LastSweep; Variable lastSweep=V_Value
 				
 				// Existing sweeps (cursors A and B).  
-				ControlInfo /W=SweepsWin Range; Variable range=V_Value
+				ControlInfo /W=SweepsWin Range; range=V_Value
 				if(range) // Append all the sweeps in the range between the cursors.  
 					ControlInfo /W=SweepsWin Inc; Variable inc=V_Value
 					if(!numtype(first) && !numtype(last))
@@ -2445,8 +2453,16 @@ Function SwitchView(view)
 	endswitch
 	ControlInfo /W=SweepsWin Range; range=V_Value
 	if(range)
-		ChannelColorCode(win="SweepsWin")
-		LightenTraces(2,except="input*",win="SweepsWin")
+		traces_shown=TraceNameList("SweepsWin",";",3)
+		string trace_sweeps=""
+		for(i=0;i<itemsinlist(traces_shown);i+=1)
+			trace = stringfromlist(i,traces_shown)
+			if(grepstring(trace,"Sweep[0-9]+"))
+				trace_sweeps += trace+";"
+			endif
+		endfor
+		ChannelColorCode(win="SweepsWin",traces=trace_sweeps)
+		LightenTraces(2,traces=trace_sweeps,except="input*",win="SweepsWin")
 	endif
 	String top_trace=TopAxisTrace("Time_Axis",win="SweepsWin")
 	RestoreCursors(view,trace=top_trace,win="SweepsWin")
@@ -3535,15 +3551,27 @@ function SweepsWinHook(info)
 						highlighted_sweep = limit(highlighted_sweep,GetCursorSweepNum("A"),GetCursorSweepNum("B"))
 					endif
 					setwindow $info.winName userData(highlighted_sweep) = num2str(highlighted_sweep)
-					ChannelColorCode(win=info.winName)
-					LightenTraces(2,except="input*",win=info.winName)
+					string traces_shown=TraceNameList(info.winName,";",3)
+					string trace_sweeps=""
+					for(i=0;i<itemsinlist(traces_shown);i+=1)
+						string trace = stringfromlist(i,traces_shown)
+						if(grepstring(trace,"Sweep[0-9]+"))
+							trace_sweeps += trace+";"
+						endif
+					endfor
+					ChannelColorCode(win=info.winName,traces=trace_sweeps)
+					LightenTraces(2,traces=trace_sweeps,except="input*",win=info.winName)
+					for(i=0;i<itemsinlist(trace_sweeps);i+=1)
+						string trace_sweep = stringfromlist(i,trace_sweeps)
+						modifygraph /w=$info.winName lsize($trace_sweep)=1
+					endfor
 					string matching_traces = listmatch(traces,"*sweep"+num2str(highlighted_sweep)+"*")
 					for(i=0;i<itemsinlist(matching_traces);i+=1)
 						string matching_trace = stringfromlist(i,matching_traces)
 						string channel = Trace2Channel(matching_trace,win=info.winName)
 						variable red,green,blue
 						GetChannelColor(channel,red,green,blue)
-						modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue), lsize=1, lsize($matching_trace)=2
+						modifygraph /w=$info.winName rgb($matching_trace)=(red,green,blue), lsize($matching_trace)=2
 						Trace2Top(matching_trace,win=info.winName)
 					endfor
 					SweepsWinTextBoxUpdate()
@@ -3790,12 +3818,12 @@ Function DrugTags()
 End
 
 // Makes all traces on the graph containing "R1" red, "L2" blue, and "B3" green
-Function ChannelColorCode([win])
-	String win
+Function ChannelColorCode([traces,win])
+	String win,traces
 	if(ParamIsDefault(win))
 		win=WinName(0,1)
 	endif
-	String traces=TraceNameList(win,";",3)
+	traces = selectstring(!paramisdefault(traces),TraceNameList(win,";",3),traces)
 	Variable i
 	String trace,channel
 	for(i=0;i<ItemsInList(traces);i+=1)
