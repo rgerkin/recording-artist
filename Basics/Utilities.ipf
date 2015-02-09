@@ -1170,7 +1170,9 @@ Function LCM(w)
 	Wave w
 	Variable i,result=w[0]
 	for(i=1;i<numpnts(w);i+=1)
-		result=LCM2(result,w[i])
+		if(w[i] > 0)
+			result=LCM2(result,w[i])
+		endif
 	endfor
 	return result
 End
