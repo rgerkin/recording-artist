@@ -835,10 +835,12 @@ Function SealTestCollectSweeps(DAQ)
 				string inputType=GetModeInputType(mode,fundamental=1)
 				if(stringmatch(outputType,"Current"))
 					variable in=abs(mean(sweep,0.20/freq,0.24/freq)-mean(sweep,0.70/freq,0.74/freq))
+					variable biphasic=0
 				else
 					in=abs(mean(sweep,0.29/freq,0.49/freq)-mean(sweep,0.6233/freq,0.8233/freq))
+					biphasic=1
 				endif
-				variable out=abs(2*Ampl[i])
+				variable out=abs((1+biphasic)*Ampl[i])
 				variable ratioFactor=UnitsRatio(GetModeOutputPrefix(mode),GetModeInputPrefix(mode))
 				variable ratio=ratioFactor*out/in
 				string ratioString=outputType+"/"+inputType
