@@ -1032,7 +1032,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			if(x_left!=x_right)
 				FindLevels /Q/EDGE=1/M=0.0025 /R=(x_left,x_right) Sweep,threshold
 			endif
-			result[sweepNum][0][layer]=V_LevelsFound/(WaveDuration(Sweep))
+			result[sweepNum][0][layer]=V_LevelsFound/(x_right-x_left)
 			result[sweepNum][1][layer]=V_LevelsFound
 			break
 		case "Spike_Rate_EC": // The number of spikes between the cursors.  
