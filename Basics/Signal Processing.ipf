@@ -1563,7 +1563,10 @@ Function /wave BandPassFilter(w,lo,hi)
 	wavestats /q/m=1 w
 	w-=v_avg
 	wavetransform flip,w
-	wave w_flipped
+	wave /z w_flipped
+	if(!waveexists(w_flipped))
+		wave w_flipped = m_flipped
+	endif
 	variable delta=dimdelta(w,0),points=dimsize(w,0),half=points/2
 	if(lo>0 && lo<inf && hi>0 && hi<inf)
 		filteriir /lo=(lo*delta) /hi=(hi*delta) w
