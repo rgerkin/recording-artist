@@ -1862,6 +1862,45 @@ Function SweepsWinButtons(info) : ButtonControl
 						KillControl SweepChooser
 					endif
 					break
+				case "Export":
+					dfref df=Core#InstanceHome(module,"sweepsWin","win0")
+					wave /sdfr=df SelWave
+					variable first = GetCursorSweepNum("A")
+					variable last = GetCursorSweepNum("B")
+					if(CursorExists("A") && CursorExists("B"))
+						variable start = xcsr(A)
+						variable finish = xcsr(B)
+					else
+						start = 0
+						finish = Inf
+					endif
+					variable i,k,num_channels = GetNumChannels()
+					for(i=0;i<num_channels;i+=1)
+						if(StringMatch(Chan2ADC(i),"N")) // If input data is not being collected on this channel.  
+							continue // Skip it.  
+						endif
+						dfref chanDF = GetChanDF(i)
+						string export_loc = getdatafolder(1,chanDF)+":export"
+						ControlInfo /W=SweepsWin Inc; variable inc=V_Value
+						if(!numtype(first) && !numtype(last))
+							for(k=min(first,last);k<=max(first,last);k+=inc)
+								if(SelWave[k][i+1] & 16)
+									wave sweep = GetChanSweep(i,k)
+									wave /z export = $export_loc
+									if(!waveexists(export))
+										finish = min(finish,rightx(sweep))
+										duplicate /o/r=(start,finish) sweep, $export_loc /wave=export
+									else
+										redimension /n=(-1,dimsize(export,1)+1) export
+										duplicate /free/r=(start,finish) sweep,piece
+										export[][dimsize(export,1)-1] = piece[p]
+									endif
+								endif
+							endfor
+							edit /k=1/n=$getdatafolder(0,chanDF) export
+						endif
+					endfor
+					break
 				case "SetBaselineRegion":
 					if(CursorExists("A") && CursorExists("B"))
 						String trace=CsrWave(A)
@@ -2718,6 +2757,7 @@ Function SweepsWinCheckboxes(ctrlName,val)
 		case "Range":
 			SetVariable Inc, disable=!val, pos={504,35}, title="Inc", value=_NUM:1, limits={1,Inf,1}, win=SweepsWin, proc=SweepsWinSetVariables
 			Button ChooseSweeps, disable=!val, pos={424,32}, title="Choose", win=SweepsWin, proc=SweepsWinButtons
+			Button Export, disable=!val, pos={524,32}, title="Export", win=SweepsWin, proc=SweepsWinButtons
 			if(val)
 				SweepsChooserUpdate()
 			endif
