@@ -1874,30 +1874,38 @@ Function SweepsWinButtons(info) : ButtonControl
 						start = 0
 						finish = Inf
 					endif
-					variable i,k,num_channels = GetNumChannels()
+					variable i,j,k,num_channels = GetNumChannels()
 					for(i=0;i<num_channels;i+=1)
 						if(StringMatch(Chan2ADC(i),"N")) // If input data is not being collected on this channel.  
 							continue // Skip it.  
 						endif
 						dfref chanDF = GetChanDF(i)
-						string export_loc = getdatafolder(1,chanDF)+":export"
+						string export_loc = getdatafolder(1,chanDF)+"export"
 						ControlInfo /W=SweepsWin Inc; variable inc=V_Value
+						variable made_export = 0
 						if(!numtype(first) && !numtype(last))
 							for(k=min(first,last);k<=max(first,last);k+=inc)
 								if(SelWave[k][i+1] & 16)
 									wave sweep = GetChanSweep(i,k)
-									wave /z export = $export_loc
-									if(!waveexists(export))
+									if(!made_export)
 										finish = min(finish,rightx(sweep))
 										duplicate /o/r=(start,finish) sweep, $export_loc /wave=export
+										redimension /n=(-1,1) export
+										made_export = 1
 									else
+										wave /z export = $export_loc
 										redimension /n=(-1,dimsize(export,1)+1) export
 										duplicate /free/r=(start,finish) sweep,piece
 										export[][dimsize(export,1)-1] = piece[p]
 									endif
+									SetDimLabel 1,dimsize(export,1)-1,$GetSweepName(k),export 
 								endif
 							endfor
-							edit /k=1/n=$getdatafolder(0,chanDF) export
+							for(j=0;j<dimsize(export,0);j+=1)
+								SetDimLabel 0,j,$num2str(start+j*deltax(sweep)),export 
+							endfor
+							dowindow /k $getdatafolder(0,chanDF)
+							edit /k=1/n=$getdatafolder(0,chanDF) export.ld
 						endif
 					endfor
 					break
@@ -2757,7 +2765,7 @@ Function SweepsWinCheckboxes(ctrlName,val)
 		case "Range":
 			SetVariable Inc, disable=!val, pos={504,35}, title="Inc", value=_NUM:1, limits={1,Inf,1}, win=SweepsWin, proc=SweepsWinSetVariables
 			Button ChooseSweeps, disable=!val, pos={424,32}, title="Choose", win=SweepsWin, proc=SweepsWinButtons
-			Button Export, disable=!val, pos={524,32}, title="Export", win=SweepsWin, proc=SweepsWinButtons
+			Button Export, disable=!val, pos={571,32}, title="Export", win=SweepsWin, proc=SweepsWinButtons
 			if(val)
 				SweepsChooserUpdate()
 			endif
