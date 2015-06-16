@@ -148,8 +148,8 @@ Function NumChannelsStimulated(sweep)
 	Variable i,j,numStimulated=0,numChannels=GetNumChannels()
 	for(i=0;i<numChannels;i+=1)
 		dfref chanDF=GetChanDF(i)
-		wave w=GetChanSweep(i,sweep,quiet=1) 
-		if(numpnts(w))
+		//wave w=GetChanSweep(i,sweep,quiet=1) 
+		//if(numpnts(w))
 			wave ampl=GetChanSweepParam(i,sweep,"ampl")
 			wave width=GetChanSweepParam(i,sweep,"width")
 			wave pulses=GetChanSweepParam(i,sweep,"pulses")
@@ -161,7 +161,7 @@ Function NumChannelsStimulated(sweep)
 				endif
 			endfor
 			numStimulated+=stimulated
-		endif
+		//endif
 	endfor
 	return numStimulated
 End

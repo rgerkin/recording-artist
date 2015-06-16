@@ -2946,7 +2946,7 @@ Function AnalysisMethodSubSelections(axisNum)
 			if(!exists("root:Minis:mini_thresh"))
 				Variable /G root:Minis:mini_thresh=5
 			endif
-			limits="0;Inf;0.5"
+			limits="-Inf;Inf;0.5"
 			value=5
 			descriptionShort="Thresh"
 			descriptionLong="Mini amplitude threshold (pA)"

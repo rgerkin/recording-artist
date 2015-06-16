@@ -2569,7 +2569,15 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	dfref df=GetMinisChannelDF(channel,create=1)
 	dfref dataDF=GetChannelDF(channel)
 	wave /z/sdfr=dataDF MinisAnalysisWave=$miniMethod
-	wave /t/sdfr=df MiniCounts
+	wave /z/t/sdfr=df MiniCounts
+	if(!waveexists(MiniCounts))
+		variable currSweep=GetCurrSweep()
+		wave /z/t/sdfr=df MiniCounts
+		Make /o/T/n=(currSweep,3) df:MiniCounts /wave=MiniCounts=""
+		MiniCounts[][0]=num2str(p)
+		MiniCounts[][1]=""
+		MiniCounts[][2]="Use"
+	endif
 	variable maxSweep=str2num(MiniCounts[dimsize(MiniCounts,0)-1][0])
 	if(!WaveExists(MinisAnalysisWave))
 		make /o/n=(maxSweep+1,3) dataDF:$miniMethod /WAVE=MinisAnalysisWave
@@ -2582,14 +2590,6 @@ Function MiniLocsAndValsToAnalysis(sweepNum,channel,Locs,Vals[,duration,miniMeth
 	endif
 	
 	wave /z/t/sdfr=df MiniCounts
-	if(!waveexists(MiniCounts))
-		variable currSweep=GetCurrSweep()
-		wave /z/t/sdfr=df MiniCounts
-		Make /o/T/n=(currSweep,3) df:MiniCounts /wave=MiniCounts=""
-		MiniCounts[][0]=num2str(p)
-		MiniCounts[][1]=""
-		MiniCounts[][2]="Use"
-	endif
 	
 	Make /free/n=(dimsize(MiniCounts,0)) MiniSweepIndex=str2num(MiniCounts[p][0])
 	FindValue /V=(sweepNum) MiniSweepIndex

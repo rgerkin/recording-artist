@@ -1081,18 +1081,19 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 #if exists("FindMinis") && exists("NumChannelsStimulated")
 			Variable num_stimuli=NumChannelsStimulated(sweepNum)
 			Variable charge=StatsMedian(Sweep)-mean(Sweep)
-			if(num_stimuli && charge>1)
+			if(0)//num_stimuli && charge>1)
 				result[sweepNum][0][layer] = NaN  
 				result[sweepNum][1][layer] = NaN
 			else
 				String curr_folder=GetDataFolder(1)
 				NewDataFolder /O/S root:Minis
-				NVar mini_thresh
 				NewDataFolder /O/S $Labels[chan]
 				NewDataFolder /O/S $("Sweep"+num2str(sweepNum))
 				if(0)//earliest_global_stim<inf) // If there was a stimulus.
 					Make /o/n=0 Locs,Vals // Ignore minis. 
 				else // Otherwise calculated mini locations and sizes.  
+					ControlInfo /W=AnalysisWin 	Parameter
+					variable mini_thresh=v_value
 					FindMinis(Sweep,thresh=mini_thresh,tStart=x_left,tStop=x_right,within_median=10)
 					wave /Z Locs,Vals
 					nvar net_duration
