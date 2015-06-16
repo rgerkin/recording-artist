@@ -2337,7 +2337,7 @@ Function SwitchView(view)
 	string traces_to_remove=""
 	for(i=0;i<itemsinlist(traces_shown);i+=1)
 		string trace = stringfromlist(i,traces_shown)
-		if(!range || grepstring(trace,"Sweep[0-9]+"))
+		if(!range || grepstring(trace,"Chan_[0-9]+_Sweep[0-9]+") || grepstring(trace,"Chan_[0-9]+_Stim[0-9]+") || grepstring(trace,"Chan_[0-9]+_TestPulse[0-9]+"))
 			traces_to_remove += trace+";"
 		endif
 	endfor
