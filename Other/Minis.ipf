@@ -1250,6 +1250,9 @@ End
 Function ShowMinisButtons(info)
 	Struct WMButtonAction &info
 	
+	if(info.eventCode != 2) // If not a mouse up.  
+		return -1
+	endif
 	dfref df=GetMinisDF()
 	nvar /z/sdfr=df currMini
 	variable undo = info.eventMod & 1
