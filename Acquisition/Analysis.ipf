@@ -876,16 +876,16 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			endif
 			
 			string acqMode=GetDimLabel(SweepParamsPost,0,sweepNum)
-              	// Compute baseline region.  
-               	ControlInfo /W=SweepsWin AutoBaseline
-               	if(V_Value)
+         // Compute baseline region.  
+         ControlInfo /W=SweepsWin AutoBaseline
+         if(V_Value)
 				Variable baselineRight_=x_right
 				for(baselineRight_=baselineRight_;baselineRight_>earliestChannelStim;baselineRight_-=1/noise_freq)
 				endfor
 				Variable baselineLeft_=baselineRight_-1/noise_freq // Make the total length of the baseline equal to one cycle of noise.  
-               		Variable noiseCorrection=0
-               		if(noiseCorrection)
-               			Variable diff=mod(x_right-x_left,1/noise_freq)
+            Variable noiseCorrection=0
+            if(noiseCorrection)
+               	Variable diff=mod(x_right-x_left,1/noise_freq)
 					Variable baselineCenter_=baselineLeft_
 					baselineLeft_=baselineCenter_-diff // Make the total length of the baseline equal to one cycle of noise plus the remainder diff.  
 					//Variable num_cycles=floor((x_right-x_left)*noise_freq) // The number of cycles of noise between the cursors.  
