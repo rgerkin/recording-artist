@@ -29,6 +29,10 @@ End
 
 static Function EditPackagesButtons(info) : ButtonControl
 	struct wmbuttonaction &info
+		
+	if(info.eventCode != 2) // Not a mouse up.  
+		return -1
+	endif
 	
 	string package=Core#GetControlUserData(info.ctrlName,"PACKAGE",win=info.win)
 	string instance=Core#GetControlUserData(info.ctrlName,"INSTANCE",win=info.win)
