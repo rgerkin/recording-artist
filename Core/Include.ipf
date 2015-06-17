@@ -46,6 +46,7 @@ Function IgorStartOrNewHook(igorApplicationNameStr)
 	//string lastProfile=StringFromList(0,profiles)
 	//Core#SetProfile(lastProfile)
 	printf "%s %s\r",Date(),time()
+	FixMacFontSize()
 	Execute /Q/P "ExperimentModified 0"
 End
 #endif
@@ -57,8 +58,15 @@ Function AfterFileOpenHook(refNum,file,pathName,type,creator,kind)
     
     printf "%s %s\r",Date(),time()
     SetDataFolder root:
+    FixMacFontSize()
     Execute /Q/P "ExperimentModified 0"
 End
+
+function FixMacFontSize()
+	String igorMetaFont= "_IgorSmall"
+	DefaultGUIFont /Mac all={igorMetaFont,0,0}
+ 	DefaultGUIFont /Mac popup={igorMetaFont,0,0}
+end
 
 //Menu "Misc", hideable
 //	Submenu "Packages"
