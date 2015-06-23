@@ -2356,6 +2356,22 @@ function Noisy_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweep
 	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=gnoise(dAmpl)
 end
 
+function NoisyAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity[,sweep_num])
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity,sweep_num
+	
+	sweep_num = paramisdefault(sweep_num) ? GetCurrSweep() : sweep_num
+	
+	Default_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity,sweep_num = sweep_num)
+	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
+	variable pulses=GetStimParam("Pulses",chan,pulseSet)
+	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=gnoise(dAmpl)
+	if(pulseNum==pulses-1)
+		wave template = AlphaSynapso(1,3,0,50)
+		Convolve2(template,Stimulus,col=sweepParity)
+	endif
+end
+
 function Frozen_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity[,sweep_num])
 	wave Stimulus
 	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity,sweep_num
