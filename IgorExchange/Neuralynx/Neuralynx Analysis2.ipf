@@ -1285,7 +1285,7 @@ Function CreateViewer(df)
 	y_pos+=y_size+5
 	//Button Merge, title="Merge", pos={2,y_pos},disable=1,proc=ViewerButtons
 	//y_pos+=y_space
-	SetVariable YAxisRange, title="Range (\F'Symbol'm\F'Arial'V)", value=nlx:$"YAxisRange", limits={0,Inf,10}, bodywidth=40, pos={55,y_pos}, disable=0, proc=ViewerSetVariables
+	SetVariable YAxisRange, title="Range (uV)", value=nlx:$"YAxisRange", limits={0,Inf,10}, bodywidth=40, pos={55,y_pos}, disable=0, proc=ViewerSetVariables
 	Checkbox YAxisAuto, title="Auto", value=0, pos={107,y_pos+2}, proc=ViewerCheckboxes
 	y_pos+=y_space
 	ValDisplay TimeStamp, title="Timestamp (s)", disable=1, bodywidth=60, pos={88,y_pos}, value=#(PACKAGE_FOLDER+"timestamp")
@@ -2007,7 +2007,7 @@ Function ReplaceWaves(df,type[,computeIsolation])
 					visibleClusters+=1
 				endif
 			endfor
-			if(numpnts(spikeIndices)>(maxSpikes*10)) // No more than maxSpikes*10 (across clusters) should ever be plotted.  
+			if(!oneSpike && numpnts(spikeIndices)>(maxSpikes*10)) // No more than maxSpikes*10 (across clusters) should ever be plotted.  
 				statssample /n=(maxSpikes*10) spikeIndices
 				wave spikeIndices=w_sampled
 			endif
@@ -2166,7 +2166,7 @@ Function ReplaceWaves(df,type[,computeIsolation])
 			endif
 			nvar /z/sdfr=df analog
 			if(!nvar_exists(analog) || !analog)
-				modifygraph /w=NlxViewer muloffset={0,bitVolts} // Apply voltage scaling factor to traces to convert from a 16-bit A/D output to a decimal voltage.  
+				//modifygraph /w=NlxViewer muloffset={0,bitVolts} // Apply voltage scaling factor to traces to convert from a 16-bit A/D output to a decimal voltage.  
 			endif
 			killwaves /z w_sampled
 			// Update list wave and sel wave to reflect changes in numbers of clusters.  
