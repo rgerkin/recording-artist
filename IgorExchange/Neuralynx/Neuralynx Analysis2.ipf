@@ -1478,19 +1478,23 @@ function ExcludeSpikes(df,electrode,clusterList,boundaryType,boundary[,destClust
 	variable clusterLogic=BitList2Num(clusterList)
 	strswitch(boundaryType)
 		case "upper": // Exclude spikes that are or cross above the boundary.  
-			boundary/=bitVolts
+			//boundary/=bitVolts
 			multithread exclude=(clusterLogic & 2^clusters[p])>0 && data[q][p][electrode]>boundary[q]
 			break
 		case "lower": // Exclude spikes that are or cross below the boundary
-			boundary/=bitVolts
+			//boundary/=bitVolts
 			multithread exclude=(clusterLogic & 2^clusters[p])>0 && data[q][p][electrode]<boundary[q]
 			break
 		case "marquee": // Exclude spikes that are or cross into the marquee.  
 			variable left=(nvar_exists(analog) && analog) ? (boundary[0]-dimoffset(data,0))/dimdelta(data,0) : ceil(boundary[0])
-			variable top=boundary[1]/bitVolts
+			variable top=boundary[1]///bitVolts
 			variable right=(nvar_exists(analog) && analog) ? (boundary[2]-dimoffset(data,0))/dimdelta(data,0) : floor(boundary[2])
-			variable bottom=boundary[3]/bitVolts
-			multithread exclude=(clusterLogic & 2^clusters[p])>0 && q>=left && q<=right && data[q][p][electrode]>bottom && data[q][p][electrode]<top
+			variable bottom=boundary[3]///bitVolts
+			if(wavemax(clusters) > 50) // BitList2Num won't work for cluster numbers greater than 52 due to bitwise arithmetic not working in those cases (floating point limits?)
+				multithread exclude= whichlistitem(num2str(clusters[p]),clusterList)>=0 && q>=left && q<=right && data[q][p][electrode]>bottom && data[q][p][electrode]<top
+			else
+				multithread exclude=(clusterLogic & 2^clusters[p])>0 && q>=left && q<=right && data[q][p][electrode]>bottom && data[q][p][electrode]<top
+			endif
 			break
 	endswitch
 	matrixop /free exclude=sumrows(exclude)
