@@ -4729,7 +4729,7 @@ function KohonenAux(data,map)
 	//mapProjection=mapProjection_
 	//redimension /u/w mapProjection
 	make /free/n=(numXunits,numYunits,4) Umatrix_
-	make /free/n=(numXunits,numYunits) neighbors=4-(p==0 || p==(numXunits-1))-(q==0 || q==(numYunits-1)
+	make /free/n=(numXunits,numYunits) neighbors=4-(p==0 || p==(numXunits-1))-(q==0 || q==(numYunits-1))
 	multithread Umatrix_[][][0]=UmatrixAux(map,p,q,1,0,numXunits,numYunits)
 	multithread Umatrix_[][][1]=UmatrixAux(map,p,q,-1,0,numXunits,numYunits)
 	multithread Umatrix_[][][2]=UmatrixAux(map,p,q,0,1,numXunits,numYunits)
