@@ -22,7 +22,7 @@ Menu "TracePopup"
 	End
 	SubMenu "Trace Stats"
 		//selectstring(GraphStatsOn(),"Activate Graph Stats",""),/Q,ActivateGraphStats()
-		"This Trace",/Q,GetLastUserMenuInfo;WaveStat2(TraceNameToWaveRef("",S_tracename))
+		"This Trace",/Q,GetLastUserMenuInfo;WaveStats2(TraceNameToWaveRef("",S_tracename))
 		"Group Mean",/Q,GetLastUserMenuInfo;DisplayMeanTrace(keyTrace=s_tracename)
 		"Group Mean+-SEM",/Q,GetLastUserMenuInfo;DisplayMeanTrace(keyTrace=s_tracename,error="SEM")
 		"Group Median",/Q,GetLastUserMenuInfo;DisplayMeanTrace(keyTrace=s_tracename,type="med")
