@@ -3670,7 +3670,6 @@ function AnalysisWinHook(info)
 			string trace = stringbykey("TNAME",csr_info)
 			string trace_info = TraceInfo(info.winname,trace,0)
 			string y_axis = stringbykey("YAXIS",trace_info)
-			print y_axis
 			variable axis_num
 			sscanf y_axis,"Axis_%d",axis_num
 			if(strlen(y_axis) && axis_num>=0)

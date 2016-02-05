@@ -1245,7 +1245,7 @@ Function SwitchMiniView(mode)
 
 	Button SwitchView userData=mode
 	Label /Z/W=ShowMinisWin left, "pA"
-End
+End	
 
 Function ShowMinisButtons(info)
 	Struct WMButtonAction &info
@@ -2321,6 +2321,27 @@ Function /S GoToMini(miniNum)
 		endif
 		i-=1
 	while(i>=0)
+	variable show_in_sweep = Core#VarPackageSetting("Minis","Viewing","","show_in_sweep")
+	if(show_in_sweep)
+		if(WinType("SweepsWin"))
+			Checkbox SweepShow_A value=1, win=SweepsWin // Make sure the "A" box is checked in the Sweeps Window.  
+			MoveCursor("A",sweepNum) // Do all the updates associated with updating the associated sweep number variable.  
+			getAxis /q/w=sweepsWin time_axis
+			variable range = v_max - v_min // Get the current time axis range.  
+			range = numtype(range) ? 1 : range // Set to 1 second if it is NaN.  
+			variable loc = Locs[sweepMiniNum]
+			setaxis /w=sweepsWin time_axis loc-range/2,loc+range/2			
+			getaxis /q/w=ShowMinisWin left
+			variable top = v_max
+			variable bottom = v_min
+			getaxis /q/w=ShowMinisWin bottom
+			variable left = v_min+loc
+			variable right = v_max+loc
+			string y_axis = AxisName("left",win="SweepsWin")
+			setdrawenv /w=sweepswin xcoord=time_axis, ycoord=$y_axis, fillpat=0
+			drawrrect /w=SweepsWin left,top,right,bottom
+		endif
+	endif
 	return miniName
 End
 
@@ -2347,12 +2368,24 @@ Function AppendMini(mini_name,channel[,noFit,traceIndex,zero,scale])
 	variable proxy=GetMinisProxyState()//channel,sweepNum)
 	Wave Sweep=GetChannelSweep(channel,sweepNum,proxy=proxy)
 	dfref df=GetMinisDF()
+	nvar /z/sdfr=df threshold
+	variable thresh_sign = sign(threshold)
 	variable before=-0.015
 	variable after=0.030
 	Variable start=x2pnt(Sweep,loc+before)
+	variable x0 = x2pnt(Sweep,loc+0)
 	Variable finish=x2pnt(Sweep,loc+after)
 	Variable red,green,blue; GetChannelColor(channel,red,green,blue)
-	if(zero)
+	variable lock_y = Core#VarPackageSetting("Minis","Viewing","","lock_yaxis")
+	
+	variable chan = Label2Chan(channel)
+	if(FiltersOn(chan))
+		String filtName=GetWavesDataFolder(sweep,2)+"_filt"
+		duplicate /o sweep $filtName /wave=sweep
+		ApplyFilters(sweep,chan)
+	endif
+	
+	if(zero || lock_y)
 		WaveStats /M=1/Q/R=[start,start+100] Sweep
 		Variable baseline=V_avg
 	endif
@@ -2362,7 +2395,20 @@ Function AppendMini(mini_name,channel[,noFit,traceIndex,zero,scale])
 	else
 		peak=1
 	endif
+	
+	if(lock_y)
+		GetAxis /Q left
+		variable /g range = v_max-v_min
+		//Core#SetVarPackageSetting(module,"Viewing","","range",v_max-v_min,create=1)
+	endif
 	AppendToGraph /c=(red,green,blue) Sweep[start,finish] /tn=$mini_name
+	if(lock_y && !numtype(baseline-range/2))
+		variable top = baseline + range*(0.5+0.3*thresh_sign)
+		variable bottom = baseline - range*(0.5-0.3*thresh_sign)
+		setaxis left bottom,top
+	else
+		setaxis /a left
+	endif
 	setaxis bottom before,after
 	if(ParamIsDefault(traceIndex))
 		String top_trace=TopTrace()
