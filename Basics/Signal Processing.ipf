@@ -1561,7 +1561,7 @@ Function /wave BandPassFilter(w,lo,hi)
 	wave w
 	variable lo,hi
 	wavestats /q/m=1 w
-	w-=v_avg
+	//w-=v_avg
 	wavetransform flip,w
 	wave /z w_flipped
 	if(!waveexists(w_flipped))
@@ -1582,7 +1582,7 @@ Function /wave BandPassFilter(w,lo,hi)
 	//display w,w_flipped; abort
 	//w=(p>half ? w : w_flipped)
 	variable med=statsmedian(w)
-	w-=med
+	//w-=med
 	killwaves /z w_flipped
 	return w
 End
