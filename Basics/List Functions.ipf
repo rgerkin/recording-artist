@@ -1207,7 +1207,9 @@ threadsafe Function /S ListExpand(list[,no_sort])
 			endif
 		endif
 	endfor
-	
+	if(stringmatch(exclude,""))
+		exclude = " "
+	endif
 	new_list=RemoveFromList(exclude,new_list)
 	
 	if(!no_sort)
