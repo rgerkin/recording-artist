@@ -648,6 +648,7 @@ Function AverageMinis([peak_align,peak_scale])
 	variable red,green,blue; GetChannelColor(channel,red,green,blue)
 	string traces=TraceNameList("",";",1)
 	variable minis=0
+	variable chan = Label2Chan(channel)
 	for(i=0;i<itemsinlist(traces);i+=1)
 		string trace=stringfromlist(i,traces)
 		FindValue /TEXT=trace /TXOP=4 MiniNames
@@ -686,9 +687,11 @@ Function AverageMinis([peak_align,peak_scale])
 	endfor
 	if(minis)
 		AverageMini/=minis
+		wavestats /q/r=[0,10] AverageMini
+		variable yoffset=-v_avg
 		red=min(60000,65535-red); green=min(60000,65535-green); blue=min(60000,65535-blue)
 		appendtograph /c=(65535-red,65535-green,65535-blue) AverageMini
-		ModifyGraph lsize($TopTrace())=2
+		ModifyGraph lsize($TopTrace())=2,offset($TopTrace())={0,yoffset}
 	else
 		printf "No traces with minis were found.\r"
 	endif
@@ -1203,7 +1206,7 @@ Function SwitchMiniView(mode)
 	ControlBar /T 69
 	strswitch(mode)
 		case "All":
-			Variable count=dimsize(MiniNames,0)
+			Variable count=numpnts(Index)
 			if(count>500)
 				DoAlert 1,"There are more than 500 minis to plot.  Are you sure you want to do this?"
 				if(V_flag==2)
@@ -1223,6 +1226,7 @@ Function SwitchMiniView(mode)
 			endfor
 			SetVariable SweepNum, disable=1
 			SetVariable SweepMiniNum, disable=1
+			setaxis /a left
 			break
 		case "Browse":
 			browse=1
@@ -1842,6 +1846,12 @@ Function FitMini(num[,channel])//trace)
 	variable proxy=GetMinisProxyState()//channel,sweepNum)
 	variable V_FitMaxIters=500,error,i
 	wave sweep=GetChannelSweep(channel,sweepNum,proxy=proxy)//TraceWave=TraceNameToWaveRef("",trace)
+	variable chan = Label2Chan(channel)
+	if(FiltersOn(chan))
+		String filtName=GetWavesDataFolder(sweep,2)+"_filt"
+		duplicate /o sweep $filtName /wave=sweep
+		ApplyFilters(sweep,chan)
+	endif
 	variable delta=dimdelta(sweep,0)
 	variable kHz=0.001/delta
 	//KillWaves $FitLocation(trace,win="ShowMinisWin")
@@ -2321,7 +2331,7 @@ Function /S GoToMini(miniNum)
 		endif
 		i-=1
 	while(i>=0)
-	variable show_in_sweep = Core#VarPackageSetting("Minis","Viewing","","show_in_sweep")
+	variable show_in_sweep = MiniSetting("Viewing","show_in_sweep")
 	if(show_in_sweep)
 		if(WinType("SweepsWin"))
 			Checkbox SweepShow_A value=1, win=SweepsWin // Make sure the "A" box is checked in the Sweeps Window.  
@@ -2376,7 +2386,7 @@ Function AppendMini(mini_name,channel[,noFit,traceIndex,zero,scale])
 	variable x0 = x2pnt(Sweep,loc+0)
 	Variable finish=x2pnt(Sweep,loc+after)
 	Variable red,green,blue; GetChannelColor(channel,red,green,blue)
-	variable lock_y = Core#VarPackageSetting("Minis","Viewing","","lock_yaxis")
+	variable lock_y = MiniSetting("Viewing","lock_yaxis")
 	
 	variable chan = Label2Chan(channel)
 	if(FiltersOn(chan))
@@ -2403,8 +2413,8 @@ Function AppendMini(mini_name,channel[,noFit,traceIndex,zero,scale])
 	endif
 	AppendToGraph /c=(red,green,blue) Sweep[start,finish] /tn=$mini_name
 	if(lock_y && !numtype(baseline-range/2))
-		variable top = baseline + range*(0.5+0.3*thresh_sign)
-		variable bottom = baseline - range*(0.5-0.3*thresh_sign)
+		variable top = baseline*(1-zero) + range*(0.5+0.3*thresh_sign)
+		variable bottom = baseline*(1-zero) - range*(0.5-0.3*thresh_sign)
 		setaxis left bottom,top
 	else
 		setaxis /a left
