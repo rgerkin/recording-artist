@@ -1786,7 +1786,7 @@ Function FitMinis([channel,first,last,proxy])
 		//string miniName=MiniNames[i]
 		//trace=StringFromList(i,traces)
 		if(StringMatch(mode,"Browse"))
-			GoToMini(i)
+			GoToMini(i,possibly_show_in_sweep=0)
 		endif
 	
 		error=FitMini(i,channel=channel)//trace)
@@ -2276,8 +2276,11 @@ function RestoreMini(miniNum)
 	endif
 end
 
-Function /S GoToMini(miniNum)
+Function /S GoToMini(miniNum[,possibly_show_in_sweep])
 	variable miniNum
+	variable possibly_show_in_sweep
+	
+	possibly_show_in_sweep = paramisdefault(possibly_show_in_sweep) ? 1 : possibly_show_in_sweep
 	
 	string traces=TraceNameList("ShowMinisWin",";",1)
 	traces=SortList(traces,";",16)
@@ -2332,7 +2335,7 @@ Function /S GoToMini(miniNum)
 		i-=1
 	while(i>=0)
 	variable show_in_sweep = MiniSetting("Viewing","show_in_sweep")
-	if(show_in_sweep)
+	if(possibly_show_in_sweep && show_in_sweep)
 		if(WinType("SweepsWin"))
 			Checkbox SweepShow_A value=1, win=SweepsWin // Make sure the "A" box is checked in the Sweeps Window.  
 			MoveCursor("A",sweepNum) // Do all the updates associated with updating the associated sweep number variable.  
