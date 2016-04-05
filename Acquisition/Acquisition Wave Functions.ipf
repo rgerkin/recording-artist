@@ -1818,6 +1818,9 @@ Function /S Assemble(chan,Stimulus[,triparity,sweep_num])
 					Variable lastX=begin[j]/1000+i*IPI[j]/1000+width[j]/1000
 					Variable firstSample=round((firstX-dimOffset(Stimulus,0))/dimdelta(Stimulus,0))
 					Variable lastSample=round((lastX-dimOffset(Stimulus,0))/dimdelta(Stimulus,0))
+					if(width[j]>0) // If this pulse has any width
+						lastSample -= 1 // Make the last sample the one before the right edge so that if another pulse starts immediately afterwards they don't overlap.  
+					endif
 					// Not using x2pnt because of a rounding bug in that function.  
 					if(lastSample>firstSample) // Pulse is at least one sample in duration and occurs before the end of the sweep.  
 						if(lastSample<dimsize(Stimulus,0))
