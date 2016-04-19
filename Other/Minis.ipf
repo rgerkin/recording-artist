@@ -1789,7 +1789,7 @@ Function FitMinis([channel,first,last,proxy])
 			GoToMini(i,possibly_show_in_sweep=0)
 		endif
 	
-		error=FitMini(i,channel=channel)//trace)
+		error=FitMini(i,channel=channel,possibly_show_in_sweep=0)//trace)
 		num_errors+=error
 		string msg
 		sprintf msg,"%s mini %s",formattedChannel,MiniNames[Index[i]]
@@ -1816,9 +1816,12 @@ Function FitMinisPause(buttonNum, buttonName)
 End
 
 // Try adding /G so that the guesses from W_Coef are actually used.  
-Function FitMini(num[,channel])//trace)
+Function FitMini(num[,channel,possibly_show_in_sweep])
 	variable num
 	string channel
+	variable possibly_show_in_sweep
+	
+	possibly_show_in_sweep = paramisdefault(possibly_show_in_sweep) ? 1 : possibly_show_in_sweep
 	
 	variable winIsTop=stringmatch(TopGraph(),"ShowMinisWin")
 	if(paramisdefault(channel))
@@ -1830,7 +1833,8 @@ Function FitMini(num[,channel])//trace)
 		endif
 	endif
 	if(winIsTop)
-		GoToMini(num)
+		GoToMini(num,possibly_show_in_sweep=possibly_show_in_sweep)
+		doupdate
 	endif
 	variable sweepNum,miniNum
 	dfref df=GetMinisDF()
@@ -1888,6 +1892,8 @@ Function FitMini(num[,channel])//trace)
 		variable V_FitError=7, V_FitQuitReason=4
 	else  
 		variable tries=0
+		make /free/n=18 cumul_gap = Inf
+		variable settle = 0
 		do
 			v_fiterror=0; V_FitQuitReason=0
 			switch(tries)
@@ -1897,6 +1903,7 @@ Function FitMini(num[,channel])//trace)
 					break
 				case 1: // On the second try, if the first try fails.  
 					v_fitoptions=6 // Minimize the absolute error.  
+					fitType="Synapse"
 					break
 				case 2: 
 					fitType="Synapse"
@@ -1925,6 +1932,42 @@ Function FitMini(num[,channel])//trace)
 				case 8: 
 					fitType="Synapse"
 					break
+				case 9: // Now do the same 3 tries with the fit region shifted left by 2 ms.    
+					fitType="Synapse3"
+					v_fitoptions=4 // Minimize the squared error. 
+					first_point = peak_point-max(1,min(fit_before+2,round(fit_before/3)))*kHz
+					last_point = peak_point+max(1,min(fit_after-2,round(fit_after/3)))*kHz
+					break
+				case 10: 
+					v_fitoptions=6 // Minimize the absolute error.  
+					break
+				case 11: 
+					fitType="Synapse"
+					break
+				case 12: // Now do the same 3 tries with the fit region shifted right by 2 ms.    
+					fitType="Synapse3"
+					v_fitoptions=4 // Minimize the squared error. 
+					first_point = peak_point-max(1,min(fit_before-2,round(fit_before/3)))*kHz
+					last_point = peak_point+max(1,min(fit_after+2,round(fit_after/3)))*kHz
+					break
+				case 13: 
+					v_fitoptions=6 // Minimize the absolute error.  
+					break
+				case 14: 
+					fitType="Synapse"
+					break
+				case 14: // Now do the same 3 tries with the fit region padded right by 5 ms.    
+					fitType="Synapse3"
+					v_fitoptions=4 // Minimize the squared error. 
+					first_point = peak_point-max(1,min(fit_before,round(fit_before/3)))*kHz
+					last_point = peak_point+max(1,min(fit_after+5,round(fit_after/3)))*kHz
+					break
+				case 15: 
+					v_fitoptions=6 // Minimize the absolute error.  
+					break
+				case 16: 
+					fitType="Synapse"
+					break
 			endswitch
 			//if(proxy)
 			//	fitType+="_Reversed"
@@ -1934,12 +1977,12 @@ Function FitMini(num[,channel])//trace)
 				case "Synapse":
 				//case "Synapse_Reversed":
 					redimension /n=5 Coefs,Constraints
-					Constraints={"K0<=0.003","K1<=0.05","K2<"+num2str(peak_loc),"K4"+amplInequality} // Fit constraints for fit function 'Synapse'.  
-					Coefs={0.001,0.003,peak_loc-0.0025,Sweep[first_point],amplGuess} // Initial guesses for fitting coefficients for fit function 'Synapse'.  
+					Constraints={"K0>0","K0<=0.003","K1>0","K1<=0.05","K2<"+num2str(peak_loc),"K4"+amplInequality} // Fit constraints for fit function 'Synapse'.  
+					Coefs={0.001,0.003,peak_loc-0.0035,Sweep[first_point],amplGuess} // Initial guesses for fitting coefficients for fit function 'Synapse'.  
 					break
 				case "Synapse3":
 					redimension /n=6 Coefs,Constraints
-					Constraints={"K0<=0.003","K1<=0.05","K2<"+num2str(peak_loc),"K4"+amplInequality,"K5>1"} // Fit constraints for fit function 'Synapse3.  
+					Constraints={"K0>0","K0<=0.003","K1>0","K1<=0.05","K2<"+num2str(peak_loc),"K4"+amplInequality,"K5>1"} // Fit constraints for fit function 'Synapse3.  
 					Coefs={0.002,0.003,peak_loc-0.0015,Sweep[first_point],amplGuess,2}
 					//Coefs= {0.0002,0.003,peak_loc,-29.126,-27.1913,2.06805}
 					break
@@ -1951,12 +1994,38 @@ Function FitMini(num[,channel])//trace)
 				printf "Error in Curvefit: %s\r", errMessage
 				err = GetRTError(1)						// Clear error state
 			endif
-			tries+=1
-			wavestats /q/m=1 Fit
-			if(v_fiterror == 0 && v_max == v_min) // If no error was reported but fit is still a flat line.  
-				v_fiterror = -1 // Consider it an error so that a new fit is attempted.   
+			if(settle)
+				break
 			endif
-		while(v_fiterror && tries<9)
+			tries+=1
+			// Fitting error:
+			duplicate /free Fit,Residual
+			Residual=Sweep[first_point+p]-Fit[p]
+			wavestats /q/m=1 Fit
+			variable plausability = (v_max-v_min)/(norm(Residual)^2)
+			integrate residual
+			residual = abs(residual)
+			wavestats /q residual
+			cumul_gap[tries] = v_max
+			wavestats /q/m=1 Fit
+			//print tries,fittype,plausability,cumul_gap[tries],coefs
+			if(v_fiterror == 0 && !settle) // If no error was reported...
+				if(v_max - v_min < 1e-1) // ...but fit is still a flat line.  
+					v_fiterror = -1 // Consider it an error so that a new fit is attempted.   
+				elseif(v_max - v_min > 1e3) // ... or the fit didn't really converge.
+					v_fiterror = -1 // Consider it an error so that a new fit is attempted.   
+				elseif(plausability < 0.01) // ... or the fit is terrible.
+					v_fiterror = -1 // Consider it an error so that a new fit is attempted.  
+				elseif(cumul_gap[tries] > 0.01) // ... or the fit is terrible.
+					v_fiterror = -1 // Consider it an error so that a new fit is attempted.  
+				endif
+			endif
+		if(tries == 18 && v_fiterror)
+			wavestats /q/m=1 cumul_gap
+			tries = v_minloc
+			settle = 1
+		endif
+		while(v_fiterror && tries<18)
 		if(winIsTop)
 			AppendToGraph /c=(0,0,0) Fit
 			ModifyGraph offset($fit_name)={,0+offset_fits*fitOffset}
@@ -1966,9 +2035,6 @@ Function FitMini(num[,channel])//trace)
 	if(winIsTop)
 		ModifyGraph /W=ShowMinisWin rgb($TopTrace())=(0,0,0)
 	endif
-	// Fitting error:
-	duplicate /free Fit,Residual
-	Residual=Sweep[first_point+p]-Fit[p]
 	
 	if(V_FitError!=0)
 		printf "%s: Fit Error = %d; %d.\r",MiniNames[Index[num]],V_FitError,V_FitQuitReason
