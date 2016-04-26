@@ -2335,10 +2335,17 @@ Function SwitchView(view)
 	ControlInfo /W=SweepsWin Range; Variable range=V_Value
 	String traces_shown=TraceNameList("SweepsWin",";",3)
 	string traces_to_remove=""
+	wave /t chan_labels = GetChanLabels()
 	for(i=0;i<itemsinlist(traces_shown);i+=1)
 		string trace = stringfromlist(i,traces_shown)
-		if(!range || grepstring(trace,"Chan_[0-9]+_Sweep[0-9]+") || grepstring(trace,"Chan_[0-9]+_Stim[0-9]+") || grepstring(trace,"Chan_[0-9]+_TestPulse[0-9]+"))
+		if(!range)
 			traces_to_remove += trace+";"
+		else
+			for(j=0;j<numpnts(chan_labels);j+=1)
+				if(grepstring(trace,chan_labels[j]+"_Sweep[0-9]+") || grepstring(trace,chan_labels[j]+"_Stim[0-9]+") || grepstring(trace,chan_labels[j]+"_TestPulse[0-9]+"))
+					traces_to_remove += trace+";"
+				endif
+			endfor
 		endif
 	endfor
 	string sweepsToRemove=SortList(traces_to_remove,";",16)
