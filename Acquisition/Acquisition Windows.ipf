@@ -3517,10 +3517,10 @@ function SweepsWinHook(info)
 					redimension /n=(max(numpnts(cursor_locs),2)) cursor_locs
 					strswitch(info.cursorName)
 						case "A":
-							cursor_locs[0] = loc
+							cursor_locs[0] = {loc}
 							break
 						case "B":
-							cursor_locs[1] = loc
+							cursor_locs[1] = {loc}
 							break
 					endswitch
 				endif
