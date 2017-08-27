@@ -2862,7 +2862,11 @@ Function AnalysisMethodSubSelections(axisNum)
 		wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"cursorLocs")
 		if(waveexists(cursor_locs))
 			//Variable focused=StringMatch(view,"Focused")
-			String trace=LongestVisibleTrace(win="SweepsWin")
+			string cursor_info = CsrInfo(A,"SweepsWin")
+			string trace = stringbykey("TNAME", cursor_info)
+			if(!strlen(trace))
+				trace=LongestVisibleTrace(win="SweepsWin")
+			endif
 			if(strlen(trace))
 				Variable offset=XOffset(trace,win="SweepsWin")
 				SetWindow SweepsWin hook=$""
