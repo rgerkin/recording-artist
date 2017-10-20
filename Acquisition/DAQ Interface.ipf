@@ -23,6 +23,8 @@ static constant maxDAQs=10
 // desired, all other GetDAQs() (slaves) should be triggered off of this DAQ, for example by connecting the Trigger Out 
 // on the master DAQ to the Trigger In on the slave GetDAQs().  
 
+#ifndef ReallyNoDAQ
+
 #if exists("ITC18Init") // Can't remember the name of an actual pre-MX operation!  Fix this.  
 #define ITC
 #include ":ITC Wrappers"
@@ -38,6 +40,13 @@ static constant maxDAQs=10
 #include ":LIH Wrappers"
 #endif
 
+#else
+
+#define NoDAQ
+#include "No DAQ Wrappers"
+
+#endif // ReallyNoDAQ
+
 #if exists("SIDXCameraInit") // TO DO: Change to name of actual SIDX Operation.
 #define SIDX6
 #include "SIDX6 Wrappers"
@@ -47,6 +56,7 @@ static constant maxDAQs=10
 #define NoDAQ
 #include "No DAQ Wrappers"
 #endif
+
 
 function /s DAQTypes()
 	return "ITC;LIH;NIDAQmx;NoDAQ"
