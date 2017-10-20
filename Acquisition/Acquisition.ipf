@@ -555,7 +555,7 @@ Function StartSweep([DAQ])
 	if(err)
 		return err
 	endif
-	
+	//print 1,LIH#SamplesAvailable2Read("daq0")
 	acquiring=1
 	Speak(1,outputWaves,SelectNumber(continuous,32,0),DAQs=DAQ)
 	Listen(1,boardGain,inputWaves,5,continuous,"CollectSweep("+DAQ+")","ErrorSweep()","",DAQs=DAQ)
@@ -568,6 +568,7 @@ Function StartSweep([DAQ])
 #ifdef Img
 	AcquireMovie(now=0)
 #endif
+	//print 2,LIH#SamplesAvailable2Read("daq0")
 	if(StartClock(isi,DAQs=DAQ)) // If Start_Clock returns an error.  
 		StopAcquisition(DAQ=DAQ) // Stop acquisition.  
 	endif

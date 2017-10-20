@@ -8,6 +8,14 @@
 static strconstant module="Acq"
 static strconstant type=LIH
 
+static constant board_type = 3
+// ITC-16 Board          	=  0
+// ITC-18 Board          	=  1
+// ITC 1600 Board       	=  2
+// LIH 8+8 Board         =  3
+// ITC-16 with USB-16	= 10
+// ITC-18 with USB-18	= 11
+
 static function /s DAQType(DAQ[,quiet])
 	string DAQ
 	variable quiet
@@ -29,8 +37,12 @@ static function /s OutputChannelList([DAQ])
 end
 constant LIH_kHz=10
 
-Structure ChannelsParam
+Structure ADCChannelsParam
     int16 channels[17]
+EndStructure
+
+Structure DACChannelsParam
+    int16 channels[9]
 EndStructure
 
 static Function BoardGain(DAQ)
@@ -76,7 +88,9 @@ static Function BoardReset(Device[,DAQ])
 	Variable device
 	String DAQ
 	
-	LIH_InitInterface(device)
+	string msg
+	
+	LIH_InitInterface(msg,board_type)
 End
 
 static Function BoardInit([DAQ])
@@ -103,7 +117,7 @@ End
 static Function DefaultKHz(DAQ)
 	String DAQ
 	
-	dfref df=ObjectManifest(module,"DAQs","kHz")
+	dfref df=Core#ObjectManifest(module,"DAQs","kHz")
 	nvar /sdfr=df value
 	return value
 End
@@ -249,6 +263,14 @@ static Function /wave ParseWavesInfo(waves,i,map,chan)
 	string name=StringFromList(0,info,",")
 	if(strlen(name))
 		string channel=StringFromList(1,name,"_")
+		if(!strlen(channel))
+			variable j
+			for(j=0;j<=20;j+=1)
+				if(stringmatch(name,"*ch"+num2str(j)+"*"))
+					channel = num2str(j)
+				endif
+			endfor
+		endif
 		chan=str2num(channel)
 		if(stringmatch(name,"*input*"))
 			string direction="input"
@@ -307,6 +329,7 @@ End
 static Function SpeakAndListen([DAQ])
 	String DAQ
 	
+	//print 6,LIH#SamplesAvailable2Read("daq0")
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=type),DAQ)
 	dfref df=GetDaqDF(DAQ)
 	dfref statusDF=GetStatusDF()
@@ -318,18 +341,19 @@ static Function SpeakAndListen([DAQ])
 		//variable FifoOutSize=SamplesAvailable2Write(DAQ)
 	endif
 	
-	struct ChannelsParam DAC
-	struct ChannelsParam ADC
+	struct DACChannelsParam DAC
+	struct ADCChannelsParam ADC
 	wave in=df:InputMultiplex, out=df:OutputMultiplex
 	variable buffer=dimsize(in,0)
-	
+	//print fifoinsize, interval()
 	if(FifoInSize>2^14)
-		printf "Too many points in the input buffer!\r"
+		printf "Too many points (%d) in the input buffer!\r",FifoInSize
 		abort
 	endif
-	if(FifoInSize>buffer+10) // Over the buffer limit.  
+	if(FifoInSize>(buffer+10)) // Over the buffer limit.  
 		svar /sdfr=df inputWaves,outputWaves
 		string listenHook=GetListenHook(DAQ)
+		//listenHook = replacestring("(\"daq0\")","")
 		nvar /sdfr=statusDF first,currSweep
 		funcref CollectSweep f=$listenHook
 		if(sealTest && FifoInSize>2*buffer) // Way too many points have accumulated.  .  
@@ -350,6 +374,7 @@ static Function SpeakAndListen([DAQ])
 		if(continuous || sealtest || outPoints<acqPoints)
 			WriteStimAndSample(out,0,buffer)
 		endif
+		//print dimsize(in,0),dimsize(in,1),dimsize(out,0),dimsize(out,1)
 		if(sealTest || inPoints>=acqPoints)
 			inPoints=0
 			outPoints=0
@@ -375,6 +400,7 @@ End
 static Function OneStimAndSample(out,in[,DAQ])
 	wave /d out,in
 	string DAQ
+	//print "OneStimAndSample"//4,LIH#SamplesAvailable2Read("daq0")
 	
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=type),DAQ)
 	dfref df=GetDaqDF(DAQ)
@@ -382,9 +408,9 @@ static Function OneStimAndSample(out,in[,DAQ])
 	lastDAQSweepT=StopMSTimer(-2)
 	variable bits=1//+8*(strlen(ListMatch(DAQs,"NIDAQmx"))>0) // Set the the third bit if the NIDAQmx is present, so it can control the start time of the sweep.  
 	variable inSize=dimsize(in,0)
-	variable outSize=2*inSize
-	struct ChannelsParam DAC
-	struct ChannelsParam ADC
+	variable outSize=5*inSize
+	struct DACChannelsParam DAC
+	struct ADCChannelsParam ADC
 	Sequence(DAC,ADC)
 	variable samplingInterval=0.001/kHz
 	
@@ -394,8 +420,12 @@ static Function OneStimAndSample(out,in[,DAQ])
 		redimension /n=(outSize,-1) out
 		out=out[mod(p,outLength)][q]
 	endif
-	
+	//print 5,LIH#SamplesAvailable2Read("daq0")
+	redimension /n=(-1,1) out
+	redimension /n=(-1,1) in
+	//print getwavesdatafolder(in,2)
 	LIH_StartStimAndSample(out,in,outSize,inSize,DAC,ADC,samplingInterval,bits)
+	//print(outSize)
 	matrixop /o out=rotaterows(out,-outSize)
 	redimension /n=(-1,max(1,dimsize(out,1))) out // Needed because rotaterows squeezes out singleton column.  
 	outPoints+=outSize
@@ -404,7 +434,7 @@ End
 static Function ReadStimAndSample(in,stop,size)
 	wave /d in
 	variable stop,size
-	
+	//print numpnts(in),mean(in),variance(in)
 	LIH_ReadStimAndSample(in,stop,size)
 End
 
@@ -412,7 +442,7 @@ static Function WriteStimAndSample(out,last,size[,DAQ])
 	wave /d out
 	variable last,size
 	string DAQ
-	
+	//print "WriteStimAndSample"
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=type),DAQ)
 	dfref df=GetDaqDF(DAQ)
 	nvar /sdfr=df outPoints
@@ -434,8 +464,8 @@ static Function SamplesAvailable2Read(DAQ)
 End
 
 static Function /S Sequence(DAC,ADC[,DAQ])
-	struct ChannelsParam &DAC
-	struct ChannelsParam &ADC
+	struct DACChannelsParam &DAC
+	struct ADCChannelsParam &ADC
 	string DAQ
 	
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=type),DAQ)
@@ -467,8 +497,8 @@ static Function /S Sequence(DAC,ADC[,DAQ])
 			dacNum+=1
 		endif
 	endfor
-	ReplaceRepetitionsWithN(DAC) // Guard against overwriting acquisition on one channel by replacing the second instance of an input channel with "N".  
-	ReplaceRepetitionsWithN(ADC)
+	DACReplaceRepetitionsWithN(DAC) // Guard against overwriting acquisition on one channel by replacing the second instance of an input channel with "N".  
+	ADCReplaceRepetitionsWithN(ADC)
 	string /g df:ADC_, df:DAC_
 	svar /z/sdfr=df ADC_,DAC_
 	
@@ -478,14 +508,14 @@ static Function /S Sequence(DAC,ADC[,DAQ])
 	
 	// Return an easily readable string with the sequence.  
 	string result="|"
-	for(i=0;i<17;i+=1)
+	for(i=0;i<9;i+=1)
 		result+=num2str(ADC.channels[i])+","+num2str(DAC.channels[i])+"|"
 	endfor
 	return result
 End
 
-static Function /S ReplaceRepetitionsWithN(ChannelsParam[,DAQ])
-	struct ChannelsParam &ChannelsParam
+static Function /S ADCReplaceRepetitionsWithN(ChannelsParam[,DAQ])
+	struct ADCChannelsParam &ChannelsParam
 	String DAQ
 	
 	variable i,j
@@ -495,6 +525,22 @@ static Function /S ReplaceRepetitionsWithN(ChannelsParam[,DAQ])
 			variable chan2=ChannelsParam.channels[j]
 			if(chan2==chan1)
 				ChannelsParam.channels[j]=15 // An unlikely channel, which probably won't be used.  
+			endif
+		endfor
+	endfor
+End
+
+static Function /S DACReplaceRepetitionsWithN(ChannelsParam[,DAQ])
+	struct DACChannelsParam &ChannelsParam
+	String DAQ
+	
+	variable i,j
+	for(i=0;i<9;i+=1)
+		variable chan1=ChannelsParam.channels[i]
+		for(j=i+1;j<9;j+=1)
+			variable chan2=ChannelsParam.channels[j]
+			if(chan2==chan1)
+				ChannelsParam.channels[j]=7 // An unlikely channel, which probably won't be used.  
 			endif
 		endfor
 	endfor
@@ -535,10 +581,14 @@ static Function StartClock(isi[,DAQ])
 	Variable isi
 	String DAQ
 	
+	string msg
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=type),DAQ)
-	LIH_InitInterface(1)
+	//print 2.1,LIH#SamplesAvailable2Read("daq0")
+	LIH_InitInterface(msg, board_type)
+	//print 2.2,LIH#SamplesAvailable2Read("daq0")
 	dfref df=GetDaqDF(DAQ)
-	CtrlNamedBackground Acquisition, period=1, burst=1, proc=LIH#SpeakAndListenBkg//, start
+	//print 3,LIH#SamplesAvailable2Read("daq0")
+	CtrlNamedBackground Acquisition, period=1, burst=0, proc=LIH#SpeakAndListenBkg//, start
 	dfref statusDF=GetStatusDF()
 	variable /g statusDF:first=1
 	
@@ -551,8 +601,17 @@ static Function StartClock(isi[,DAQ])
 	
 	wave /d/sdfr=df in=InputMultiplex, out=OutputMultiplex
 	CtrlNamedBackground Acquisition, start
+	//print 3.5,LIH#SamplesAvailable2Read("daq0")
 	OneStimAndSample(out,in)
 End
+
+function interval()
+	nvar ticks_ = root:ticks_
+	variable now = ticks
+	variable delta  = now - ticks_
+	ticks_ = now
+	return delta
+end
 
 static Function SpeakAndListenBkg(s)
 	Struct WMBackgroundStruct &s
