@@ -2422,8 +2422,8 @@ function TestDebugToggler()
 end
 
 function FuncWithRTE()
-	make /o/n=101 test
-	fft test
+	make /o/n=101 test0
+	fft test0
 end
 
 function UnDebug()

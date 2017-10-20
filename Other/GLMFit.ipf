@@ -2041,16 +2041,16 @@ end
 Function TestGLMFit(num)
 	variable num
 	variable i
-	make /o/n=(100,3) test
-	for(i=0;i<numpnts(test);i+=1)
-		prog("Test",i,numpnts(test))
+	make /o/n=(100,3) test0
+	for(i=0;i<numpnts(test0);i+=1)
+		prog("Test",i,numpnts(test0))
 		make /o/n=(num) xx1=gnoise(1),xx2=gnoise(1),yy=poissonnoise(exp(0.1+0.2*xx1[p]-0.3*xx2[p]+gnoise(0.1)))
 		glmfit(yy,{xx1,xx2},"poisson",quiet=1)
 		wave betas
-		test[i][]=betas[q]
+		test0[i][]=betas[q]
 		//test[i]=GLMFit(0,stepMethod=num)
 	endfor
-	matrixop /free result = meancols(test)
+	matrixop /free result = meancols(test0)
 	print result
 End
 
