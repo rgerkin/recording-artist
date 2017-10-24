@@ -2281,7 +2281,7 @@ Function Default_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,swe
 	
 	variable ampl=GetStimParam("Ampl",chan,pulseSet,sweep_num = sweep_num)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
-	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	Stimulus[firstSample,lastSample][sweepParity] += ampl+dampl*pulseNum
 End
 
 // ------------------------ Some custom stimulus functions. ----------------------------------
@@ -2294,7 +2294,7 @@ function AlphaSynapse_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	
 	variable ampl=GetStimParam("Ampl",chan,pulseSet,sweep_num = sweep_num)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
-	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	Stimulus[firstSample,lastSample][sweepParity] += ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet,sweep_num = sweep_num)
 	if(pulseNum==pulses-1)
 		wave template = AlphaSynapso(1,3,0,50)
@@ -2310,9 +2310,9 @@ function Template_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sw
 	
 	variable ampl=GetStimParam("Ampl",chan,pulseSet,sweep_num = sweep_num)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
-	variable begin = GetStimParam("Begin",chan,pulseSet,sweep_num = sweep_num)
+	//variable begin = GetStimParam("Begin",chan,pulseSet,sweep_num = sweep_num)
 	
-	Stimulus[firstSample][sweepParity][pulseSet]+=ampl+dampl*pulseNum // Pulse of only one sample, to be convolved below.  
+	Stimulus[firstSample][sweepParity] += ampl+dampl*pulseNum // Pulse of only one sample, to be convolved below.  
 	variable pulses=GetStimParam("Pulses",chan,pulseSet,sweep_num = sweep_num)
 	if(pulseNum==pulses-1)
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
@@ -2339,7 +2339,7 @@ function PoissonTemplate_stim(Stimulus,chan,firstSample,lastSample,pulseNum,puls
 		locs += 0.001*begin/delta_x
 		variable i
 		for(i=0;i<numpnts(locs);i+=1)
-			Stimulus[floor(locs[i])][sweepParity]+=ampl+dampl*i
+			Stimulus[floor(locs[i])][sweepParity] += ampl+dampl*i
 		endfor
 		wave /z template=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"template")
 		if(waveexists(template))
@@ -2356,7 +2356,7 @@ function Noisy_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweep
 	
 	Default_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity,sweep_num = sweep_num)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
-	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=gnoise(dAmpl)
+	Stimulus[firstSample,lastSample][sweepParity] += gnoise(dAmpl)
 end
 
 function NoisyAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity[,sweep_num])
@@ -2368,7 +2368,7 @@ function NoisyAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,
 	Default_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity,sweep_num = sweep_num)
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
 	variable pulses=GetStimParam("Pulses",chan,pulseSet)
-	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=gnoise(dAmpl)
+	Stimulus[firstSample,lastSample][sweepParity] += gnoise(dAmpl)
 	if(pulseNum==pulses-1)
 		wave template = AlphaSynapso(1,3,0,50)
 		Convolve2(template,Stimulus,col=sweepParity)
@@ -2388,7 +2388,7 @@ function Frozen_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,swee
 	wave /z frozen=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
 	if(waveexists(frozen))
 		lastSample = min(lastSample,firstSample+numpnts(frozen)-1) // Only extend to the end of the pulse or the end of the frozen wave, whichever comes first.  
-		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample][sweepParity]
+		Stimulus[firstSample,lastSample][sweepParity] += multiplier*frozen[p-firstSample][sweepParity]
 	endif
 end
 
@@ -2409,8 +2409,8 @@ function FrozenPlusNegative_stim(Stimulus,chan,firstSample,lastSample,pulseNum,p
 	wave /z frozen=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"frozen")
 	if(waveexists(frozen))
 		lastSample = min(lastSample,firstSample+numpnts(frozen)-1) // Only extend to the end of the pulse or the end of the frozen wave, whichever comes first.  
-		Stimulus[firstSample,lastSample][sweepParity][pulseSet]+=multiplier*frozen[p-firstSample][sweepParity]
-		Stimulus[firstSample+numPulses*IPI*kHz,lastSample+numPulses*IPI*kHz][sweepParity][pulseSet]-=multiplier*frozen[p-firstSample-numPulses*IPI*kHz]
+		Stimulus[firstSample,lastSample][sweepParity] += multiplier*frozen[p-firstSample][sweepParity]
+		Stimulus[firstSample+numPulses*IPI*kHz,lastSample+numPulses*IPI*kHz][sweepParity] -= multiplier*frozen[p-firstSample-numPulses*IPI*kHz]
 	endif
 end
 
@@ -2424,7 +2424,7 @@ function PoissonAlpha_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSe
 	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)
 	variable width=lastSample-firstSample
 	variable start=abs(enoise(dimsize(Stimulus,0)))
-	Stimulus[start,start+width][sweepParity][pulseSet]+=ampl+dampl*pulseNum
+	Stimulus[start,start+width][sweepParity] += ampl+dampl*pulseNum
 	variable pulses=GetStimParam("Pulses",chan,pulseSet,sweep_num = sweep_num)
 	if(pulseNum==pulses-1)
 		wave template = AlphaSynapso(1,3,0,50)
@@ -2444,7 +2444,7 @@ function Sine_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepP
 	variable kHz=GetKHz(MasterDAQ())
 	variable start = firstSample/(1000*kHz)
 	
-	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+= ampl * sin(2*pi*(x-start)*freq)
+	Stimulus[firstSample,lastSample][sweepParity] += ampl * sin(2*pi*(x-start)*freq)
 end
 
 //sin function added by AG 3-21-13
@@ -2461,7 +2461,7 @@ function Ramp_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepP
 	variable width = (lastSample-firstSample+1)/(1000*kHz)
 	variable slope = (amplEnd-amplStart)/width
 	
-	Stimulus[firstSample,lastSample][sweepParity][pulseSet]+= amplStart + slope*(x-start)
+	Stimulus[firstSample,lastSample][sweepParity] += amplStart + slope*(x-start)
 end
 
 #ifndef Aryn
