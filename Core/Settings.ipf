@@ -2527,6 +2527,26 @@ function /df NewInstanceHome(module,package[,sub,scratch,quiet])
 	endif
 	return df
 end
+
+function /s InstanceHomeLoc(module,package,instance[,sub,create,quiet])
+	string module,package,instance,sub
+	variable create // Create the folder for the instance (but don't fill it with content).  
+	variable quiet
+	
+	sub = selectstring(!paramisdefault(sub),"",sub)
+	create = paramisdefault(create) ? 1 : create
+	string origInstance=instance
+	strswitch(instance)
+		case "":
+		case "_default_":
+			instance=DefaultInstance(module,package,quiet=quiet)//defaultInstanceName
+			break
+	endswitch
+	
+	dfref df_=PackageHome(module,package,create=create,quiet=quiet)
+	string loc=JoinPath({getdatafolder(1,df_),instance,sub})
+	return loc
+end
 	
 function /df InstanceHome(module,package,instance[,sub,create,quiet])
 	string module,package,instance,sub
@@ -2537,19 +2557,9 @@ function /df InstanceHome(module,package,instance[,sub,create,quiet])
 	if(stringmatch(instance,"_new_"))
 		return NewInstanceHome(module,package,sub=sub,quiet=quiet)
 	endif
-	string origInstance=instance
-	variable generic=IsGenericPackage(module,package,quiet=quiet)
-	strswitch(instance)
-		case "":
-		case "_default_":
-			instance=DefaultInstance(module,package,quiet=quiet)//defaultInstanceName
-			break
-	endswitch
-	
-	variable package_create = paramisdefault(create) ? 1 : create
-	dfref df_=PackageHome(module,package,create=package_create,quiet=quiet)
-	string loc=JoinPath({getdatafolder(1,df_),instance,sub})
+	string loc = InstanceHomeLoc(module,package,instance,sub=sub,create=create,quiet=quiet)
 	dfref df = $loc
+	variable generic=IsGenericPackage(module,package,quiet=quiet)
 	if(!datafolderrefstatus(df))
 		if(create)
 			NewFolder(loc)

@@ -752,7 +752,11 @@ Function SealTestStart(reset,DAQ)
 	svar /sdfr=daqDF inputWaves,outputWaves,listenHook
 	nvar /sdfr=df chanBits
 	nvar /sdfr=instanceDF freq
-	SetListenHook("SealTestCollectSweeps(\"_daq_\")",DAQ=DAQ)
+	if(stringmatch(DAQType(DAQ),"LIH"))
+		SetListenHook("SealTestCollectSweeps",DAQ=DAQ)
+	else
+		SetListenHook("SealTestCollectSweeps(\"_daq_\")",DAQ=DAQ)
+	endif
 	Speak(1,outputWaves,0,DAQs=DAQ)
 	Listen(1,1,inputWaves,5,1,listenHook,"ErrorHook()","",DAQs=DAQ)
 	StartClock(1/freq,DAQs=DAQ) // Includes starting stimulation.  
@@ -812,6 +816,7 @@ Function SealTestCollectSweeps(DAQ)
 	//	DAQ_Speak(1,outputWaves,64,now=1) // Add the next stimulus to the stimulus buffer.  (ITC18 only).  
 	//endif
 	Variable i,minn=Inf,maxx=-Inf
+	
 	for(i=0;i<numChannels;i+=1)
 		if(chanBits & 2^i)
 			string mode=GetAcqMode(i)
@@ -821,9 +826,15 @@ Function SealTestCollectSweeps(DAQ)
 			nvar /sdfr=chanDF inputRes,seriesRes,timeConstant,pressure
 			variable inputGain=GetModeInputGain(mode)
 		
-			String DAQType=Chan2DAQ(i)
-			if(StringMatch(DAQType,"NIDAQnonMX")) // pre-MX NIDAQ driver.  
+			String daq_type=DAQType(Chan2DAQ(i))
+			if(StringMatch(daq_type,"NIDAQnonMX")) // pre-MX NIDAQ driver.  
 				sweep *= (1000/inputGain)/32 // Is this right?  
+			endif
+			if(stringmatch(daq_type,"LIH"))
+				wave /z/sdfr=chanDF Sweep_buff
+				if(waveexists(Sweep_buff))
+					duplicate /o Sweep_buff chanDF:Sweep
+				endif
 			endif
 			ControlInfo /W=SealTestWin Pulse; Variable pulse=V_Value
 			if(Ampl[i]==0) // Noise Test

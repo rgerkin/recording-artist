@@ -320,7 +320,11 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 						Core#SetControlUserData(info.ctrlName,"oldLabel",newLabel)
 						Core#SetStrPackageSetting(module,"channelConfigs",name,"label_",newLabel) // Update the channel label.  
 					endif
+					string acqMode = Core#StrPackageSetting(module,"channelConfigs",newlabel,"acqMode")
 					SelectPackageInstance("channelConfigs",newLabel,special=special)
+					//print special
+					SetAcqMode(acqMode,chan)//SelectPackageInstance("acqModes",acqMode,special=special)
+					//abort
 					SetVariable $info.ctrlName userData(oldLabel)=Labels[chan]
 					string chanName=GetChanName(chan)
 					if(!stringmatch(newLabel,chanName))
@@ -2810,6 +2814,7 @@ Function PossiblyShowAnalysis()
 		string columnControl = "Column_"+num2str(column)+"_"+cleanupname(analysisMethod,0)
 		ControlInfo /W=AnalysisWin $columnControl
 		variable columnOn=V_flag==2 ? V_Value : 1
+		print columnOn
 		
 		variable crossChannel=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"crossChannel")
 		if(!crossChannel) // For analyses that are not cross-channel.  

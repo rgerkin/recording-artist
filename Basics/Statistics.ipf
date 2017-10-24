@@ -1660,14 +1660,14 @@ End
 Function OrnUhlPS(tau,sigma)
 	Variable tau,sigma
 	Variable i
-	Make /o/n=100000 Test
-	SetScale x,0,10,Test
+	Make /o/n=100000 Test0
+	SetScale x,0,10,Test0
 	for(i=0;i<100;i+=1)
-		OrnUhl(Test,tau,sigma)
+		OrnUhl(Test0,tau,sigma)
 		//Test=gnoise(1)
 		//Integrate Test
 		//Redimension /n=100000 Test
-		FFT /MAGS /DEST=ftest2 Test
+		FFT /MAGS /DEST=ftest2 Test0
 		Wave /C ftest2
 		Make /o/n=(numpnts(ftest2)) ftest
 		CopyScales ftest,ftest
@@ -1698,17 +1698,17 @@ Function OrnUhlTest(tau,sigma)
 	Make /o/n=(points) Test221=0
 	Variable i
 	for(i=0;i<numpnts(Iterations);i+=1)
-		Make /o/n=(points) Test=0
-		Test=Test[p-1]-Test[p-1]/tau+gnoise(sigma) // gnoise(sigma) = sigma*gnoise(1)
-		WaveStats /Q Test; Test-=V_avg
-		Correlate Test,Test
-		DeletePoints 0,points-1,Test
-		Test221+=Test
+		Make /o/n=(points) Test0=0
+		Test0=Test0[p-1]-Test0[p-1]/tau+gnoise(sigma) // gnoise(sigma) = sigma*gnoise(1)
+		WaveStats /Q Test0; Test0-=V_avg
+		Correlate Test0,Test0
+		DeletePoints 0,points-1,Test0
+		Test221+=Test0
 	endfor
 	Test221/=i
 	Variable peak=Test221[0]
 	Test221/=peak
-	SetScale /P x,0,1,Test,Test221
+	SetScale /P x,0,1,Test0,Test221
 	Variable V_FitOptions=4
 	Make /o/n=3 W_Coef={0,1,1/tau}
 	//Variable K1=sum(Test2)

@@ -3565,11 +3565,11 @@ function test124(channel)
 		rSweep[i]=sweepNum
 	endfor
 	
-	make /free/n=(numpnts(fTime),numpnts(rTime)) test=fTime[p] - (30000-rTime[q])
-	test=(fSweep[p] == rSweep[q]) ? abs(test[p][q]) : Inf
+	make /free/n=(numpnts(fTime),numpnts(rTime)) test0=fTime[p] - (30000-rTime[q])
+	test0=(fSweep[p] == rSweep[q]) ? abs(test0[p][q]) : Inf
 	make /o/n=(numpnts(rTime)) relTime_
 	for(i=0;i<numpnts(rTime);i+=1)
-		wave w=col(test,i)
+		wave w=col(test0,i)
 		relTime_[i]=wavemin(w)
 	endfor
 end

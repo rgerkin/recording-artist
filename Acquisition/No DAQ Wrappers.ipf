@@ -24,7 +24,7 @@ static function /s InputChannelList([DAQ])
 	for(i=0;i<num_inputs;i+=1)
 		list+=num2str(i)+";"
 	endfor
-	//list += "D;N;"
+	list += "D;N;"
 	return list
 end
 
@@ -36,7 +36,7 @@ static function /s OutputChannelList([DAQ])
 	for(i=0;i<num_outputs;i+=1)
 		list+=num2str(i)+";"
 	endfor
-	//list += "D;N;"
+	list += "D;N;"
 	return list
 end
 
