@@ -233,8 +233,8 @@ Function MiniAnalysisWinButtons(ctrlName)
 			Controlinfo Threshold; Variable threshold=V_Value
 			Controlinfo Sweeps; String sweeps=S_Value
 			ControlInfo UseCursors; Variable useCursors=V_Value
-			Variable tStart=(useCursors && strlen(csrinfo(A,"SweepsWin")) ? xcsr(A,"SweepsWin") : 0
-			Variable tStop=(useCursors && strlen(csrinfo(B,"SweepsWin")) ? xcsr(B,"SweepsWin") : Inf
+			Variable tStart=(useCursors && strlen(csrinfo(A,"SweepsWin"))) ? xcsr(A,"SweepsWin") : 0
+			Variable tStop=(useCursors && strlen(csrinfo(B,"SweepsWin"))) ? xcsr(B,"SweepsWin") : Inf
 			CompleteMiniAnalysis(clean=clean,miniSearch=miniSearch,channels=channels,threshold=threshold,noDB=!DB,sweeps=sweeps,tStart=tStart,tStop=tStop,proxy=proxy)
 			break
 		case "ShowMinis":
@@ -1652,8 +1652,8 @@ Function MoreMiniStats(channel[,proxy])
 		Variable j=V_Value
   
 		wave /z/sdfr=sweepDF Fit=$("Fit_"+num2str(miniNum))
-		variable tenThresh=Baseline[i]+0.1*(Event_Size[i]*sign(Amplitude[i])
-		variable ninetyThresh=Baseline[i]+0.9*(Event_Size[i]*sign(Amplitude[i])
+		variable tenThresh=Baseline[i]+0.1*(Event_Size[i]*sign(Amplitude[i]))
+		variable ninetyThresh=Baseline[i]+0.9*(Event_Size[i]*sign(Amplitude[i]))
 		if(WaveExists(Fit))
 			FindLevel /Q Fit,tenThresh // Search from 5 ms before the peak until the peak. 
 			Variable ten=V_LevelX
