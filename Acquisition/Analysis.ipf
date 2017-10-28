@@ -784,13 +784,13 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 		string amplName=CleanupName(analysisMethod,0)
 		wave /z/sdfr=postDF ampl=$amplName
 		if(!waveexists(ampl))
-	       	make /o/n=(currSweep) postDF:$amplName /wave=ampl=NaN
-	      endif
-	      if(layer>=dimsize(ampl,2))
-	      		Redimension /n=(-1,-1,layer+1) ampl
-	      endif
-	      string view=GetSweepsWinView()
-	      variable i,j,k,x1,x2
+	   	make /o/n=(currSweep) postDF:$amplName /wave=ampl=NaN
+	   endif
+	   if(layer>=dimsize(ampl,2))
+	   	Redimension /n=(-1,-1,layer+1) ampl
+	   endif
+	   string view=GetSweepsWinView()
+	   variable i,j,k,x1,x2
 		if(!strlen(CsrInfo(A,"SweepsWin")))
 			printf "Cursor A is not in the Sweeps window.  Adding cursors.\r"
 			Cursors(win="SweepsWin")
@@ -816,18 +816,18 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			Variable oldNumRows=dimsize(Ampl,0)
 			redimension /n=(max(oldNumRows,sweepNum+1),max(2,dimsize(Ampl,1)),-1) Ampl
 			wave /z/sdfr=postDF sweep=$("sweep"+num2str(sweepNum))
-	             if(FiltersOn(post) && WaveExists(Sweep)) // If any filters are on.  
-             		 if(sweepNum==currSweep)
-             			Wave Sweep=daqDF:$("input_"+num2str(post)) // Don't both filtering again, since we just filtered when we displayed this sweep.  
-             		else
-             			duplicate /free Sweep, FilteredSweep
-             			ApplyFilters(FilteredSweep,post)
-             			wave Sweep=FilteredSweep
-             		endif
-	             endif
+         if(FiltersOn(post) && WaveExists(Sweep)) // If any filters are on.  
+     		   if(sweepNum==currSweep)
+     			   Wave Sweep=daqDF:$("input_"+num2str(post)) // Don't both filtering again, since we just filtered when we displayed this sweep.  
+     		   else
+     			    duplicate /free Sweep, FilteredSweep
+     			    ApplyFilters(FilteredSweep,post)
+     			    wave Sweep=FilteredSweep
+     		    endif
+         endif
 	             
-	             if(!WaveExists(Sweep)) // If the sweep cannot be found.  
-				if(sweepNum==currSweep) // But it was the most recently acquired sweep.  
+	      if(!WaveExists(Sweep)) // If the sweep cannot be found.  
+			    if(sweepNum==currSweep) // But it was the most recently acquired sweep.  
 					wave Sweep=daqDF:$("input_"+num2str(post)) // Try the DAQ version of it, which might be all that was been saved. 
 				endif
 				if(!WaveExists(Sweep)) // If it still doesn't exist.   .  
@@ -839,27 +839,10 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			
 			// First sets baseline regions and regions of interest for analyzing peaks and average values of EPSCs and test pulses.  
 			// Most of this based on finding regions such the noise cancels out when the baseline is subtracted from the region of interest
-			variable numPulses=1
-			wave numPulses_=GetNumPulses(pre,sweepNum=sweepNum)
-			for(j=0;j<dimsize(SweepParamsPre,2);j+=1) // Iterate through each pulse set.  
-				Variable divisor=SweepParamsPre[sweepNum][%Divisor][j]
-				Variable remainder=SweepParamsPre[sweepNum][%Remainder][j]
-				if(divisor<=1 || (remainder & 2^mod(sweepNum,divisor)))
-					variable IPI=SweepParamsPre[sweepNum][%IPI][j]/1000 // Interval between first and second pulses in seconds
-					numPulses=max(numPulses,SweepParamsPre[sweepNum][%Pulses][j]) // Number of pulses.  
-					break
-				endif
-			endfor
-//			if(IPI==0) // If no IPI was found from the provided presynaptic channel.  
-//				for(j=0;j<numChannels;j+=1)
-//					if(j!=post)
-//						wave /z SweepParamsPre2=root:$(Labels[j]):StimulusHistory
-//						for(k=0;k<dimsize(SweepParamsPre2,2);k+=1)
-//							IPI=max(IPI,SweepParamsPre2[sweepNum][%IPI][j]/1000)
-//						endfor
-//					endif
-//				endfor
-//			endif
+			variable numPulses = GetEffectiveStimParam("pulses",pre,sweepNum=sweepNum)
+			numPulses = numtype(numPulses) ? 1 : numPulses
+			variable IPI = GetEffectiveStimParam("IPI",pre,sweepNum=sweepNum)
+			IPI = numtype(IPI) ? 100 : IPI
 			Variable earliestChannelStim=EarliestStim(sweepNum,chan=pre)
 			if(StringMatch(view,"Focused"))
 				if(numtype(earliestChannelStim)!=0) // If there was not stimulation on this presynaptic channel.  
@@ -910,7 +893,7 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
  				string /g df:method=analysisMethod
  				svar /sdfr=df method
  			endif
- 			err=MakeMeasurement(analysisMethod,method,Sweep,Ampl,sweepNum,post,layer,baselineLeft_,baselineRight_,x_left,x_right,IPI,numPulses,flip_sign)
+ 			err = MakeMeasurement(analysisMethod,method,Sweep,Ampl,sweepNum,post,layer,baselineLeft_,baselineRight_,x_left,x_right,IPI,numPulses,flip_sign)
 			//UpdateProgressWin(frac=i/ItemsInList(sweeps),text="Sweep "+num2str(sweepNum))
 		endfor	
 	//Execute /Q "ProgressWindow close"

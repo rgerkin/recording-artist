@@ -1631,49 +1631,6 @@ function /wave GetAmpl(chan[,sweepNum])
 	return ampl
 end
 
-function /wave GetdAmpl(chan[,sweepNum])
-	variable chan,sweepNum
-	
-	variable curr_sweep_num = GetCurrSweep()
-	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
-		wave dAmpl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"dAmpl")
-	else
-		wave chanHistory=GetChanHistory(chan)
-		make /free/n=(dimsize(chanHistory,2)) dAmpl=chanHistory[sweepNum][%$"dAmpl"][p]
-	endif
-	return dAmpl
-end
-
-function GetEffectiveParam(param_name,chan[,sweepNum,pulseSet,pulseNum])
-	string param_name
-	variable chan,sweepNum,pulseSet,pulseNum
-	
-	wave param = GetChanStimParam(param_name,chan,sweepNum=sweepNum)
-	if(paramisdefault(pulseSet))
-		wave livePulseSets = GetLivePulseSets(chan,sweepNum=sweepNum)
-		pulseSet = livePulseSets[0] // First live pulse set.  
-	endif
-	variable result = param[pulseSet]
-	
-	return result
-end
-
-function /wave GetSweepsWithEffectiveParam(param_name,value,chan[,pulseNum])
-	string param_name
-	variable value,chan,pulseNum
-	
-	make /free/n=0 w_sweeps
-	variable i,num_sweeps = GetCurrSweep()
-	for(i=0;i<num_sweeps;i+=1)
-		variable sweep_value = GetEffectiveParam(param_name,chan,sweepNum=i,pulseNum=pulseNum)
-		if(value == sweep_value)
-			w_sweeps[numpnts(w_sweeps)] = {i}
-		endif
-	endfor
-	
-	return w_sweeps
-end
-
 function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	variable chan,sweepNum,pulseSet,pulseNum
 	
@@ -1693,6 +1650,49 @@ function GetEffectiveAmpl(chan[,sweepNum,pulseSet,pulseNum])
 	endfor
 	
 	return result
+end
+
+function /wave GetdAmpl(chan[,sweepNum])
+	variable chan,sweepNum
+	
+	variable curr_sweep_num = GetCurrSweep()
+	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
+		wave dAmpl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),"dAmpl")
+	else
+		wave chanHistory=GetChanHistory(chan)
+		make /free/n=(dimsize(chanHistory,2)) dAmpl=chanHistory[sweepNum][%$"dAmpl"][p]
+	endif
+	return dAmpl
+end
+
+function GetEffectiveStimParam(param_name,chan[,sweepNum,pulseSet])
+	string param_name
+	variable chan,sweepNum,pulseSet
+	
+	wave param = GetChanStimParam(param_name,chan,sweepNum=sweepNum)
+	if(paramisdefault(pulseSet))
+		wave livePulseSets = GetLivePulseSets(chan,sweepNum=sweepNum)
+		pulseSet = livePulseSets[0] // First live pulse set.  
+	endif
+	variable result = param[pulseSet]
+	
+	return result
+end
+
+function /wave GetSweepsWithEffectiveParam(param_name,value,chan)
+	string param_name
+	variable value,chan
+	
+	make /free/n=0 w_sweeps
+	variable i,num_sweeps = GetCurrSweep()
+	for(i=0;i<num_sweeps;i+=1)
+		variable sweep_value = GetEffectiveStimParam(param_name,chan,sweepNum=i)
+		if(value == sweep_value)
+			w_sweeps[numpnts(w_sweeps)] = {i}
+		endif
+	endfor
+	
+	return w_sweeps
 end
 
 function /wave GetLivePulseSets(chan[,sweepNum])

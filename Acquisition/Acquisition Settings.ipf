@@ -441,6 +441,10 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	string dontMove
 	variable recompile
 	
+	string version = ""
+	if(exists("root:sweep_number1"))
+		version = "malenka1"
+	endif
 	recompile=paramisdefault(recompile) ? 1 : recompile
 	printf "Making experiment compatible with latest version of code...\r"
 	
@@ -467,8 +471,6 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	InitializeVariables(quiet=quiet,noContainers=1)
 	
 	// Parameters.  
-	//dfref oldParamsDF=oldRoot:parameters
-	//joinpath({getdatafolder(1,oldRoot),removefromlist("root",getdatafolder(1,daqDF),":")})
 	if(datafolderrefstatus(oldRoot:parameters))
 		Core#CopyData(oldRoot:parameters,"root:parameters",quiet=quiet)
 	endif
@@ -480,8 +482,7 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	string items="sweep_t,sweepT;sweepT,sweepT;"
 	dfref status=GetStatusDF()
 	MoveObjects(items,oldRoot,root:)
-	//CopyData(oldRoot:status,getdatafolder(1,status))
-	items="current_sweep_number,currSweep;currentSweepNum,currSweep;"
+	items="current_sweep_number,currSweep;currentSweepNum,currSweep;sweep_number1,currSweep;"
 	items+="cursor_A_sweep_number,cursorSweepNum_A;"
 	items+="cursor_B_sweep_number,cursorSweepNum_B;"
 	items+="sweeps_this_waveform,waveformSweeps;"
@@ -516,7 +517,7 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	
 	// Fix channel instances.  
 	if(!numChannels)
-		wave /z/t/sdfr=oldRoot:parameters labels,colors
+		wave /z/t/sdfr=root:parameters labels,colors
 		if(waveexists(labels))
 			for(i=0;i<numpnts(labels);i+=1)
 				InitChan(i,noContainer=1)
@@ -548,7 +549,6 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 	for(i=0;i<ItemsInList(DAQs);i+=1)
 		DAQ=StringFromList(i,DAQs)
 		dfref daqDF=GetDaqDF(DAQ)
-//		NewDataFolder /O/S root:$DAQ
 		items="inputWaves;input_waves,inputWaves;outputWaves;output_waves,outputWaves;input_R1,input_0;input_0;input_L2,input_1;input_1;input_B3,input_2;input_2;"
 		MoveObjects(items,oldRoot,daqDF) // Move from root if they are located there.  
 		items+="InputMultiplex;OutputMultiplex;Raw_0;Raw_1;Raw_2;Stimulus_1;Stimulus_2;cumPoints;"
@@ -557,73 +557,13 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 		MoveObjects(items,oldParameters,daqDF)//,saveSource=(i<ItemsInList(DAQs)-1))
 		MoveObjects("boardGain",oldParameters:random,daqDF)
 		MoveObjects("sweepsLeft;lastSweepT,lastDAQSweepT",status,daqDF) // Move from root:DAQ (generic DAQ folder) if they are located there.  
-//		objects="VAR::kHz="+num2str(WaveVarOrDefault("root:parameters:kHz[0]",10))+";"
-//		objects+="VAR::acquiring=0;VAR::numDAQChannels="+num2str((i==0) ? numChannels : 0)+";"
-//		objects+="VAR::saveMode=2;VAR::sweepsLeft=0"
-//		MakeObjects(objects,root:$DAQ)
+
 	endfor	
-	
-	// Parameters.  
-	
-//	NVar /Z numChannels
-//	if(!NVar_Exists(numChannels))
-//		Variable /G numChannels=ItemsInList(UsedChannels())
-//	endif
-	//MoveData("root:parameters","root:variables")
-	//MoveData("root:variables",getdatafolder(1,df)) // Old location.  
-	
-//	String acqModes=ListAcqModes()
-	
-//	string objects=""
-//	objects+="WAVT:/n=%:Labels=\"cell\"+StringFromList(p,\""+oldChanNames+"\",\",\");"
-//	objects+="WAV:/n=%:ActiveChannels=1;"
-//	objects+="WAVT:/n=%:InputMap=num2str(p);"
-//	objects+="WAVT:/n=%:OutputMap=num2str(p);"
-//	objects+="WAV:/n=(%,3):Colors=DefaultColors(p,q);"
-//	objects+="WAVT:/n=%:StimulusName=;"
-//	objects+="WAVT:/n=%:ChannelDAQ="+MasterDAQ()+";"
-//	objects+="WAVT:/n=%:AcqMode="+StringFromList(0,acqModes)+";"
-//	objects+="VAR::pulseSets=1;"
-//	objects=ReplaceString("%",objects,num2str(numChannels))
-//	MakeObjects(objects,root:parameters)
-//	String genericWaves="ChannelSaveMode;AddStimulus;TestPulseOn;"+pulseParams
-//	for(i=0;i<ItemsInList(genericWaves);i+=1)
-//		String genericWave=StringFromList(i,genericWaves)
-//		MakeObjects("WAV:/n="+num2str(numChannels)+":"+genericWave+"=0",root:parameters)
-//	endfor
-//	
-//	if(!exists("root:parameters:drugList"))
-//		SetDrugDefaults()
-//	endif
-//	
-//	// Old parameters locations / formats.  
-//	MoveObjects("StimulusName",root:stimWaves,root:parameters) // An old location.  
-//	
-//	// Parameters/Filters.  
-//	NewDataFolder /O/S root:parameters:filters
-//	genericWaves="Notch;NotchFreq;NotchHarmonics;Low;LowFreq;High;HighFreq;Wyldpoint;WyldpointWidth;WyldpointThresh;Zero;PowerSpec;"+pulseParams
-//	for(i=0;i<ItemsInList(genericWaves);i+=1)
-//		genericWave=StringFromList(i,genericWaves)
-//		MakeObjects("WAV:/n="+num2str(numChannels)+":"+genericWave+"=0",root:parameters:filters)
-//	endfor
-//	
-//	// Parameters/Random.  
-//	NewDataFolder /O/S root:parameters:random
-//	objects="VAR::noiseFreq=60;VAR::lockCursors=0;VAR::lblPos=35;VAR::fsize=9;VAR::lineFeedLabels=1;STR::logDefault=;STR::defaultView=Broad;STR::dataDir="
-//	MakeObjects(objects,root:parameters:random)
-//	
-//	for(i=0;i<4;i+=1) // First 4 profile packages: AcqModes;ChannelConfigs;AnalysisMethods;Stimuli
-//		String package=StringFromList(i,ListPackages())
-//		LoadPackageInstances(module,package,noOverwrite=1) // Load profile package instances that do not already exist.  
-//	endfor
-//	
-//	SetDataFolder root:
 	
 	// Fix channel data folder.  
 	variable firstSweepIs1=FirstSweepIsSweep1() // Is the first sweep called sweep1 (1) or sweep0 (0)?  
 	if(firstSweepIs1)
 		nvar /sdfr=status currSweep
-		//currSweep-=1
 	endif
 	variable lastSweep=GetCurrSweep()//root:status:currentSweepNum // The number of the last sweep collected.  
 	wave /t labels=GetChanLabels()//root:parameters:Labels
@@ -646,21 +586,10 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 				SetDimLabel 0,j,$SelectString(w[j][%VC],"CC","VC"),w 
 			endif
 			Redimension /n=(-1,ItemsInList(pulseParams),max(1,dimsize(w,2))) w
-			//if(firstSweepIsSweep1_ && dimsize(StimulusHistory,0)>1)
-			//	DeletePoints 0,1,StimulusHistory
-			//endif
 		endfor
-		//string objects
-		//sprintf objects,"WAV:/n=(%d,%d,%d):StimulusHistory",max(1,lastSweep),ItemsInList(pulseParams),1
-		//MakeObjects(objects,root:$channel) // Make stimulus history (in case for some reason it is not there).  
-		//Wave StimulusHistory
-		//LabelStimulusHistory(StimulusHistory)
 		w[][%Divisor][]=(w>=1) ? w : 1
 		w[][%TestPulseOn][]=1
 		
-//		objects="series_res,SeriesRes;series_r,SeriesRes;input_res,InputRes;input_r,InputRes"
-//		MoveObjects(objects,root:parameters,root:parameters) // Rename membrane constant waves.  
-//		
 		// Convert old amplitude waves into a modern analysis wave.  
 		string oldChanNames="R1;L2;B3;"
 		string chan=StringFromList(i,oldChanNames)
@@ -715,37 +644,11 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 		endif
 	endfor
 	
-//	// Cleanup the windows "Sweeps" and "Ampl_Analysis" to show only those traces/plots that could possibly be relevant. 
-//	SwitchView("Focused")
-//	for(i=0;i<numChannels;i+=1)
-//		channel=Chan2Label(i)
-//		NewDataFolder /O/S root:$(channel)
-//		String sweeps=WaveList("sweep*",";","")
-//		if(strlen(sweeps)==0) // No sweeps.  
-//			Checkbox $("Show_"+num2str(i)) disable=1, win=SweepsWin
-//			for(j=0;j<numChannels;j+=1)
-//				String synapse=num2str(i)+"_"+num2str(j)
-//				Checkbox $("Synapse_"+synapse) disable=1, win=SweepsWin
-//				synapse=num2str(j)+"_"+num2str(i)
-//				Checkbox $("Synapse_"+synapse) disable=1, win=SweepsWin
-//			endfor
-//		else
-//			ChannelActivate(i,1)
-//		endif
-//	endfor
-//	Wave SweepT=root:SweepT
-//	if(numpnts(sweepT))
-//		WaveStats /Q/M=1 SweepT
-//		Variable initial_time=max(V_min-5,0)
-//		Variable final_time=V_max*1.1
-//		SetAxis /Z/W=AnalysisWin time_axis initial_time,final_time
-//	endif
-//	
 	// Deal with likely vestigial folder cellB3.  
 	if(DataFolderExists("root:cellB3") && whichlistitem("cellB3",UsedChannels())<0)
 		KillDataFolder root:cellB3
 	endif
-//	
+
 	// Renumber sweeps if necessary so that the first sweep is sweep 0.  
 	for(i=0;i<ItemsInList(usedChannels_);i+=1)
 		channel=StringFromList(i,usedChannels_)
@@ -770,13 +673,10 @@ Function BackwardsCompatibility([quiet,dontMove,recompile])
 		endfor
 	endfor
 	
-//	// Cleanup:  
-//	KillWaves /Z kHzWave
-//	KillInFolder(root:,"new_waveForms;stop_code")
-//	KillInFolder(root:status,"acquiring")
-//	KillInFolder(root:parameters,"duration;isi;continuous;realTime;itcPeriod;left;top;right;bottom;outputChannels")
-//	KillInFolder(root:parameters:random,"ITCkHz")
-//	SwitchView("Broad")
-//	root()
+	strswitch(version)
+		case "malenka1":
+			SetAcqMode("VC",0)
+			break
+	endswitch
 End
-//
+
