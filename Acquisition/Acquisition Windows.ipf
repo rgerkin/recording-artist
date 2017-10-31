@@ -1559,7 +1559,7 @@ Function AnalysisWinPopupMenus(info)
 			strswitch(method)
 				case "Decimation":
 				case "Loess":
-					variable neighbors=5
+					variable neighbors=stringmatch(method,"Decimation") ? 5 : 10
 					prompt neighbors,"Enter a "+method+" factor:"
 					doprompt "Trend Settings",neighbors
 					if (V_Flag)
@@ -2814,7 +2814,6 @@ Function PossiblyShowAnalysis()
 		string columnControl = "Column_"+num2str(column)+"_"+cleanupname(analysisMethod,0)
 		ControlInfo /W=AnalysisWin $columnControl
 		variable columnOn=V_flag==2 ? V_Value : 1
-		print columnOn
 		
 		variable crossChannel=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"crossChannel")
 		if(!crossChannel) // For analyses that are not cross-channel.  
@@ -3411,6 +3410,10 @@ Function TrendRegion(method,options)
 	variable neighbors=numberbykey("neighbors",options)
 	neighbors=numtype(neighbors) ? 5 : neighbors
 	
+	if(!stringmatch(method,"Remove"))
+		TrendRegion("Remove",options)
+	endif
+	
 	strswitch(method)
 		case "Remove":
 			Trend=NaN
@@ -3464,8 +3467,10 @@ Function TrendRegion(method,options)
 			appendToGraph /c=(red,green,blue) /L=$y_axis_name /B=time_axis Trend[][value][pre] vs sweepT
 			string trend_trace = TopTrace(win="AnalysisWin")
 			modifyGraph /Z lsize($trend_trace)=0.5
-			if(stringmatch(method,"Decimation"))
+			if(stringmatch(method,"Decimation") || stringmatch(method,"Loess"))
 				modifygraph /Z rgb($trace)=(65535-(65535-red)/2,65535-(65535-green)/2,65535-(65535-blue)/2)
+			endif
+			if(stringmatch(method,"Decimation"))
 				variable marker = numberbykey("marker(x)",trace_info,"=")
 				modifyGraph /Z mode($trend_trace)=3,marker($trend_trace)=marker,lsize($trend_trace)=5
 			endif
