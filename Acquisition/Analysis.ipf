@@ -726,6 +726,13 @@ Function Recalculate()
 	    endfor
 		endif
 	endfor
+	// Put cursors in the Analysis Window if they weren't already there.  
+	if(!strlen(csrinfo(A,"analysisWin")))
+		Cursor /W=analysisWin A, $TopVisibleTrace(), left
+	endif
+	if(!strlen(csrinfo(B,"analysisWin")))
+		Cursor /W=analysisWin B, $TopVisibleTrace(), right
+	endif
 End
 
 Function Analyze(pre,post,sweeps[,analysisMethod])
