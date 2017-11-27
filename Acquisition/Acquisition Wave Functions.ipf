@@ -2454,14 +2454,32 @@ function Ramp_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepP
 	
 	sweep_num = paramisdefault(sweep_num) ? GetCurrSweep() : sweep_num
 	
-	variable amplEnd=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)		//Set frequency (Hz)
-	variable amplStart=GetStimParam("Ampl",chan,pulseSet,sweep_num = sweep_num)		//Set amplitude
+	variable amplEnd=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)		//Set amplitude of peak
+	variable amplStart=GetStimParam("Ampl",chan,pulseSet,sweep_num = sweep_num)		//Set amplitude of base
 	variable kHz=GetKHz(MasterDAQ())
 	variable start = firstSample/(1000*kHz)
 	variable width = (lastSample-firstSample+1)/(1000*kHz)
 	variable slope = (amplEnd-amplStart)/width
 	
 	Stimulus[firstSample,lastSample][sweepParity] += amplStart + slope*(x-start)
+end
+
+function Triangle_stim(Stimulus,chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity[,sweep_num])
+	wave Stimulus
+	variable chan,firstSample,lastSample,pulseNum,pulseSet,sweepParity,sweep_num
+	
+	sweep_num = paramisdefault(sweep_num) ? GetCurrSweep() : sweep_num
+	
+	variable ampl=GetStimParam("Ampl",chan,pulseSet,sweep_num = sweep_num)		
+	variable dAmpl=GetStimParam("dAmpl",chan,pulseSet,sweep_num = sweep_num)		
+	variable kHz=GetKHz(MasterDAQ())
+	variable width = (lastSample-firstSample+1)/(kHz) // Width in ms
+	ampl = ampl + dAmpl*pulseNum
+	variable slope = ampl/(kHz*width/2) // Slope in units per sample
+	variable midSample = (lastSample + firstSample) / 2
+	
+	Stimulus[firstSample,midSample][sweepParity] += slope*(p-firstSample)
+	Stimulus[midSample+1,lastSample][sweepParity] += ampl - slope*(p-midSample)
 end
 
 #ifndef Aryn
