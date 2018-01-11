@@ -1559,7 +1559,7 @@ function /wave GetChanStimParam(param_name,chan[,sweepNum])
 	
 	variable curr_sweep_num = GetCurrSweep()
 	if(paramisdefault(sweepNum) || sweepNum >= curr_sweep_num)
-		wave ampl=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param_name)
+		wave param=Core#WavPackageSetting(module,"stimuli",GetChanName(chan),param_name)
 	else
 		wave chanHistory=GetChanHistory(chan)
 		make /free/n=(dimsize(chanHistory,2)) param=chanHistory[sweepNum][%$param_name][p]
