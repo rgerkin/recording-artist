@@ -1212,10 +1212,11 @@ Function WaveSelectorButtons(info)
 			case "RotateR":
 				variable pulse_set = chan // The number after the underscore is actually a pulse set number in this case.  
 				variable num_channels = GetNumChannels()
-				variable i
+				variable i,j
 				for(i=0;i<num_channels;i+=1)
 					wave divisor = GetChanDivisor(i)
 					wave remainder = GetChanRemainder(i)
+					redimension /d remainder
 					// Rotate remainder bits.  
 					if(stringmatch(action[6],"R"))
 						remainder *= 2
