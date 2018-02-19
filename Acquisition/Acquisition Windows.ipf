@@ -914,7 +914,9 @@ Function SetQuickPulseSets()
 	redimension /n=(pulseSets) divisor,remainder
 	divisor=pulseSets
 	remainder=2^p
+	variable /g stimulusDF:rotated=0
 	testPulseOn=TestPulseOn[0]
+	RotatePulseSetsToCurrent(DAQ)
 	RedrawSelector(win=selectorWin)
 End
 
@@ -1210,24 +1212,8 @@ Function WaveSelectorButtons(info)
 				break
 			case "RotateL":
 			case "RotateR":
-				variable pulse_set = chan // The number after the underscore is actually a pulse set number in this case.  
-				variable num_channels = GetNumChannels()
-				variable i,j
-				for(i=0;i<num_channels;i+=1)
-					wave divisor = GetChanDivisor(i)
-					wave remainder = GetChanRemainder(i)
-					redimension /d remainder
-					// Rotate remainder bits.  
-					if(stringmatch(action[6],"R"))
-						remainder *= 2
-						remainder += remainder & 2^(Divisor[p]) ? -2^(Divisor[p])+1 : 0
-					else
-						remainder /= 2
-						remainder += mod(remainder,1)==0.5 ? 2^(Divisor[p]-1)-0.5 : 0
-					endif
-				endfor
-				variable numPulseSets = GetNumPulseSets(DAQ)
-				PulseSetTabs(numPulseSets,0,win=info.win)
+				string direction = action[6] // "L" or "R"
+				RotatePulseSets(direction,DAQ,win=info.win)
 				//RedrawSelector()
 				break
 			case "Advanced":
@@ -1236,6 +1222,57 @@ Function WaveSelectorButtons(info)
 		endswitch
 	endif
 End
+
+function RotatePulseSets(direction,DAQ[,win])
+	string direction // "L" or "R"
+	string DAQ
+	string win
+	
+	win = selectstring(!paramisdefault(win),GetDAQWin(DAQ=DAQ),win)
+	
+	variable num_channels = GetNumChannels()
+	variable i
+	dfref stimulusDF=Core#InstanceHome(module,"stimuli",GetChanName(0))
+	nvar /sdfr=stimulusDF rotated
+	for(i=0;i<num_channels;i+=1)
+		wave divisor = GetChanDivisor(i)
+		wave remainder = GetChanRemainder(i)
+		redimension /d remainder
+		// Rotate remainder bits.  
+		if(stringmatch(direction,"R"))
+			remainder *= 2
+			remainder += remainder & 2^(Divisor[p]) ? -2^(Divisor[p])+1 : 0
+			rotated += 1
+		else
+			remainder /= 2
+			remainder += mod(remainder,1)==0.5 ? 2^(Divisor[p]-1)-0.5 : 0
+			rotated -= 1
+		endif
+	endfor
+	variable numPulseSets = GetNumPulseSets(DAQ)
+	PulseSetTabs(numPulseSets,0,win=win)
+end
+
+function RotatePulseSetsToCurrent(DAQ[,pulse_set])
+	string DAQ
+	variable pulse_set
+	
+	variable chan = FirstActiveChan()
+	wave divisor = GetChanDivisor(chan)
+	wave remainder = GetChanRemainder(chan)
+	dfref stimulusDF=Core#InstanceHome(module,"stimuli",GetChanName(0))
+	nvar /sdfr=stimulusDF rotated
+	variable curr_sweep = GetCurrSweep()
+	variable curr_remainder = mod(curr_sweep,divisor[pulse_set])
+	variable to_rotate = curr_remainder - rotated
+	do
+		to_rotate = mod(to_rotate + divisor[pulse_set],divisor[pulse_set])
+	while(to_rotate<0)
+	variable i
+	for(i=0;i<to_rotate;i+=1)
+		RotatePulseSets("R",DAQ)
+	endfor
+end
 
 Function WaveValuesProc(info) : SetVariableControl
 	Struct WMSetVariableAction &info

@@ -1742,6 +1742,18 @@ function /wave GetActiveChannels()
 	return active
 end
 
+function FirstActiveChan()
+	variable numChannels=GetNumChannels()
+	variable i,result=-1
+	for(i=0;i<numChannels;i+=1)
+		if(IsChanActive(i))
+			result = i
+			break
+		endif
+	endfor
+	return result
+end
+
 // Assemble the stimulus from components.  
 Function /S Assemble(chan,Stimulus[,triparity,sweep_num])
 	variable chan

@@ -889,6 +889,9 @@ Function StopAcquisition([DAQ])
 #endif
 	Button Start title="\\Z10Start", win=$(DAQ+"_Selector")
 	variable /g df:acquiring=0
+	// THIS CODE WILL AUTOROTATE THE REMAINDER BOXES
+	// RotatePulseSetsToCurrent(DAQ)
+	//
 End
 
 Function StartAcquisition([DAQ])
