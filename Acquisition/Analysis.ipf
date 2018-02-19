@@ -1158,6 +1158,14 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 				result[sweepNum][i][layer] = 1000/K2 // Time constant in ms.  
  			endfor
  			break
+ 		case "Capacitance":
+ 			nvar /sdfr=df accessLeft,accessRight,rBaselineLeft,rBaselineRight,testPulseStart,t
+			variable input_resistance = ComputeInputResistance(sweep,mode) // Input resistance in Ohms
+			variable time_constant = GetOneTau(sweep,testPulseStart) // Time constant of test pulse in seconds
+			variable capacitance = time_constant/input_resistance // Capacitance of membrane in Farads
+ 			result[sweepNum][0][layer] = capacitance*1e12 // Capacitance of membrane in pF
+ 			result[sweepNum][1][layer] = NaN
+ 			break
  		case "Ten_Ninety": // The time to get from 10% to 90% of the peak amplitude between the cursors.  
 			for(i=0;i<numPulses_;i+=1)
 				waveStats /Q/M=1 /R=(baselineLeft+i*IPI,baselineRight+i*IPI) Sweep
@@ -1184,27 +1192,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			endif
 			break
 		case "Input_Resistance":
-			dfref df=Core#InstanceHome(module,"acqModes",mode)
-			nvar /z/sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
-			if(!nvar_exists(inputLeft))
-				AcqModeDefaults(mode)
-				nvar /sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
-			endif
-			baseline=mean(sweep,rBaselineLeft,rBaselineRight)
-			out=abs(testPulseampl)
-			in=abs(mean(sweep,inputLeft,inputRight)-baseline)
-			ratioFactor=UnitsRatio(GetModeOutputPrefix(mode),GetModeInputPrefix(mode))
-			ratio=ratioFactor*out/in
-			outputType=GetModeOutputType(mode,fundamental=1)
-			inputType=GetModeInputType(mode,fundamental=1)
-			ratioString=outputType+"/"+inputType
-			if(stringmatch(ratioString,"Current/Voltage"))
-				ratio=1/ratio // Convert from Siemens to Ohms.  
-			elseif(stringmatch(ratioString,"Voltage/Current"))
-				// Keep in Ohms.  
-			else
-				ratio=NaN
-			endif
+			input_resistance = ComputeInputResistance(sweep,mode)
 			result[sweepNum][0][layer] = ratio/1e6 // Convert from Ohms to Megaohms.  
 			result[sweepNum][1][layer] = NaN
 			break
@@ -1280,3 +1268,31 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 	return 0
 End
 
+function ComputeInputResistance(sweep,mode)
+	// Computes the input resistance in Ohms
+	wave sweep
+	string mode
+	
+	dfref df=Core#InstanceHome(module,"acqModes",mode)
+	nvar /z/sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
+	if(!nvar_exists(inputLeft))
+		AcqModeDefaults(mode)
+		nvar /sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
+	endif
+	variable baseline = mean(sweep,rBaselineLeft,rBaselineRight)
+	variable out = abs(testPulseampl)
+	variable in = abs(mean(sweep,inputLeft,inputRight)-baseline)
+	variable ratioFactor = UnitsRatio(GetModeOutputPrefix(mode),GetModeInputPrefix(mode))
+	variable ratio = ratioFactor*out/in
+	string outputType = GetModeOutputType(mode,fundamental=1)
+	string inputType = GetModeInputType(mode,fundamental=1)
+	string ratioString = outputType+"/"+inputType
+	if(stringmatch(ratioString,"Current/Voltage"))
+		ratio=1/ratio // Convert from Siemens to Ohms.  
+	elseif(stringmatch(ratioString,"Voltage/Current"))
+		// Keep in Ohms.  
+	else
+		ratio=NaN
+	endif
+	return ratio
+end
