@@ -402,7 +402,7 @@ Function /S MethodList(method)
 	for(i=0;i<ItemsInList(methods);i+=1)
 		string oneMethod=StringFromList(i,methods)
 		string sourceMethod=Core#StrPackageSetting(module,"analysisMethods",oneMethod,"method")
-		if(stringMatch(oneMethod,method))
+		if(stringMatch(sourceMethod,method))
 			matchingMethods+=oneMethod+";"
 		endif
 	endfor
@@ -909,7 +909,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 	string mode=SweepAcqMode(chan,sweepNum)
 	wave param=GetAnalysisParameter(measurement,chan)
 	strswitch(method)
- 		case "Peak": // The maximum/minimum value between the cursors (normalized to baseline).  
+ 		case "Peak": 
+ 		   // The maximum/minimum value between the cursors (normalized to baseline).  
  			redimension /n=(-1,max(dimsize(result,1),numPulses_),-1) result
  			variable i
  			for(i=0;i<numPulses_;i+=1)
@@ -920,7 +921,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  				result[sweepNum][i][layer] = (IPI || i==0) ? (flip_sign ? baseline-V_min : v_max-baseline) : 0
  			endfor
  			break
- 		case "PeakWX": // The maximum/minimum value between the cursors (normalized to baseline).  
+ 		case "PeakWX": 
+ 		   // The maximum/minimum value between the cursors (normalized to baseline).  
  			variable width=param[0]
  			width=(numtype(width) || width==0) ? 0.0001 : width/1000 // Convert from ms to seconds.  
  			WaveStats /Q/M=1 /R=(baselineLeft,baselineRight) Sweep
@@ -930,7 +932,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  			result[sweepNum][0][layer] = baseline0 - mean(Sweep,x_left-width,x_left+width)
 			result[sweepNum][1][layer] = IPI ? baseline1 - mean(Sweep,x_left+IPI-width,x_left+IPI+width) : 0
  			break
- 		case "Charge": // The charge between the cursors (normalized to baseline).  
+ 		case "Charge": 
+ 		   // The charge between the cursors (normalized to baseline).  
 			WaveStats /Q/M=1 /R=(baselineLeft,baselineRight) Sweep
 			baseline0=V_avg
 			WaveStats /Q/M=1 /R=(baselineLeft+IPI,baselineRight+IPI) Sweep
@@ -944,7 +947,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 				result[sweepNum][1][layer] *= -1
 			 endif
 			 break
-    case "Slope": // Maximum/Minimum slope within the region between the cursors.
+    case "Slope": 
+         // Maximum/Minimum slope within the region between the cursors.
 			Duplicate /O/R=(x_left,x_right) Sweep slope_piece1
 			Duplicate /O/R=(x_left+IPI,x_right+IPI) Sweep slope_piece2
  			Smooth 2,slope_piece1,slope_piece2
@@ -955,7 +959,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  			result[sweepNum][1][layer] =  IPI ? abs(SelectNumber(flip_sign,V_max,V_min))/1000 : 0
  			KillWaves /Z slope_piece1,slope_piece2
  			break
- 		case "Ratio": // The ratio of the second to the first pulse.  
+ 		case "Ratio": 
+ 		   // The ratio of the second to the first pulse.  
  			WaveStats /Q/M=1 /R=(baselineLeft,baselineRight) Sweep
  			baseline0=V_avg
  			WaveStats /Q/M=1 /R=(baselineLeft+IPI,baselineRight+IPI) Sweep
@@ -974,7 +979,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  			result[sweepNum][0][layer] = secondPulse/firstPulse
 			result[sweepNum][1][layer] = NaN
  			break
-		case "Average": // The average value after and before the earliest stimulus (ignores the cursors, normalized to baseline).   
+		case "Average": 
+		   // The average value after and before the earliest stimulus (ignores the cursors, normalized to baseline).   
 			WaveStats /Q/M=1 /R=(baselineLeft,baselineRight) Sweep
  			baseline0=V_avg
  			WaveStats /Q/M=1 /R=(baselineLeft+IPI,baselineRight+IPI) Sweep
@@ -988,29 +994,35 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
        			result[sweepNum][1][layer] *= -1
        		endif
        		break
-		case "Standard_Deviation": // The standard deviation between the cursors (not normalized to baseline).  Second point is the skewness
+		case "Standard_Deviation": 
+		   // The standard deviation between the cursors (not normalized to baseline).  Second point is the skewness
 			WaveStats /Q/R=(x_left,x_right) Sweep
 			result[sweepNum][0][layer] = V_sdev
 			result[sweepNum][1][layer] = V_skew
 			break
-		case "Meann": // The mode - the mean
+		case "Meann": 
+			// The mode - the mean
 			Wavestats/M=1/Q/R=(x_left,x_right) Sweep
 			result[sweepNum][0][layer] = V_avg
 			result[sweepNum][1][layer] = NaN
 			break
-		case "Mode-Mean": // The mode - the mean
+		case "Mode-Mean": 
+			// The mode - the mean
 			result[sweepNum][0][layer] = - MeanMinusMode(Sweep)
 			result[sweepNum][1][layer] = NaN
 			break
-		case "Median-Mean": // The median minus the median, which will generally be the average current, baseline subtracted, since the median typically occurs when there is no activity.  
+		case "Median-Mean": 
+			// The median minus the median, which will generally be the average current, baseline subtracted, since the median typically occurs when there is no activity.  
 			result[sweepNum][0][layer] = StatsMedian(Sweep)-mean(Sweep)
 			result[sweepNum][1][layer]=NaN
 			break
-		case "Mode_Dev": // The mode - the mean
+		case "Mode_Dev": 
+			// The mode - the mean
 			result[sweepNum][0][layer] = DeviationFromMode(Sweep)
 			result[sweepNum][1][layer] = NaN
 			break
-		case "Spike_Rate": // The number of spikes between the cursors.  
+		case "Spike_Rate": 
+			// The number of spikes between the cursors.  
 			variable threshold=param[0]
 			WaveStats /Q/M=1 Sweep
 			if(x_left!=x_right)
@@ -1019,7 +1031,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			result[sweepNum][0][layer]=V_LevelsFound/(x_right-x_left)
 			result[sweepNum][1][layer]=V_LevelsFound
 			break
-		case "Spike_Rate_EC": // The number of spikes between the cursors.  
+		case "Spike_Rate_EC": 
+			// The number of spikes between the cursors.  
 			threshold=param[0]
 			Duplicate /FREE Sweep,Filtered
 			FilterIIR /HI=(500*dimdelta(Sweep,0)) Filtered
@@ -1028,25 +1041,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			result[sweepNum][1][layer]=V_LevelsFound
 			break
 		case "Heart_Rate":
-//			StatsQuantiles /Q Sweep
-//			threshold=(V_max+V_median)/2
-//			Variable maximumRate=500/60 // 500 beats per minute divided by 60 seconds per minute.  
-//			FindLevels /Q/M=(1/maximumRate)/EDGE=1 Sweep,threshold
-//			Wave W_FindLevels
-//			result[sweepNum][0][layer]=numpnts(W_FindLevels)*60 // Pulses per minute.  
-//			result[sweepNum][1][layer]=NaN
-			//Duplicate /o Sweep $"TempCorr"; Wave TempCorr
-			//WaveStats /Q/M=1 TempCorr
-			//TempCorr-=V_avg
-			//FilterIIR /HI=0.0001 TempCorr
-			//StatsQuantiles /Q TempCorr
-			//TempCorr=limit(TempCorr,V_median-2*V_IQR,V_median+2*V_IQR)
-			//Correlate /NODC /AUTO TempCorr,TempCorr
-			//Smooth 10000,TempCorr
-			//WaveStats /Q TempCorr
-			//Display /K=1 TempCorr
-			//FFT /MAG /DEST=root:fftd /RP=[0,numpnts(TempCorr)-2] TempCorr
-			//WaveStats /Q/R=(0.1,0.5) TempCorr
+			// Number of heart beats per minute
 			WaveStats /Q Sweep
 			FindLevels /Q/M=0.1 /EDGE=1 Sweep,(V_max+V_avg)/2
 			Wave W_FindLevels
@@ -1093,6 +1088,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 #endif
 			break
 		case "Bek_Clem":
+			// The rate of mPSCs according to the Bekker and Clements method
 			Duplicate /o Sweep BC_Sweep
 			wave template=AlphaSynapso(10,3,3,20)
 			Execute /Q "MatchTemplate "+getwavesdatafolder(template,2)+",BC_Sweep"
@@ -1112,7 +1108,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			return -1
 #endif
 			break
-		case "Power": // The standard deviation between the cursors (not normalized to baseline).  Second point is the skewness
+		case "Power": 
+			// The standard deviation between the cursors (not normalized to baseline).  Second point is the skewness
 			FFT /MAGS /WINF=Hanning /DEST=$("root:Power2_"+num2str(chan))  Sweep
 			Wave Power=$("root:Power2_"+num2str(chan))
 			variable freq=param[0]
@@ -1120,6 +1117,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			result[sweepNum][1][layer]=NaN
 			break
 		case "Access_Resistance":
+			// The access resistance of the recording (sometimes also called the series resistance), measured from the test pulse
 			dfref df=Core#InstanceHome(module,"acqModes",mode)
 			nvar /sdfr=df accessLeft,accessRight,rBaselineLeft,rBaselineRight,testPulseStart,testPulseampl,testPulselength
 			if(!nvar_exists(accessLeft))
@@ -1146,6 +1144,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			result[sweepNum][1][layer]=1000*GetOneTau(sweep,testPulsestart)
 			break
 		case "Time_Constant":
+			// The time constant of a pulse response
 			redimension /n=(-1,max(dimsize(result,1),numPulses_),-1) result
  			variable v_fitoptions=4
  			for(i=0;i<numPulses_;i+=1)
@@ -1159,6 +1158,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  			endfor
  			break
  		case "Capacitance":
+ 			// The capacitance measured from the test pulse
  			nvar /sdfr=df accessLeft,accessRight,rBaselineLeft,rBaselineRight,testPulseStart,t
 			variable input_resistance = ComputeInputResistance(sweep,mode) // Input resistance in Ohms
 			variable time_constant = GetOneTau(sweep,testPulseStart) // Time constant of test pulse in seconds
@@ -1166,7 +1166,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  			result[sweepNum][0][layer] = capacitance*1e12 // Capacitance of membrane in pF
  			result[sweepNum][1][layer] = NaN
  			break
- 		case "Ten_Ninety": // The time to get from 10% to 90% of the peak amplitude between the cursors.  
+ 		case "Ten_Ninety": 
+ 			// The time to get from 10% to 90% of the peak amplitude between the cursors.  
 			for(i=0;i<numPulses_;i+=1)
 				waveStats /Q/M=1 /R=(baselineLeft+i*IPI,baselineRight+i*IPI) Sweep
  				baseline = V_avg
@@ -1181,6 +1182,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  			break
 		case "Generic":
 		case "Baseline":
+			// The average of the baseline segment
 			variable points=x2pnt(sweep,baselineRight)-x2pnt(sweep,baselineLeft)
 			if(abs(points)>2)
 				wavestats /q/r=(baselineLeft,baselineRight) sweep
@@ -1192,11 +1194,13 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			endif
 			break
 		case "Input_Resistance":
+			// The input resistance, measured from the test pulse
 			input_resistance = ComputeInputResistance(sweep,mode)
 			result[sweepNum][0][layer] = ratio/1e6 // Convert from Ohms to Megaohms.  
 			result[sweepNum][1][layer] = NaN
 			break
-		case "AMPA_NMDA": // The value at cursor A and the value a specified distance from cursors A
+		case "AMPA_NMDA": 
+			// The value at cursor A and the value a specified distance from cursors A
 		 	width=param[0]
 		 	variable delay=param[1]
  			width=(numtype(width) || width==0) ? 0.0001 : width/1000 // Convert from ms to seconds.  
@@ -1206,6 +1210,7 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 			result[sweepNum][1][layer] = baseline - mean(Sweep,x_left+delay-width,x_left+delay+width)
  			break
  		case "Resistance":
+ 			// The resistance, measured from a stimulus pulse response
  			wave numPulses=GetNumPulses(chan,sweepNum=sweepNum)
  			wave ampl=GetAmpl(chan,sweepNum=sweepNum)
  			wave dAmpl=GetdAmpl(chan,sweepNum=sweepNum)
@@ -1242,7 +1247,8 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
  				result[sweepNum][i][layer] = nan
  			endfor
  			break
- 		case "Latency": // Compute the location of the peak relative to the stimulus.  
+ 		case "Latency": 
+ 			// Compute the location of the peak relative to the stimulus.  
  			variable stim_time = x_left
  			duplicate /o/r=(x_left+0.001,x_right) sweep, piece
  			differentiate piece /d=d_piece

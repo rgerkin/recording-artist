@@ -599,65 +599,77 @@ Function PlotShifted(exp_number,exp_list,parameter1,parameter2,offset)
 	SetDataFolder root:
 End
 
-function CellSpikes(cell)
-    string cell
-    
-    dfref df=root:$cell
-    if(!datafolderrefstatus(df))
-        DoAlert 0,"There is no folder for cell "+cell
-        return -1
-    endif
-    variable i,j,index=0,max_spikes=1
-    string stats="Peak;Peak_locs;Threshold;Threshold_locs;Trough;Trough_locs;Width;Width_locs;ISI"
-    
-    // Fill matrix with spike stats.  
-    for(i=0;i<CountObjectsDFR(df,1);i+=1)
-        string name=GetIndexedObjNameDFR(df,1,i)
-        if(grepstring(name,"sweep[0-9]+"))
-        	if(stringmatch(name,"*_filt"))
-			continue
+function CellSpikes(cell[,first,last,list])
+	string cell
+	variable first,last // First and last sweep number
+	string list // List of sweep numbers
+	
+	dfref df=root:$cell
+	if(!datafolderrefstatus(df))
+		DoAlert 0,"There is no folder for cell "+cell
+		return -1
+	endif
+	variable i,j,index=0,max_spikes=1
+	string stats="Peak;Peak_locs;Threshold;Threshold_locs;Trough;Trough_locs;Width;Width_locs;ISI"
+	
+	// Fill matrix with spike stats.  
+	for(i=0;i<CountObjectsDFR(df,1);i+=1)
+	    string name=GetIndexedObjNameDFR(df,1,i)
+	    if(grepstring(name,"sweep[0-9]+"))
+			if(stringmatch(name,"*_filt"))
+				continue
+			endif
+			variable sweepNum = str2num(replacestring("sweep",name,""))
+			if(!paramisdefault(first) && sweepNum<first)
+				continue
+			endif
+			if(!paramisdefault(last) && sweepNum>last)
+				continue
+			endif
+			if(!paramisdefault(list) && whichlistitem(num2str(sweepNum),list)<0)
+				continue
+			endif
+			wave w=df:$name
+			string folder=getdatafolder(1,df)+"Spikes_"+name
+			Spikes(w=w,folder=folder)
+			dfref subDF=$folder
+			wave /sdfr=subDF peak
+			variable num_spikes = numpnts(peak)
+			max_spikes = max(num_spikes,max_spikes)
+			if(index==0)
+			    make /o/n=(1,max_spikes,itemsinlist(stats)) df:AllSpikes /wave=AllSpikes
+			endif
+			Redimension /n=(index+1,max_spikes,-1) AllSpikes
+			SetDimLabel 0,index,$name,AllSpikes
+			for(j=0;j<itemsinlist(stats);j+=1)
+			    string stat=stringfromlist(j,stats)
+			    SetDimLabel 2,j,$stat,AllSpikes
+			    wave w_stat=subDF:$stat
+			    AllSpikes[index][][j]=nan
+			    AllSpikes[index][0,num_spikes-1][j]=w_stat[q]
+			endfor
+			index+=1
 		endif
-            wave w=df:$name
-            string folder=getdatafolder(1,df)+"Spikes_"+name
-            Spikes(w=w,folder=folder)
-            dfref subDF=$folder
-            wave /sdfr=subDF peak
-            variable num_spikes = numpnts(peak)
-            max_spikes = max(num_spikes,max_spikes)
-            if(index==0)
-                make /o/n=(1,max_spikes,itemsinlist(stats)) df:AllSpikes /wave=AllSpikes
-            endif
-            Redimension /n=(index+1,max_spikes,-1) AllSpikes
-            SetDimLabel 0,index,$name,AllSpikes
-            for(j=0;j<itemsinlist(stats);j+=1)
-                string stat=stringfromlist(j,stats)
-                SetDimLabel 2,j,$stat,AllSpikes
-                wave w_stat=subDF:$stat
-                AllSpikes[index][][j]=nan
-                AllSpikes[index][0,num_spikes-1][j]=w_stat[q]
-            endfor
-            index+=1
-        endif
-    endfor
-    
-    // Go back and fill extra space with NaN's.  
-    index = 0
-    for(i=0;i<CountObjectsDFR(df,1);i+=1)
-        name=GetIndexedObjNameDFR(df,1,i)
-        if(grepstring(name,"sweep[0-9]+"))
-            folder=getdatafolder(1,df)+"Spikes_"+name
-            dfref subDF=$folder
-            wave /sdfr=subDF peak
-            num_spikes = numpnts(peak)
-            AllSpikes[index][num_spikes,max_spikes-1][]=nan
-            index+=1
-        endif
-    endfor
-    
-    for(j=0;j<dimsize(AllSpikes,1);j+=1)
-    	SetDimLabel 1,j,$("#"+num2str(j+1)),AllSpikes
-    endfor
-    Edit /K=1 AllSpikes.ld
+	endfor
+	
+	// Go back and fill extra space with NaN's.  
+	index = 0
+	for(i=0;i<CountObjectsDFR(df,1);i+=1)
+	    name=GetIndexedObjNameDFR(df,1,i)
+	    if(grepstring(name,"sweep[0-9]+"))
+	        folder=getdatafolder(1,df)+"Spikes_"+name
+	        dfref subDF=$folder
+	        wave /sdfr=subDF peak
+	        num_spikes = numpnts(peak)
+	        AllSpikes[index][num_spikes,max_spikes-1][]=nan
+	        index+=1
+	    endif
+	endfor
+	
+	for(j=0;j<dimsize(AllSpikes,1);j+=1)
+		SetDimLabel 1,j,$("#"+num2str(j+1)),AllSpikes
+	endfor
+	Edit /K=1 AllSpikes.ld
 end
 
 // Find spikes and store information about those spikes.  Only scans the region between the cursors (must have cursors on the trace).  
