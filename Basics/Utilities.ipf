@@ -395,6 +395,19 @@ function /s Igor2WindowsPath(path)
 	return path	
 end
 
+function /s PossiblyQuoteName2(str)
+	string str
+	
+	string result = ""
+	variable i
+	for(i=0;i<itemsinlist(str,":");i+=1)
+		string item = stringfromlist(i,str,":")
+		result += possiblyquotename(item)+":"
+	endfor
+	result = removeending(result,":")
+	return result
+end
+
 // Execute 'command' for all instances of ## replaced by items in 'replaceStrs'.  
 function Exx(command,replaceStrs[,parallel,times,noExpand])
 	string command

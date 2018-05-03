@@ -1768,7 +1768,7 @@ End
 Function Cursors([num,win])
 	Variable num
 	String win
-	num=ParamIsDefault(num) ? 2 : num
+	num=ParamIsDefault(num) ? (exists("FIReport") ? 3 : 2) : num
 	if(ParamIsDefault(win))
 		win=WinName(0,1)
 	endif
@@ -1779,18 +1779,25 @@ Function Cursors([num,win])
 	String trace=LongestVisibleTrace(win=win)
 	if(!IsEmptyString(trace))
 		Wave TraceWave=TraceNameToWaveRef(win,trace)
-		Cursor /W=$win /H=2 A $trace leftx(TraceWave)
-		Cursor /W=$win /H=2 B $trace rightx(TraceWave)
+		Cursor /W=$win /H=2 A $trace strlen(csrinfo(A,win)) ? xcsr(A,win) : leftx(TraceWave)
+		Cursor /W=$win /H=2 B $trace strlen(csrinfo(B,win)) ? xcsr(B,win) : rightx(TraceWave)
 		variable i,pos
-		variable length=rightx(theWave)-leftx(theWave)
-		variable start=leftx(theWave)
+		variable length=xcsr(B)-xcsr(A)
+		variable start=xcsr(A)
 		for(i=2;i<min(10,num);i+=1)
 			if(mod(i,2)==0)
 				pos=start+length*(i/2)/9
 			else
 				pos=start+length*(9-(i-1)/2)/9
 			endif
-			Cursor /W=$win /H=0 /S=1 $StringFromList(i-2,"C;D;E;F;G;H;I;J") $trace pos
+			string csr_name = StringFromList(i-2,"C;D;E;F;G;H;I;J")
+			Cursor /W=$win /H=0 /S=1 $csr_name $trace pos
+		endfor
+		for(i=num;i<10;i+=1)
+			csr_name = StringFromList(i-2,"C;D;E;F;G;H;I;J")
+			if(strlen(CsrInfo(csr_name,win)))
+				Cursor /W=$win /K $csr_name
+			endif
 		endfor
 	endif
 	//CursorStats()
@@ -1834,20 +1841,25 @@ Function SaveCursors(name,[win])
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
 	dfref df=Core#InstanceHome("Acq",win,"win0",create=1,sub=name)
-	String cursors="A;B",stem="xcsr_"
+	String cursors="A;B;C",stem="xcsr_"
 	Variable i
 	for(i=0;i<ItemsInList(cursors);i+=1)
 		String csr=StringFromList(i,cursors)
-		if(strlen(csrwave($csr,win)) && datafolderrefstatus(df))
-			newdatafolder /o df:$csr
-			dfref cursorDF=df:$csr
-			variable /G cursorDF:csr_x=xcsr2(csr,win=win)
-			variable /G cursorDF:csr_y=vcsr2(csr,win=win)
-			string /G cursorDF:trace=CsrWave($csr,win)
-			string info=CsrInfo($csr)
-			variable /G cursorDF:csr_free=str2num(StringByKey("ISFREE",info))
-			variable /G cursorDF:x_point=str2num(StringByKey("POINT",info))
-			variable /G cursorDF:y_point=str2num(StringByKey("YPOINT",info))
+		if(datafolderrefstatus(df))
+			if(strlen(csrwave($csr,win)))
+				newdatafolder /o df:$csr
+				dfref cursorDF=df:$csr
+				variable /G cursorDF:csr_x=xcsr2(csr,win=win)
+				variable /G cursorDF:csr_y=vcsr2(csr,win=win)
+				string /G cursorDF:trace=CsrWave($csr,win)
+				string info=CsrInfo($csr)
+				variable /G cursorDF:csr_free=str2num(StringByKey("ISFREE",info))
+				variable /G cursorDF:x_point=str2num(StringByKey("POINT",info))
+				variable /G cursorDF:y_point=str2num(StringByKey("YPOINT",info))
+			else
+				dfref cursorDF=df:$csr
+				killdatafolder /z cursorDF
+			endif
 		endif
 	endfor
 End
@@ -1866,7 +1878,7 @@ Function RestoreCursors(name[,trace,win,offset])
 	if(strlen(trace)==0)
 		return -2 // No trace on which to place the cursors.  
 	endif
-	String cursor_list="A;B"
+	String cursor_list="A;B;C"
 	Variable i,err=0
 	if(wintype("SweepsWin"))
 		SetWindow SweepsWin hook=$""
@@ -1884,7 +1896,7 @@ Function RestoreCursors(name[,trace,win,offset])
 				variable trace_offset=XOffset(trace,win=win)
 				Cursor /W=$win $csr,$trace,csr_x-trace_offset+offset
 			endif
-		else
+		elseif(whichlistitem(csr,"A;B")>=0)
 			//printf "Could not find data for cursor '%s' in folder %s.\r",csr,getdatafolder(1,df)
 			err=-1
 		endif

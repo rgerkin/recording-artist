@@ -317,6 +317,7 @@ Function SelectPackageInstance(package,instance[,special])
 			Struct WMSetVariableAction info
 			info.ctrlName="Divisor"; info.win=DAQ+"_Selector"
 			WaveValuesProc(info)
+			RotatePulseSetsToCurrent(DAQ) // Rotate pulse sets to current sweep since a new stimulus has been selected.
 			break
 		case "filters":
 			Core#SetStrPackageSetting(module,"channelConfigs",name,"filters",instance) // Set the filter instance name.  

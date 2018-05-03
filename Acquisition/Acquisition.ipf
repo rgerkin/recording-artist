@@ -790,7 +790,9 @@ Function SaveSweepParameters()
 					endswitch
 				endfor
 			endfor
-			SetDimLabel 0,sweep,$GetAcqMode(i),chanHistory
+			string row_label
+			sprintf row_label, "%s;%s", GetAcqMode(i), GetStimName(i)
+			SetDimLabel 0,sweep,$row_label,chanHistory
 		else
 			chanHistory[sweep][][]=NaN
 		endif

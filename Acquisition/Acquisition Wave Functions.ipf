@@ -120,7 +120,7 @@ Function /S SweepAcqMode(chan,sweep[,quiet])
 		if(datafolderrefstatus(chanDF))
 			wave /z chanHistory=GetChanHistory(chan)
 			if(WaveExists(chanHistory))
-				mode=GetDimLabel(chanHistory,0,sweep)
+				mode=GetAcqMode(chan,sweep_num=sweep)
 				if(!strlen(mode))
 					//mode=GetDimLabel(chanHistory,0,-1)
 					//if(!strlen(mode))
@@ -1012,10 +1012,36 @@ Function /S AcquisitionModes()
 	return RemoveEnding(acqModes,";")+";------;Edit"
 End
 
-Function /S GetAcqMode(chan[,quiet])
-	variable chan,quiet
+Function /S GetAcqMode(chan[,sweep_num,quiet])
+	variable chan,sweep_num,quiet
 	
-	return Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",quiet=quiet)
+	variable last_sweep = GetCurrSweep()
+	if(paramisdefault(sweep_num) || sweep_num>last_sweep)	
+		string mode = Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"acqMode",quiet=quiet)
+	else
+		wave stim_history = GetChanHistory(chan)
+		string text = getdimlabel(stim_history,0,sweep_num)
+		mode = stringfromlist(0,text)
+	endif
+	return mode
+End
+
+Function /S GetStimName(chan[,sweep_num,quiet])
+	variable chan,sweep_num,quiet
+	
+	variable last_sweep = GetCurrSweep()
+	if(paramisdefault(sweep_num) || sweep_num>last_sweep)	
+		string stim_name = Core#StrPackageSetting(module,"channelConfigs",GetChanName(chan),"stimulus",quiet=quiet)
+	else
+		wave stim_history = GetChanHistory(chan)
+		string text = getdimlabel(stim_history,0,sweep_num)
+		if(itemsinlist(text)>1)
+			stim_name = stringfromlist(1,text)
+		else
+			stim_name = "" // Data collected before stimulus names were stored in the StimulusHistory row labels
+		endif
+	endif
+	return stim_name
 End
 
 Function /S GetAcqModeOutputQuantity(modeName)

@@ -158,7 +158,7 @@ static Function Listen(device,gain,list,param,continuous,endHook,errorHook,other
 		if(StringMatch(inputMap,"N")) // If it is a null output.  
 			// Don't add it to the list.  
 		elseif(StringMatch(inputMap,"D")) // If it is a null output.  
-			print "Digital output on a NIDAQmx is not yet supported in this code."  
+			printf "Digital output on a NIDAQmx is not yet supported in this code."  
 			// TO DO: Handle digital inputs on the NIDAQmx.  
 		else
 			newList+=item+";"
@@ -273,7 +273,7 @@ static Function StartClock(isi[,DAQ])
 	String DAQ
 	 
 	if(strlen(fDAQmx_DeviceNames())==0)
-		print "No NIDAQmx device attached."
+		printf "No NIDAQmx device attached."
 		return -1
 	endif
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)

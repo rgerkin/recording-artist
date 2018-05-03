@@ -40,7 +40,8 @@ Function /wave StimulusWave(channel,sweepNum)
 	
 	wave w=GetChannelHistory(channel) // Wave containing the stimulus parameters for this channel.  
 	
-	string mode=GetDimLabel(w,0,min(sweepNum,lastSweepNum-1)) // Mode of that sweep, or if it is in the future, of the most recent sweep.  
+	variable chan = Label2Chan(channel)
+	string mode = GetAcqMode(chan,sweep_num = min(sweepNum,lastSweepNum-1)) // Mode of that sweep, or if it is in the future, of the most recent sweep.  
 	if(strlen(mode))
 		dfref df=Core#InstanceHome(module,"acqModes",mode)
 		nvar /sdfr=df testPulseStart,testPulseLength,testPulseAmpl
@@ -236,7 +237,7 @@ Function /S UsedChannels()
 	String usedChannels=""
 	for(i=0;i<CountObjects("root:",4);i+=1)
 		String folder=GetIndexedObjName("root:",4,i)
-		SetDataFolder $("root:"+folder)
+		SetDataFolder $("root:"+PossiblyQuoteName(folder))
 		String sweepWaveList=WaveList("sweep*",";","DIMS:1")
 		Variable numSweeps=ItemsInList(GrepList(sweepWaveList,"sweep[0-9]"))
 		//Wave /Z StimulusHistory,SweepParameters

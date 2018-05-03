@@ -186,8 +186,7 @@ Function /s QuickDependencyList(proc_file1,proc_file2)
 	string dependency_list=""
 	variable dependency_count=0
 	DependencyCount(proc_file1,proc_file2,dependency_count,dependency_list)
-	print dependency_count
-	return  dependency_list
+	return dependency_list
 End
 
 Function SortDependencies(depends_On,depended_On,do_sort)
@@ -547,7 +546,7 @@ Function DependencyStackRecurse(proc_file,depth)
 		if(DependencyCounts[%$proc_file][%$one_proc])
 			FindValue /TEXT=one_proc /TXOP=4 ProcedureStack
 			if(StringMatch(proc_file,"Acquisition_Windows") && StringMatch(one_proc,"Experiment Facts"))
-				print depth
+				//print depth
 			endif
 			if(V_Value>=0) // Added to the stack already.  
 				Variable old_depth=StackDepth[V_Value]

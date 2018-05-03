@@ -599,10 +599,13 @@ Function PlotShifted(exp_number,exp_list,parameter1,parameter2,offset)
 	SetDataFolder root:
 End
 
-function CellSpikes(cell[,first,last,list])
+function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 	string cell
 	variable first,last // First and last sweep number
 	string list // List of sweep numbers
+	string folder // folder with spikes information
+	variable rheobase
+	variable supra
 	
 	dfref df=root:$cell
 	if(!datafolderrefstatus(df))
@@ -610,7 +613,7 @@ function CellSpikes(cell[,first,last,list])
 		return -1
 	endif
 	variable i,j,index=0,max_spikes=1
-	string stats="Peak;Peak_locs;Threshold;Threshold_locs;Trough;Trough_locs;Width;Width_locs;ISI"
+	string stats="Peak;Peak_locs;Height;Threshold;Threshold_locs;Trough;Trough_locs;Rise_Time;Decay_Time;AHP_Dur50;AHP_Dur99;Width;Width_locs;ISI"
 	
 	// Fill matrix with spike stats.  
 	for(i=0;i<CountObjectsDFR(df,1);i+=1)
@@ -630,8 +633,10 @@ function CellSpikes(cell[,first,last,list])
 				continue
 			endif
 			wave w=df:$name
-			string folder=getdatafolder(1,df)+"Spikes_"+name
-			Spikes(w=w,folder=folder)
+			if(paramisdefault(folder))
+				folder=possiblyquotename2(getdatafolder(1,df)+"Spikes_"+name)
+				Spikes(w=w,folder=folder)
+			endif
 			dfref subDF=$folder
 			wave /sdfr=subDF peak
 			variable num_spikes = numpnts(peak)
@@ -657,19 +662,32 @@ function CellSpikes(cell[,first,last,list])
 	for(i=0;i<CountObjectsDFR(df,1);i+=1)
 	    name=GetIndexedObjNameDFR(df,1,i)
 	    if(grepstring(name,"sweep[0-9]+"))
-	        folder=getdatafolder(1,df)+"Spikes_"+name
+	        if(paramisdefault(folder))
+	        		folder=possiblyquotename2(getdatafolder(1,df)+"Spikes_"+name)
+	        endif
 	        dfref subDF=$folder
-	        wave /sdfr=subDF peak
-	        num_spikes = numpnts(peak)
-	        AllSpikes[index][num_spikes,max_spikes-1][]=nan
-	        index+=1
+	        if(datafolderrefstatus(subDF))
+	            wave /sdfr=subDF peak
+	        		num_spikes = numpnts(peak)
+	        		if(max_spikes>num_spikes)
+	            		AllSpikes[index][num_spikes,max_spikes-1][]=nan
+	        		endif
+	        		index+=1
+	        endif
 	    endif
 	endfor
 	
 	for(j=0;j<dimsize(AllSpikes,1);j+=1)
 		SetDimLabel 1,j,$("#"+num2str(j+1)),AllSpikes
 	endfor
-	Edit /K=1 AllSpikes.ld
+	DoWindow /K CellSpikesTable
+	Edit /K=1/n=CellSpikesTable AllSpikes.ld
+	if(rheobase)
+		modifytable elements=(0,-3,-2)
+	endif
+	if(supra)
+		modifytable elements=(-3,0,-2)
+	endif
 end
 
 // Find spikes and store information about those spikes.  Only scans the region between the cursors (must have cursors on the trace).  
@@ -752,7 +770,7 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
 		endif
 	While(i<numpnts(Cross_Locs)-1)
 	
-	Make /o/n=(numpnts(Peak)) Trough,Trough_locs,Threshold,Threshold_locs,Width,Width_locs,ISI
+	Make /o/n=(numpnts(Peak)) Trough,Trough_locs,Threshold,Threshold_locs,Width,Width_locs,ISI,AHP_Dur50,AHP_Dur99
 	
 	Variable num_spikes=numpnts(cross_locs)-2 // -2 because of the fake ones padding the start and end time.  
   	printf "Spikes Found = %d in %.2f seconds (%.2f Hz)\r",num_spikes,finish-start,num_spikes/(finish-start)
@@ -762,7 +780,7 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
   	Trough_locs[0]=start
   	for(i=1;i<numpnts(cross_locs)-1;i+=1)
   		Variable cross_loc=cross_locs[i] // Location of the cross_val crossings
-  		Variable next_cross_loc=min(cross_locs[i+1],cross_loc+0.25) // Location of the next cross_val crossing or 250 ms, whichever comes first (i.e. AHP trough cannot be more than 250 ms away).  
+  		Variable next_cross_loc=min(cross_locs[i+1],cross_loc+0.1) // Location of the next cross_val crossing or 100 ms, whichever comes first (i.e. AHP trough cannot be more than 250 ms away).  
   		WaveStats /Q /R=(cross_loc,next_cross_loc) SmoothWave
   		Trough_locs[i]=V_minloc
   		Trough[i]=V_min
@@ -810,8 +828,26 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
 	Duplicate /O Peak,Height
 	Height=Peak-Threshold // Height is the difference between the highest point of the spike and the threshold.  
 	Duplicate /O Width,Rise_Time,Decay_Time
-      Rise_Time=Peak_Locs-Threshold_Locs // Time to rise from threshold to peak.  
-      Decay_Time=Trough_Locs-Peak_Locs // Time to decay from peak to trough.  
+   Rise_Time=Peak_Locs-Threshold_Locs // Time to rise from threshold to peak.  
+   Decay_Time=Trough_Locs-Peak_Locs // Time to decay from peak to trough.  
+      
+   // Find the baseline  
+   variable baseline = vcsr(C,"SweepsWin") 
+   if(numtype(baseline))
+   	duplicate /o/r=(start,finish) SmoothWave,segment
+   	make /free hist
+   	histogram segment,hist
+   	findpeak /r=(-65,) hist
+   	baseline = v_peakloc
+   endif
+      
+   // Find the AHP Durations
+  	for(i=0;i<numpnts(Peak);i+=1)
+  		FindLevel /Q /R=(Trough_locs[i],Trough_locs[i]+1) SmoothWave, (Trough[i]+baseline)/2 // Find where the AHP returns to halfway between the trough and threshold.  
+  		AHP_Dur50[i] = Decay_Time[i] + V_LevelX - Trough_locs[i] // The duration between the trough and this point.  
+  		FindLevel /Q /R=(Trough_locs[i],Trough_locs[i]+1) SmoothWave, (Trough[i]*0.01+baseline*0.99) // Find where the AHP returns to 99% of the waybetween the trough and threshold.  
+  		AHP_Dur99[i] = Decay_Time[i] + V_LevelX - Trough_locs[i] // The duration between the trough and this point.  
+  	endfor
 
 	Variable /G spikes_start=start+offset // Store the start and end times of analysis for future reference.  
 	Variable /G spikes_finish=finish+offset

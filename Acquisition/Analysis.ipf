@@ -732,10 +732,11 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 	Variable pre,post
 	String sweeps,analysisMethod
 	
-	string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
 	variable noise_freq=Core#VarPackageSetting(module,"random","","noiseFreq",default_=60)
-	if(!ParamIsDefault(analysisMethod)) // Singular here, the optional argument.  
-		analysisMethods=SelectedMethod() // Plural here, the local variable to loop through.  Will have only one element because analysis is restricted to the argument.  
+	if(ParamIsDefault(analysisMethod)) // analyze all analysis methods
+		string analysisMethods=Core#ListPackageInstances(module,"analysisMethods")
+	else
+		analysisMethods = analysisMethod // analysis is restricted to the argument.  
 	endif
 	wave /T Labels=GetChanLabels()
 	dfref df=Core#InstanceHome(module,"analysisWin","win0")
@@ -753,12 +754,14 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			continue
 		endif
 		wave /t chanAnalysisMethods=Core#WavPackageSetting(module,"channelConfigs",GetChanName(post),"analysisMethods")
-		if(!InWavT(chanAnalysisMethods,analysisMethod)) // If this measurement does not have its box checked in the listbox of possible measurements.  
-			continue
-		endif
-		if(StringMatch(analysisMethod,"Selected")) // If we are only analyzing the method that is currently selected (bold vertical axis).  
-			if(!StringMatch(SelectedMethod(),analysisMethod)) // If the current measurement on the list is not this method.  
-				continue // Skip it.  
+		if(paramisdefault(analysisMethod))
+			if(!InWavT(chanAnalysisMethods,analysisMethod)) // If this measurement does not have its box checked in the listbox of possible measurements.  
+				continue
+			endif
+			if(StringMatch(analysisMethod,"Selected")) // If we are only analyzing the method that is currently selected (bold vertical axis).  
+				if(!StringMatch(SelectedMethod(),analysisMethod)) // If the current measurement on the list is not this method.  
+					continue // Skip it.  
+				endif
 			endif
 		endif
 		
@@ -858,7 +861,7 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 				x_right=x2
 			endif
 			
-			string acqMode=GetDimLabel(SweepParamsPost,0,sweepNum)
+			string acqMode = GetAcqMode(post,sweep_num=sweepNum)
          // Compute baseline region.  
          ControlInfo /W=SweepsWin AutoBaseline
          if(V_Value)

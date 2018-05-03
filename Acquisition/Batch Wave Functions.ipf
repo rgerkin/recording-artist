@@ -99,7 +99,6 @@ Function Do2Waves(match[,folder])
 			// Do the following to each wave.  
 			String folder_name=GetDataFolder(0)
 			String sweep=StringFromList(2,name,"_")
-			print sweep,RemoveChar(folder_name,"'")
 			RenameDataFolder $("::"+folder_name), $("X_"+sweep+"_"+folder_name)
 			break
 			//
@@ -261,7 +260,6 @@ Function RescaleWaves(folder_match_str,scale,start [,multiply,match_str,no_match
 	endif
 	String folders=DataFolders();
 	folders=ListMatch(folders,folder_match_str);
-	print folders;
 	Variable i,j
 	String folder
 	String curr_folder=GetDataFolder(1)
@@ -312,7 +310,7 @@ Function DiffWaves(folder_match_str,wave_name1,wave_name2)
 			diff=wave1-wave2
 			AppendToGraph diff
 		else
-			Print "One of the waves does not exist in folder "+folder
+			Printf "One of the waves does not exist in folder "+folder
 		endif
 	endfor
 	SetDataFolder curr_folder
@@ -496,7 +494,7 @@ Function ModFolder(mode [,folder,match])
 				theWave=1/theWave
 				break
 			default:
-				Print "Invalid mode : "+mode
+				Printf "Invalid mode : "+mode
 				break
 		endswitch
 	endfor	

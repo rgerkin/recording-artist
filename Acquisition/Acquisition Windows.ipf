@@ -322,9 +322,7 @@ Function WaveSelectorPopupMenus(info) : PopupMenuControl
 					endif
 					string acqMode = Core#StrPackageSetting(module,"channelConfigs",newlabel,"acqMode")
 					SelectPackageInstance("channelConfigs",newLabel,special=special)
-					//print special
 					SetAcqMode(acqMode,chan)//SelectPackageInstance("acqModes",acqMode,special=special)
-					//abort
 					SetVariable $info.ctrlName userData(oldLabel)=Labels[chan]
 					string chanName=GetChanName(chan)
 					if(!stringmatch(newLabel,chanName))
@@ -1233,7 +1231,11 @@ function RotatePulseSets(direction,DAQ[,win])
 	variable num_channels = GetNumChannels()
 	variable i
 	dfref stimulusDF=Core#InstanceHome(module,"stimuli",GetChanName(0))
-	nvar /sdfr=stimulusDF rotated
+	nvar /z/sdfr=stimulusDF rotated
+	if(!nvar_exists(rotated))
+		variable /g stimulusDF:rotated = 0
+		nvar/sdfr=stimulusDF rotated
+	endif
 	for(i=0;i<num_channels;i+=1)
 		wave divisor = GetChanDivisor(i)
 		wave remainder = GetChanRemainder(i)
@@ -1261,7 +1263,11 @@ function RotatePulseSetsToCurrent(DAQ[,pulse_set])
 	wave divisor = GetChanDivisor(chan)
 	wave remainder = GetChanRemainder(chan)
 	dfref stimulusDF=Core#InstanceHome(module,"stimuli",GetChanName(0))
-	nvar /sdfr=stimulusDF rotated
+	nvar /z/sdfr=stimulusDF rotated
+	if(!nvar_exists(rotated))
+		variable /g stimulusDF:rotated = 0
+		nvar/sdfr=stimulusDF rotated
+	endif
 	variable curr_sweep = GetCurrSweep()
 	variable curr_remainder = mod(curr_sweep,divisor[pulse_set])
 	variable to_rotate = curr_remainder - rotated
@@ -2852,7 +2858,6 @@ Function PossiblyShowAnalysis()
 		string columnControl = "Column_"+num2str(column)+"_"+cleanupname(analysisMethod,0)
 		ControlInfo /W=AnalysisWin $columnControl
 		variable columnOn=V_flag==2 ? V_Value : 1
-		print columnOn
 		
 		variable crossChannel=Core#VarPackageSetting(module,"analysisMethods",analysisMethod,"crossChannel")
 		if(!crossChannel) // For analyses that are not cross-channel.  
@@ -3559,7 +3564,7 @@ function SweepsWinHook(info)
 				Variable focused=StringMatch(view,"Focused")
 				dfref instanceDF=Core#InstanceHome(module,"analysisMethods",method)
 				wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",method,"cursorLocs",quiet=quiet)
-				if(waveexists(cursor_locs))
+				if(waveexists(cursor_locs) && strlen(csrinfo($info.cursorName,info.winname)))
 					variable loc = focused ? xcsr2(info.cursorName,win=info.winname) : xcsr($(info.cursorName),info.winname)
 					redimension /n=(max(numpnts(cursor_locs),2)) cursor_locs
 					strswitch(info.cursorName)

@@ -65,7 +65,7 @@ Function RunFuncWithProfiling(f[,testTime,normMode,maxPct])
 		f()
 	catch
 		StopProfiling(s)
-		Print "User abort or other error"
+		Printf "User abort or other error"
 		return 0
 	endtry
 

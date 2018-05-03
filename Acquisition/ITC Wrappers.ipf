@@ -990,7 +990,6 @@ function DigitalLoopBkg(s)
 	variable bitCode=numvarordefault("bitCode",0)
 	variable state=numvarordefault("state",0)
 	variable /g $"state"=bitCode-state
-	print ticks,state
 	Execute /Q "ITC18WriteDigital1 "+num2str(state)
 	return 0
 end

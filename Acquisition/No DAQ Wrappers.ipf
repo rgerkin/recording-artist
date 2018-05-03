@@ -163,6 +163,10 @@ static Function Speak(device,list,param[,now,DAQ])
 	
 	variable continuous = Core#VarPackageSetting(module,"DAQs",MasterDAQ(),"continuous")
 	dfref df = $output_path
+	if(!datafolderrefstatus(df))
+		BoardInit(DAQ=DAQ)
+		df = $output_path
+	endif
 	string output_waves = Core#StrPackageSetting(module,"DAQs",MasterDAQ(),"outputWaves")
 	//print output_waves
 	variable i
