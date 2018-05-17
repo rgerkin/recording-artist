@@ -10,7 +10,11 @@ Menu "Analysis", dynamic
 	"----------------------"
 	"Quick Stats", WaveStat()
 	"Cut", Cut()
-	"C&ursors",  /Q, Cursors()
+	SubMenu "Cursors"
+		"New",  /Q, Cursors()
+		"Save", /Q, SaveCursorsDialog()
+		ListSavedCursors(), /Q, RestoreCursors("*menu*")
+	End
 	"Simple Wave Average", /Q, AverageWaves()
 End
 

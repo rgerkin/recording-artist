@@ -1803,6 +1803,15 @@ Function Cursors([num,win])
 	//CursorStats()
 End
 
+Function SaveCursorsDialog()
+	string name = "Generic"
+	Prompt name, "Name for cursor locations: "
+	DoPrompt "Save cursor locations", name
+	if (!V_Flag)
+		SaveCursors(name)
+	endif
+End
+
 Function CursorStats()
 	GetWindow kwTopWin, wsizeOuterDC
 	String win=WinName(0,1)
@@ -1840,7 +1849,7 @@ Function SaveCursors(name,[win])
 	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	dfref df=Core#InstanceHome("Acq",win,"win0",create=1,sub=name)
+	dfref df=Core#InstanceHome("Acq",win,"win0",create=1,sub="Cursors_"+name)
 	String cursors="A;B;C",stem="xcsr_"
 	Variable i
 	for(i=0;i<ItemsInList(cursors);i+=1)
@@ -1864,12 +1873,33 @@ Function SaveCursors(name,[win])
 	endfor
 End
 
+function /s ListSavedCursors()
+	dfref df = Core#InstanceHome("Acq","SweepsWin","win0",quiet=1)
+	string list = ""
+	if(datafolderrefstatus(df))
+		variable i
+		for(i=0;i<CountObjectsDFR(df,4);i+=1)
+			string name = GetIndexedObjNameDFR(df,4,i)
+			if(stringmatch(name,"Cursors_*"))
+				list += name[8,strlen(name)-1]+";"
+			endif
+		endfor
+	endif
+	return list
+end
+
 Function RestoreCursors(name[,trace,win,offset])
 	String name,trace,win
 	Variable offset // An constant offset for the cursors with respect to the saved positions.
+	
 	win=selectstring(!ParamIsDefault(win),winname(0,1),win)
 	name=selectstring(strlen(name),"Broad",name)
-	dfref df=Core#InstanceHome("Acq",win,"win0",sub=name,quiet=1)
+	if(stringmatch(name,"*menu*"))
+		GetLastUserMenuInfo
+		name = s_value
+	endif
+	
+	dfref df=Core#InstanceHome("Acq",win,"win0",sub="Cursors_"+name,quiet=1)
 	if(!datafolderrefstatus(df))
 		//printf "Could not find data '%s' to restore cursors for window '%s'.\r",name,win
 		return -1
