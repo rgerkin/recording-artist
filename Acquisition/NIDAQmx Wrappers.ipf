@@ -285,13 +285,13 @@ static Function StartClock(isi[,DAQ])
 	endif
 	fDAQmx_CTR_Finished(deviceName,0)
 	string ctr
-	sprintf ctr, "/%s/CTR0outinternaloutput", deviceName
+	sprintf ctr, "/%s/CTR0internaloutput", deviceName
 	variable pin = Core#VarPackageSetting("Acq","DAQs","Generic","StartTrigger",default_=pin_out)
 	string trig_out
 	sprintf trig_out,"/%s/%s%d",deviceName,pin_prefix,pin
 	//print ctr, trig_out
-	fdaqmx_connectterminals(ctr,trig_out,0) // Connect the counter and the trigger
 	//print trig_out
+	fdaqmx_connectterminals(ctr,trig_out,0) // Connect the counter and the trigger
 	DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=1 0
 	//DAQmx_CTR_OutputPulse /DEV=deviceName /DELY=0 /FREQ={1/isi,0.5} /NPLS=0 /STRT=1 /OUT=trig_out 0 // Set STRT=1 because /STRT=0 starts anyway.  
 	//variable result = fDAQmx_CTR_Start(deviceName,0)
