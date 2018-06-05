@@ -1026,7 +1026,8 @@ Function /S GetAcqMode(chan[,sweep_num,quiet])
 	return mode
 End
 
-Function /S GetStimName(chan[,sweep_num,quiet])
+Function /S GetStimulusName(chan[,sweep_num,quiet])
+	// GetStimName
 	variable chan,sweep_num,quiet
 	
 	variable last_sweep = GetCurrSweep()
@@ -1042,6 +1043,22 @@ Function /S GetStimName(chan[,sweep_num,quiet])
 		endif
 	endif
 	return stim_name
+End
+
+Function /s GetStimuliWithName(chan,name)
+	variable chan
+	string name
+	
+	variable last_sweep = GetCurrSweep()
+	variable i
+	string list = ""
+	for(i=0;i<=last_sweep;i+=1)
+		string sweep_stim_name = GetStimulusName(chan,sweep_num=i)
+		if(stringmatch(sweep_stim_name,name))
+			list += num2str(i)+";"
+		endif
+	endfor
+	return list
 End
 
 Function /S GetAcqModeOutputQuantity(modeName)
@@ -1555,13 +1572,6 @@ function SetAcqSetting(package,instance,object,value[,indices])
 		make /free/n=0 indices
 	endif
 	Core#SetPackageSetting(module,package,instance,object,value,indices=indices)
-end
-
-function /s GetStimulusName(chan)
-	variable chan
-	
-	string channel = GetChanName(chan)
-	return Core#StrPackageSetting(module,"channelConfigs",channel,"stimulus")
 end
 
 function /wave GetDAQDivisor(daq)
@@ -2180,9 +2190,11 @@ Function MeanPowerSpectrum(chan,sweepList)
 	MasterFFT/=i
 End
 
-Function AverageSweeps(chan,sweep_list)
-	Variable chan
+Function /wave AverageSweeps(chan,sweep_list[,show])
+	Variable chan,show
 	String sweep_list
+	
+	show = paramisdefault(show) ? 1 : show
 	String full_list=ListExpand(sweep_list)
 	Variable i,flag=0,count=0
 	Wave /T Labels=GetChanLabels()
@@ -2202,9 +2214,12 @@ Function AverageSweeps(chan,sweep_list)
 		endif
 	endfor
 	Avg/=Count
-	Display
-	Variable red,green,blue; GetChanColor(chan,red,green,blue)
-	AppendToGraph /c=(red,green,blue) Avg
+	if(show)
+		Display
+		Variable red,green,blue; GetChanColor(chan,red,green,blue)
+		AppendToGraph /c=(red,green,blue) Avg
+	endif
+	return Avg
 End
 
 Function Concat(wave_list,df[,prefix,split,to_append,downscale])

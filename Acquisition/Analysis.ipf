@@ -1281,10 +1281,11 @@ Function MakeMeasurement(measurement,method,Sweep,Result,sweepNum,chan,layer,bas
 	return 0
 End
 
-function ComputeInputResistance(sweep,mode)
+function ComputeInputResistance(sweep,mode[,ampl,baseline_left,baseline_right,input_left,input_right])
 	// Computes the input resistance in Ohms
 	wave sweep
 	string mode
+	variable ampl,baseline_left,baseline_right,input_left,input_right
 	
 	dfref df=Core#InstanceHome(module,"acqModes",mode)
 	nvar /z/sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
@@ -1292,9 +1293,21 @@ function ComputeInputResistance(sweep,mode)
 		AcqModeDefaults(mode)
 		nvar /sdfr=df inputLeft,inputRight,rBaselineLeft,rBaselineRight,testPulsestart,testPulseampl,testPulselength
 	endif
-	variable baseline = mean(sweep,rBaselineLeft,rBaselineRight)
-	variable out = abs(testPulseampl)
-	variable in = abs(mean(sweep,inputLeft,inputRight)-baseline)
+	if(paramisdefault(baseline_left) || paramisdefault(baseline_right))
+		variable baseline = mean(sweep,rBaselineLeft,rBaselineRight)
+	else
+		baseline = mean(sweep,baseline_left,baseline_right)
+	endif
+	if(paramisdefault(ampl))
+		variable out = abs(testPulseampl)
+	else
+		out = abs(ampl)
+	endif
+	if(paramisdefault(input_left) || paramisdefault(input_right))
+		variable in = abs(mean(sweep,inputLeft,inputRight)-baseline)
+	else
+		in = abs(mean(sweep,input_left,input_right)-baseline)
+	endif
 	variable ratioFactor = UnitsRatio(GetModeOutputPrefix(mode),GetModeInputPrefix(mode))
 	variable ratio = ratioFactor*out/in
 	string outputType = GetModeOutputType(mode,fundamental=1)

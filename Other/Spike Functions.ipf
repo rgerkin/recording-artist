@@ -642,13 +642,17 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 			variable num_spikes = numpnts(peak)
 			max_spikes = max(num_spikes,max_spikes)
 			if(index==0)
-			    make /o/n=(1,max_spikes,itemsinlist(stats)) df:AllSpikes /wave=AllSpikes
+			   make /o/n=(1,max_spikes,itemsinlist(stats)) df:AllSpikes /wave=AllSpikes
+			   make /o/n=(3,max_spikes,itemsinlist(stats)) df:AllSpikesSummary /wave=AllSpikesSummary
+				duplicate /free w,avg
+			else
+				avg += w
 			endif
 			Redimension /n=(index+1,max_spikes,-1) AllSpikes
 			SetDimLabel 0,index,$name,AllSpikes
 			for(j=0;j<itemsinlist(stats);j+=1)
 			    string stat=stringfromlist(j,stats)
-			    SetDimLabel 2,j,$stat,AllSpikes
+			    SetDimLabel 2,j,$stat,AllSpikes,AllSpikesSummary
 			    wave w_stat=subDF:$stat
 			    AllSpikes[index][][j]=nan
 			    AllSpikes[index][0,num_spikes-1][j]=w_stat[q]
@@ -656,6 +660,8 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 			index+=1
 		endif
 	endfor
+	avg/=index
+	duplicate /o avg,root:crap
 	
 	// Go back and fill extra space with NaN's.  
 	index = 0
@@ -676,12 +682,29 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 	        endif
 	    endif
 	endfor
-	
 	for(j=0;j<dimsize(AllSpikes,1);j+=1)
 		SetDimLabel 1,j,$("#"+num2str(j+1)),AllSpikes
 	endfor
+	
+	Spikes(w=avg,folder=folder+"_avg")
+	dfref subDF=$(folder+"_avg")
+	for(j=0;j<itemsinlist(stats);j+=1)
+		for(i=0;i<max_spikes;i+=1)
+			duplicate /free /r=[][i,i][j,j] AllSpikes w
+			wavestats /q w
+			AllSpikesSummary[0][i][j] = v_avg
+			AllSpikesSummary[1][i][j] = v_sdev
+		endfor
+		stat=stringfromlist(j,stats)
+		wave w_stat=subDF:$stat
+		AllSpikesSummary[2][][j] = w_stat[q]
+	endfor
+	
+	SetDimLabel 0,0,$"Mean",AllSpikesSummary
+	SetDimLabel 0,1,$"StDev",AllSpikesSummary
+	SetDimLabel 0,2,$"Consensus",AllSpikesSummary
 	DoWindow /K CellSpikesTable
-	Edit /K=1/n=CellSpikesTable AllSpikes.ld
+	Edit /K=1/n=CellSpikesTable AllSpikesSummary.ld,AllSpikes.ld
 	if(rheobase)
 		modifytable elements=(0,-3,-2)
 	endif
@@ -723,6 +746,7 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
 	Variable offset=keepOffset ? dimoffset(w,0) : 0
 	
 	String curr_folder=GetDataFolder(1) // Mark the current data folder so we can go back to it at the end.  
+	folder = RemoveEnding(folder,":")
 	NewDataFolder /O/S $folder // Make the folder to put the analyzed data into.  
 	Duplicate /o/FREE w SmoothWave,DiffWave // Make a copy of the source wave so we can smooth the copy.  /FREE means it will automatically be killed at the end (i.e. not global).  
 	Smooth 5,SmoothWave
@@ -837,7 +861,7 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
    	duplicate /o/r=(start,finish) SmoothWave,segment
    	make /free hist
    	histogram segment,hist
-   	findpeak /r=(-65,) hist
+   	findpeak /q/r=(-65,) hist
    	baseline = v_peakloc
    endif
       
