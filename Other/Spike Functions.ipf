@@ -683,10 +683,10 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 	DoWindow /K CellSpikesTable
 	Edit /K=1/n=CellSpikesTable AllSpikes.ld
 	if(rheobase)
-		modifytable elements=(0,-3,-2)
+		modifytable elements=(0,-3,-2, 0)
 	endif
 	if(supra)
-		modifytable elements=(-3,0,-2)
+		modifytable elements=(-3,0,-2, 0)
 	endif
 end
 
