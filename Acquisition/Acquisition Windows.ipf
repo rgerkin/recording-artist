@@ -1221,10 +1221,11 @@ Function WaveSelectorButtons(info)
 	endif
 End
 
-function RotatePulseSets(direction,DAQ[,win])
+function RotatePulseSets(direction,DAQ[,win,no_redraw])
 	string direction // "L" or "R"
 	string DAQ
 	string win
+	variable no_redraw
 	
 	win = selectstring(!paramisdefault(win),GetDAQWin(DAQ=DAQ),win)
 	
@@ -1252,7 +1253,9 @@ function RotatePulseSets(direction,DAQ[,win])
 		endif
 	endfor
 	variable numPulseSets = GetNumPulseSets(DAQ)
-	PulseSetTabs(numPulseSets,0,win=win)
+	if(!no_redraw)
+		PulseSetTabs(numPulseSets,0,win=win)
+	endif
 end
 
 function RotatePulseSetsToCurrent(DAQ[,pulse_set])
@@ -1279,7 +1282,7 @@ function RotatePulseSetsToCurrent(DAQ[,pulse_set])
 	endfor
 	if(!numtype(to_rotate))
 		for(i=0;i<to_rotate;i+=1)
-			RotatePulseSets("R",DAQ)
+			RotatePulseSets("R",DAQ,no_redraw=(i<(to_rotate-1)))
 		endfor
 	endif
 end

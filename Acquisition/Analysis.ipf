@@ -732,8 +732,8 @@ Function Recalculate()
 	endfor
 End
 
-Function Analyze(pre,post,sweeps[,analysisMethod])
-	Variable pre,post
+Function Analyze(pre,post,sweeps[,analysisMethod,x_left,x_right])
+	Variable pre,post,x_left,x_right
 	String sweeps,analysisMethod
 	
 	variable noise_freq=Core#VarPackageSetting(module,"random","","noiseFreq",default_=60)
@@ -803,16 +803,16 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			Cursors(win="SweepsWin")
 			return -1
 		endif
-		wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"cursorLocs")
-		if(!waveexists(cursor_locs)) // If there is no analysis region set for this measurement method.  
-			// Use the current cursor positions.  
-			variable focused=StringMatch(view,"Focused")
-			x1=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
-			x2=focused ? xcsr2("B",win="SweepsWin") : xcsr(B,"SweepsWin")
-		else
-			x1=cursor_locs[0]
-			x2=cursor_locs[1]
-		endif
+			wave /z cursor_locs = Core#WavPackageSetting(module,"analysisMethods",analysisMethod,"cursorLocs")
+			if(!waveexists(cursor_locs)) // If there is no analysis region set for this measurement method.  
+				// Use the current cursor positions.  
+				variable focused=StringMatch(view,"Focused")
+				x1=focused ? xcsr2("A",win="SweepsWin") : xcsr(A,"SweepsWin")
+				x2=focused ? xcsr2("B",win="SweepsWin") : xcsr(B,"SweepsWin")
+			else
+				x1=cursor_locs[0]
+				x2=cursor_locs[1]
+			endif
 		Variable flip_sign=max(0,Minimum[post]) // Flip the sign of the measurement if the bit is set.  
 		//Execute /Q "ProgressWindow open"
 		wave SweepParamsPre=GetChanHistory(pre)
@@ -851,14 +851,16 @@ Function Analyze(pre,post,sweeps[,analysisMethod])
 			variable IPI = GetEffectiveStimParam("IPI",pre,sweepNum=sweepNum)
 			IPI = numtype(IPI) ? 100 : IPI
 			Variable earliestChannelStim=EarliestStim(sweepNum,chan=pre)
-			if(StringMatch(view,"Focused"))
+			if(!paramisdefault(x_left) && !paramisdefault(x_right))
+				
+			elseif(StringMatch(view,"Focused"))
 				if(numtype(earliestChannelStim)!=0) // If there was not stimulation on this presynaptic channel.  
 					ampl[sweepNum][0][layer]=NaN
 					ampl[sweepNum][1][layer]=NaN
 					continue
 				else
-					Variable x_left=x1+earliestChannelStim
-					Variable x_right=x2+earliestChannelStim
+					x_left=x1+earliestChannelStim
+					x_right=x2+earliestChannelStim
 				endif
 			else
 				x_left=x1

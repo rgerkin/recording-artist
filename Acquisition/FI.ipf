@@ -6,14 +6,17 @@
 
 
 Menu "Analysis", dynamic
-	SubMenu "Triangle Up"
-		UsedChannels(), /Q, CursorsTriangle("Up")
+	SubMenu "Triangle Alpha"
+		UsedChannels(), /Q, CursorsTriangle("Alpha")
 	End
-	SubMenu "Triangle Down"
-		UsedChannels(), /Q, CursorsTriangle("Down")
+	SubMenu "Triangle Beta"
+		UsedChannels(), /Q, CursorsTriangle("Beta")
+	End
+	SubMenu "Rheobase"
+		UsedChannels(), /Q, FIReport("Rheobase*")
 	End
 	SubMenu "FI"
-		UsedChannels(), /Q, FIReport()
+		UsedChannels(), /Q, FIReport("FI_Plot")
 	End
 	SubMenu "Supra"
 		UsedChannels(), /Q, SupraReport()
@@ -26,8 +29,8 @@ Menu "Analysis", dynamic
 	End
 End
 
-Function FIReport([channel])
-	string channel
+Function FIReport(name[,channel])
+	string channel,name
 	if(paramisdefault(channel))
 		GetLastUserMenuInfo
 		channel = s_value
@@ -44,7 +47,18 @@ Function FIReport([channel])
 	string sweeps
 	sprintf sweeps,"%d,%d",first_sweep,last_sweep
 	sweeps = ListExpand(sweeps)
-	Analyze(chan,chan,sweeps,analysisMethod=spike_method)
+	sweeps = GetStimuliWithName(chan, name)
+	if(!strlen(sweeps))
+		DoAlert 0,"No sweeps with a stimulus name matching '"+name+"'"
+	endif
+	first_sweep = str2num(stringfromlist(0,sweeps))
+	last_sweep = str2num(stringfromlist(itemsinlist(sweeps)-1,sweeps))
+	variable begin = GetEffectiveStimParam("Begin",chan,sweepNum=first_sweep)/1000
+	variable width = GetEffectiveStimParam("Width",chan,sweepNum=first_sweep)/1000
+	if(stringmatch(name,"*alpha*") || stringmatch(name,"*beta*"))
+		width = width/2
+	endif
+	Analyze(chan,chan,sweeps,analysisMethod=spike_method,x_left=begin,x_right=(begin+width))
 	wave Spike = chanDF:$spike_method
 	make /o/n=(total_sweeps) Amplitude=nan//,SpikeCount=nan,Frequency=nan
 	variable i, rheobase_sweep=NaN, max_ampl_no_spike = -Inf, min_ampl_spike = Inf
@@ -88,19 +102,25 @@ Function FIReport([channel])
 	//SetAxis right1 0,max_rate*1.2*duration
 	//Label right1, "Spike count"
 	if(rheobase_sweep>-1)
-		printf "The rheobase current is %d %s (%d %s).\r", min_ampl_spike, units, max_ampl_no_spike, units
 		wave w = GetChanSweep(chan,rheobase_sweep)
-		variable begin = GetEffectiveStimParam("Begin",chan,sweepNum=rheobase_sweep)
-		variable width = GetEffectiveStimParam("Width",chan,sweepNum=rheobase_sweep)
+		begin = GetEffectiveStimParam("Begin",chan,sweepNum=rheobase_sweep)
+		width = GetEffectiveStimParam("Width",chan,sweepNum=rheobase_sweep)
 		string folder = "root:"+possiblyquotename(channel)+":rheobase_spikes"
 		Spikes(w=w,start=begin/1000,finish=(begin+width)/1000,folder=folder)
 		dfref rheobaseDF = chanDF:rheobase_spikes
-		CellSpikes(channel,first=rheobase_sweep,last=rheobase_sweep,folder=folder,rheobase=1) 
+		CellSpikes(channel,first=rheobase_sweep,last=rheobase_sweep,folder=folder,rheobase=1,start=begin/1000,finish=(begin+width)/1000) 
 		duplicate /free/r=[][0,0] Spike, Rate
-		wavestats /q Rate
+		wavestats /q/r=[first_sweep,last_sweep] Rate
 		variable ampl_with_max_spikes = Amplitude[v_maxloc]
+		print v_max, ampl_with_max_spikes, max_ampl_no_spike
 		variable slope = v_max/(ampl_with_max_spikes - max_ampl_no_spike)
-		printf "FI Curve Slope is %.1g.\r", slope
+		string str = ""
+		if(stringmatch(name,"Rheo*"))
+			sprintf str, "The rheobase current is %d %s (%d %s)", min_ampl_spike, units, max_ampl_no_spike, units
+		elseif(stringmatch(name, "FI*"))
+			sprintf str, "FI Curve Slope is %.3g", slope
+		endif
+		TextBox /A=LT str
 	else
 		printf "No rheobase was found.\r"
 	endif
@@ -121,13 +141,18 @@ function SupraReport([channel])
 	variable first_sweep = GetCursorSweepNum("A")
 	variable last_sweep = GetCursorSweepNum("B")
 	variable i
+	string sweeps = GetStimuliWithName(chan, "Supra*")
+	first_sweep = str2num(stringfromlist(0,sweeps))
+	last_sweep = str2num(stringfromlist(itemsinlist(sweeps)-1,sweeps))
+	variable begin = GetEffectiveStimParam("Begin",chan,sweepNum=first_sweep)/1000
+	variable width = GetEffectiveStimParam("Width",chan,sweepNum=first_sweep)/1000
 	for(i=first_sweep;i<=last_sweep;i+=1)
 		variable ampl = GetEffectiveAmpl(chan,sweepNum=i)
 		if(ampl>supra_ampl_threshold)
 			supra_sweeps += num2str(i)+";"
 		endif
 	endfor
-	CellSpikes(channel,list=supra_sweeps,supra=1) 
+	CellSpikes(channel,list=supra_sweeps,supra=1,start=begin,finish=begin+0.5) 
 end
 
 function ThreeXReport([channel])
@@ -142,6 +167,11 @@ function ThreeXReport([channel])
 	variable chan = Label2Chan(channel)
 	variable first_sweep = GetCursorSweepNum("A")
 	variable last_sweep = GetCursorSweepNum("B")
+	string sweeps = GetStimuliWithName(chan, "X3X*")
+	first_sweep = str2num(stringfromlist(0,sweeps))
+	last_sweep = str2num(stringfromlist(itemsinlist(sweeps)-1,sweeps))
+	variable begin = GetEffectiveStimParam("Begin",chan,sweepNum=first_sweep)/1000
+	variable width = GetEffectiveStimParam("Width",chan,sweepNum=first_sweep)/1000
 	variable i
 	newdatafolder /o root:$(channel):ThreeXReportData
 	dfref df = root:$(channel):ThreeXReportData
@@ -152,9 +182,8 @@ function ThreeXReport([channel])
 	variable max_points = 0
 	for(i=first_sweep;i<=last_sweep;i+=1)
 		wave w = GetChanSweep(chan,i)
-		Spikes(w=w,folder=getdatafolder(1,df))
+		Spikes(w=w,folder=getdatafolder(1,df),start=begin,finish=begin+width)
 		wave /sdfr=df ISI
-		print(getwavesdatafolder(isi,2))
 		
 		duplicate /o ISI df:$("rate_"+num2str(i)) /wave=rate_i
 		if(numpnts(rate_i))
@@ -183,7 +212,7 @@ function TestPulseReport([channel])
 	
 	variable chan = Label2Chan(channel)
 	// Change to name used for test pulse sweeps
-	string test_pulse_stim_name = "TestPulse*"
+	string test_pulse_stim_name = "*put_*"
 	string sweeps = GetStimuliWithName(chan,test_pulse_stim_name) 
 	if(itemsinlist(sweeps))
 		wave w = AverageSweeps(chan,sweeps,show=1)
@@ -196,10 +225,10 @@ function TestPulseReport([channel])
 		variable tau = GetOneTau(w,begin,testPulseLength=width)
 		variable c = tau/r_in
 		string str
-		sprintf str, "R_in = %.1g MOhms; Tau = %.1g ms; C = %.1f pF", r_in/1e6, tau*1000, c*1e12 
+		sprintf str, "R_in = %.4g MOhms; Tau = %.3g ms; C = %.3g pF", r_in/1e6, tau*1000, c*1e12 
 		TextBox str
 	else
-		printf "No sweeps found matching '%s'", test_pulse_stim_name
+		printf "No sweeps found matching '%s'\r", test_pulse_stim_name
 	endif
 end
 
@@ -229,13 +258,60 @@ function CursorsTriangle(kind[,channel])
 	variable first_sweep = GetCursorSweepNum("A")
 	wave w = TriangleRange(chan,first_sweep)
 	strswitch(kind)
-		case "Up":
+		case "Alpha":
 			CursorPlace(w[0],(w[0]+w[1])/2)
+			TriangleReport(chan,"alpha")
+			CursorPlace((w[0]+w[1])/2,w[1])
+			FIReport("triangular_pulse_alpha")
 			break
-		case "Down":
+		case "Beta":
+			CursorPlace(w[0],(w[0]+w[1])/2)
+			TriangleReport(chan, "beta")
 			CursorPlace((w[0]+w[1])/2,w[1])
 			break
 	endswitch
+end
+
+function TriangleReport(chan, name[,channel])
+	variable chan
+	string name, channel
+	
+	if(paramisdefault(channel))
+		GetLastUserMenuInfo
+		channel = s_value
+	endif
+	dfref curr_df = getDataFolderDFR()
+	dfref chanDF = GetChannelDF(channel)
+	newdatafolder /o/s chanDF:Triangle
+	//variable chan = Label2Chan(channel)
+	string spike_methods = MethodList("Spike_Rate")
+	string spike_method = stringfromlist(0,spike_methods)
+	string sweeps
+	sweeps = GetStimuliWithName(chan, name)
+	if(!strlen(sweeps))
+		DoAlert 0,"No sweeps with a stimulus name matching '"+name+"'"
+	endif
+	variable first_sweep = str2num(stringfromlist(0,sweeps))
+	variable last_sweep = str2num(stringfromlist(itemsinlist(sweeps)-1,sweeps))
+	variable begin = GetEffectiveStimParam("Begin",chan,sweepNum=first_sweep)/1000
+	variable width = GetEffectiveStimParam("Width",chan,sweepNum=first_sweep)/1000
+	if(stringmatch(name,"*alpha*") || stringmatch(name,"*beta*"))
+		width = width/2
+	endif
+	Analyze(chan,chan,sweeps,analysisMethod=spike_method,x_left=begin,x_right=(begin+width))
+	wave Spike = chanDF:$spike_method
+	variable ampl = GetEffectiveAmpl(chan,sweepNum=first_sweep)
+	dfref triangleDF = chanDF:Triangle
+	wave /sdfr=triangleDF Peak,ISI
+	display /k=1/n=FIWin ISI vs Peak
+	ModifyGraph mode=4,marker=19,msize=5
+	string acq_mode = GetAcqMode(chan)
+	string units = GetModeOutputUnits(acq_mode)
+	Label bottom, "Amplitude ("+units+")" 
+	Label left, "Firing rate (Hz)"
+	string str = ""
+	TextBox /A=LT str
+	setdatafolder curr_df
 end
 
 #endif

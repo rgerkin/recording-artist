@@ -599,13 +599,17 @@ Function PlotShifted(exp_number,exp_list,parameter1,parameter2,offset)
 	SetDataFolder root:
 End
 
-function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
+function CellSpikes(cell[,first,last,list,folder,rheobase,supra,start,finish])
 	string cell
 	variable first,last // First and last sweep number
 	string list // List of sweep numbers
 	string folder // folder with spikes information
 	variable rheobase
-	variable supra
+	variable supra,start,finish
+	
+	Variable cursors=strlen(csrinfo(A))*strlen(csrinfo(B)) // Non-zero if both cursors are on the graph, zero if either or both are absent.  
+	start=ParamIsDefault(start) ? (cursors ? xcsr(A) : dimoffset(w,0)) : start // Defaults: the location of the circular cursor (cursor A) or the left edge of the wave.  
+	finish=ParamIsDefault(finish) ? (cursors ? xcsr(B) : dimoffset(w,0)+dimdelta(w,0)*dimsize(w,0)) : finish // Defaults: the location of the square cursor (cursor B) or the right edge of the wave. 
 	
 	dfref df=root:$cell
 	if(!datafolderrefstatus(df))
@@ -635,7 +639,7 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 			wave w=df:$name
 			if(paramisdefault(folder))
 				folder=possiblyquotename2(getdatafolder(1,df)+"Spikes_"+name)
-				Spikes(w=w,folder=folder)
+				Spikes(w=w,folder=folder,start=start,finish=finish)
 			endif
 			dfref subDF=$folder
 			wave /sdfr=subDF peak
@@ -644,9 +648,11 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 			if(index==0)
 			   make /o/n=(1,max_spikes,itemsinlist(stats)) df:AllSpikes /wave=AllSpikes
 			   make /o/n=(3,max_spikes,itemsinlist(stats)) df:AllSpikesSummary /wave=AllSpikesSummary
-				duplicate /free w,avg
+			   make /free/n=(numpnts(w),1) avg
+			   avg[][0] = w[p]
 			else
-				avg += w
+				redimension /n=(-1,index+1) avg
+				avg[][index] += w[p]
 			endif
 			Redimension /n=(index+1,max_spikes,-1) AllSpikes
 			SetDimLabel 0,index,$name,AllSpikes
@@ -660,9 +666,10 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 			index+=1
 		endif
 	endfor
-	avg/=index
-	duplicate /o avg,root:crap
-	
+	duplicate /o avg root:crap
+	matrixop /free avg = meancols(avg^t)
+	CopyScales w, avg
+		
 	// Go back and fill extra space with NaN's.  
 	index = 0
 	for(i=0;i<CountObjectsDFR(df,1);i+=1)
@@ -686,7 +693,7 @@ function CellSpikes(cell[,first,last,list,folder,rheobase,supra])
 		SetDimLabel 1,j,$("#"+num2str(j+1)),AllSpikes
 	endfor
 	
-	Spikes(w=avg,folder=folder+"_avg")
+	Spikes(w=avg,folder=folder+"_avg",start=start,finish=finish)
 	dfref subDF=$(folder+"_avg")
 	for(j=0;j<itemsinlist(stats);j+=1)
 		for(i=0;i<max_spikes;i+=1)
@@ -856,7 +863,11 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
    Decay_Time=Trough_Locs-Peak_Locs // Time to decay from peak to trough.  
       
    // Find the baseline  
-   variable baseline = vcsr(C,"SweepsWin") 
+   if(strlen(CsrInfo(C)))
+   	variable baseline = vcsr(C,"SweepsWin") 
+   else
+  	baseline = SmoothWave(start)
+   endif
    if(numtype(baseline))
    	duplicate /o/r=(start,finish) SmoothWave,segment
    	make /free hist
