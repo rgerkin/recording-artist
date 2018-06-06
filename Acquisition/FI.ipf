@@ -18,6 +18,12 @@ Menu "Analysis", dynamic
 	SubMenu "Supra"
 		UsedChannels(), /Q, SupraReport()
 	End
+	SubMenu "ThreeX"
+		UsedChannels(), /Q, ThreeXReport()
+	End
+	SubMenu "TestPulse"
+		UsedChannels(), /Q, TestPulseReport()
+	End
 End
 
 Function FIReport([channel])
@@ -90,6 +96,11 @@ Function FIReport([channel])
 		Spikes(w=w,start=begin/1000,finish=(begin+width)/1000,folder=folder)
 		dfref rheobaseDF = chanDF:rheobase_spikes
 		CellSpikes(channel,first=rheobase_sweep,last=rheobase_sweep,folder=folder,rheobase=1) 
+		duplicate /free/r=[][0,0] Spike, Rate
+		wavestats /q Rate
+		variable ampl_with_max_spikes = Amplitude[v_maxloc]
+		variable slope = v_max/(ampl_with_max_spikes - max_ampl_no_spike)
+		printf "FI Curve Slope is %.1g.\r", slope
 	else
 		printf "No rheobase was found.\r"
 	endif
@@ -119,10 +130,83 @@ function SupraReport([channel])
 	CellSpikes(channel,list=supra_sweeps,supra=1) 
 end
 
+function ThreeXReport([channel])
+	string channel
+	
+	if(paramisdefault(channel))
+		GetLastUserMenuInfo
+		channel = s_value
+	endif
+	
+	string burst_sweeps = ""
+	variable chan = Label2Chan(channel)
+	variable first_sweep = GetCursorSweepNum("A")
+	variable last_sweep = GetCursorSweepNum("B")
+	variable i
+	newdatafolder /o root:$(channel):ThreeXReportData
+	dfref df = root:$(channel):ThreeXReportData
+	dowindow /k ThreeXReportWin
+	display /k=1/n=ThreeXReportWin
+	variable num_sweeps = last_sweep - first_sweep + 1
+	make /o/n=(100,num_sweeps) df:rate_mean /wave=rate_mean=nan
+	variable max_points = 0
+	for(i=first_sweep;i<=last_sweep;i+=1)
+		wave w = GetChanSweep(chan,i)
+		Spikes(w=w,folder=getdatafolder(1,df))
+		wave /sdfr=df ISI
+		print(getwavesdatafolder(isi,2))
+		
+		duplicate /o ISI df:$("rate_"+num2str(i)) /wave=rate_i
+		if(numpnts(rate_i))
+			rate_i = 1/rate_i
+			appendtograph /c=(0,0,0) rate_i
+			rate_mean[0,numpnts(rate_i)-1][i-first_sweep] = rate_i[p]
+			max_points = max(max_points,numpnts(rate_i))
+		endif
+	endfor
+	matrixop /o rate_mean = meancols(rate_mean^t)
+	redimension /n=(max_points) rate_mean
+	appendtograph /c=(65535,0,0) rate_mean
+	ModifyGraph mode=4,marker=19
+	Label bottom "ISI #"
+	Label left "Instantaneous Firing Rate"
+	Legend
+end
+
+function TestPulseReport([channel])
+	string channel
+	
+	if(paramisdefault(channel))
+		GetLastUserMenuInfo
+		channel = s_value
+	endif
+	
+	variable chan = Label2Chan(channel)
+	// Change to name used for test pulse sweeps
+	string test_pulse_stim_name = "TestPulse*"
+	string sweeps = GetStimuliWithName(chan,test_pulse_stim_name) 
+	if(itemsinlist(sweeps))
+		wave w = AverageSweeps(chan,sweeps,show=1)
+		variable sweep_num = str2num(stringfromlist(0,sweeps))
+		variable begin = GetEffectiveStimParam("Begin",chan,sweepNum=sweep_num)/1000
+		variable width = GetEffectiveStimParam("Width",chan,sweepNum=sweep_num)/1000
+		variable ampl = GetEffectiveStimParam("Ampl",chan,sweepNum=sweep_num)
+		string mode = GetAcqMode(chan,sweep_num=sweep_num)
+		variable r_in = ComputeInputResistance(w,mode,ampl=ampl,baseline_left=begin-0.1,baseline_right=begin-0.01,input_left=begin+width-0.1,input_right=begin+width-0.01)
+		variable tau = GetOneTau(w,begin,testPulseLength=width)
+		variable c = tau/r_in
+		string str
+		sprintf str, "R_in = %.1g MOhms; Tau = %.1g ms; C = %.1f pF", r_in/1e6, tau*1000, c*1e12 
+		TextBox str
+	else
+		printf "No sweeps found matching '%s'", test_pulse_stim_name
+	endif
+end
+
 function /wave TriangleRange(chan,sweep_num)
 	variable chan, sweep_num
 	
-	string stim_name = GetStimName(chan,sweep_num=sweep_num)
+	string stim_name = GetStimulusName(chan,sweep_num=sweep_num)
 	if(!stringmatch(stim_name,"*tri*"))
 		printf "Stimulus name '%s' for sweep %d may not be a triangle stimulus.", stim_name, sweep_num
 	endif

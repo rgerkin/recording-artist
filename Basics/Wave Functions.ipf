@@ -2197,12 +2197,13 @@ Function FindSpikeTimes2(w[,freq_cutoff,threshold])
 	KillWaves HPF
 End
 
-Function GetOneTau(sweep,testPulsestart)
+Function GetOneTau(sweep,testPulsestart[,testPulseLength])
 	Wave sweep
-	Variable testPulsestart
+	Variable testPulsestart, testPulseLength
+	
+	testPulseLength = paramisdefault(testPulseLength) ? 0.1 : testPulseLength
 	Variable V_fitOptions=4
 	Variable V_FitError=0
-	Variable testPulselength=0.1 // Hardcoded for now since the channel number is not passed in so I can't determine the exact test pulse length.  
 	Duplicate/o/R=(testPulsestart,testPulsestart+testPulselength) sweep waveToFitA
 	Duplicate/o/R=(testPulsestart+testPulselength,testPulsestart+2*testPulselength) sweep waveToFitB
 	//Duplicate/o waveToFit waveToFitA

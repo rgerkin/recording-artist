@@ -1270,14 +1270,18 @@ function RotatePulseSetsToCurrent(DAQ[,pulse_set])
 	endif
 	variable curr_sweep = GetCurrSweep()
 	variable curr_remainder = mod(curr_sweep,divisor[pulse_set])
-	variable to_rotate = curr_remainder - rotated
-	do
-		to_rotate = mod(to_rotate + divisor[pulse_set],divisor[pulse_set])
-	while(to_rotate<0)
-	variable i
-	for(i=0;i<to_rotate;i+=1)
-		RotatePulseSets("R",DAQ)
+	variable i,to_rotate = nan
+	for(i=0;i<numpnts(remainder);i+=1)
+		if(remainder[i] & 2^curr_remainder)
+			to_rotate = i
+			break
+		endif
 	endfor
+	if(!numtype(to_rotate))
+		for(i=0;i<to_rotate;i+=1)
+			RotatePulseSets("R",DAQ)
+		endfor
+	endif
 end
 
 Function WaveValuesProc(info) : SetVariableControl
