@@ -801,7 +801,8 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
 		endif
 	While(i<numpnts(Cross_Locs)-1)
 	
-	Make /o/n=(numpnts(Peak)) Trough,Trough_locs,Threshold,Threshold_locs,Width,Width_locs,ISI,AHP_Dur50,AHP_Dur99
+	Make /o/n=(numpnts(Peak)) Trough,Trough_locs,Threshold,Threshold_locs
+	Make /o/n=(numpnts(Peak)) Width,Width_locs,ISI,AHP_Dur50,AHP_Dur99,Rise_Slope,Fall_Slope
 	
 	Variable num_spikes=numpnts(cross_locs)-2 // -2 because of the fake ones padding the start and end time.  
   	printf "Spikes Found = %d in %.2f seconds (%.2f Hz)\r",num_spikes,finish-start,num_spikes/(finish-start)
@@ -816,12 +817,15 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
   		Trough_locs[i]=V_minloc
   		Trough[i]=V_min
 		WaveStats /Q /R=(cross_loc-refract,cross_loc+refract) DiffWave
+		Rise_Slope[i] = v_max/1000 // mV/ms
 		FindLevel /Q/EDGE=1/R=(Peak_locs[i],Trough_locs[i-1]) DiffWave, V_Max*thresh_fraction // Find where the first derivative reaches thresh_fraction of its maximum value, searching backwards from the spike peak to the trough of the last spike.  
 		Threshold_locs[i]=V_LevelX // Set the threshold location to the result.  
 		Threshold[i]=SmoothWave(V_LevelX) // Se the threshold voltage to the value at that location.  
 		if(Threshold[i]<-70) // If the threshold is less than -70 mV.  
 			printf "Threshold was too low for spike @ %.3f\r",cross_loc
 		endif
+		WaveStats /Q /R=(Peak_locs[i],Peak_locs[i]+refract) DiffWave
+		Fall_Slope[i] = v_min/1000 // mV/ms
   	endfor
   	
   	// Find the width of the spike at half-max, and where (left side of the spike) this was measured from.  
@@ -839,8 +843,8 @@ Function Spikes([w,start,finish,cross_val,refract,thresh_fraction,minHeight,fold
   	endfor
 	
 	// Remove the padded boundaries
-  	DeletePoints numpnts(cross_locs)-1,1,Peak,Peak_locs,Threshold,Threshold_locs,Trough,Trough_locs,Width,Width_locs,Cross_locs,ISI // Remove the paddings on the right
-  	DeletePoints 0,1,Peak,Peak_locs,Threshold,Threshold_locs,Trough,Trough_locs,Width,Width_locs,Cross_locs,ISI // Remove the padding on the left
+  	DeletePoints numpnts(cross_locs)-1,1,Peak,Peak_locs,Threshold,Threshold_locs,Trough,Trough_locs,Width,Width_locs,Cross_locs,ISI,Rise_Slope,Fall_Slope // Remove the paddings on the right
+  	DeletePoints 0,1,Peak,Peak_locs,Threshold,Threshold_locs,Trough,Trough_locs,Width,Width_locs,Cross_locs,ISI,Rise_Slope,Fall_Slope // Remove the padding on the left
 	
 	// Restore the original offset (if any).  
   	Cross_Locs+=offset

@@ -1073,26 +1073,31 @@ Function /S GetAcqModeInputQuantity(modeName)
 	return Core#StrPackageSetting(module,"acqModes",modeName,"inputType")
 End
 
-function /s GetOutputUnits(chan)
-	variable chan
+function /s GetOutputUnits(chan[,sweep_num])
+	variable chan,sweep_num
+
+	sweep_num = paramisdefault(sweep_num) ? Inf : sweep_num
 	
-	string quantity=GetOutputQuantity(chan)
+	string quantity=GetOutputQuantity(chan,sweep_num=sweep_num)
 	string units = Core#StrPackageSetting(module,"quantities",quantity,"units")
 	string prefix = Core#StrPackageSetting(module,"quantities",quantity,"prefix")
 	return prefix+units
 end
 
-function /s GetInputUnits(chan)
-	variable chan
-	
-	string quantity=GetInputQuantity(chan)
+function /s GetInputUnits(chan[,sweep_num])
+	variable chan,sweep_num
+
+	sweep_num = paramisdefault(sweep_num) ? Inf : sweep_num
+	string quantity=GetInputQuantity(chan,sweep_num=sweep_num)
 	string units = Core#StrPackageSetting(module,"quantities",quantity,"units")
 	string prefix = Core#StrPackageSetting(module,"quantities",quantity,"prefix")
 	return prefix+units
 end
 
-Function /S GetOutputQuantity(chan)
-	Variable chan
+Function /S GetOutputQuantity(chan[,sweep_num])
+	Variable chan,sweep_num
+	
+	sweep_num = paramisdefault(sweep_num) ? Inf : sweep_num
 	
 	string type=""
 	string DAC=Chan2DAC(chan)
@@ -1101,14 +1106,16 @@ Function /S GetOutputQuantity(chan)
 		case "N":
 			break
 		default:
-			string modeName=GetAcqMode(chan)
+			string modeName=GetAcqMode(chan,sweep_num=sweep_num)
 			type=GetAcqModeOutputQuantity(modeName)
 	endswitch
 	return type
 End
 
-Function /S GetInputQuantity(chan)
-	Variable chan
+Function /S GetInputQuantity(chan[,sweep_num])
+	Variable chan,sweep_num
+	
+	sweep_num = paramisdefault(sweep_num) ? Inf : sweep_num
 	
 	string type=""
 	string DAC=Chan2ADC(chan)
@@ -1117,7 +1124,7 @@ Function /S GetInputQuantity(chan)
 		case "N":
 			break
 		default:
-			string modeName=GetAcqMode(chan)
+			string modeName=GetAcqMode(chan,sweep_num=sweep_num)
 			type=GetAcqModeInputQuantity(modeName)
 	endswitch
 	return type
