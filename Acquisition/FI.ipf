@@ -305,15 +305,38 @@ function TriangleReport(name[,channel])
 	sprintf str,"\K(65535,0,0)Current at recruitment is %d pA", up
 	sprintf str,"%s\r\K(0,0,65535)Current at decruitment is %d pA", str, down
 	dowindow /k TriangleWin
-	display /k=1/n=TriangleWin
-	appendtograph /c=(65535,0,0) rate_up vs current_up
-	appendtograph /c=(0,0,65535) rate_down vs current_down
+	display /k=1/n=TriangleWin/w=(0,0,700,400)
+	appendtograph /c=(65535,0,0)/l=frequency /b=current_b rate_up vs current_up
+	appendtograph /c=(0,0,65535)/l=frequency /b=current_b rate_down vs current_down
 	ModifyGraph mode=4,marker=19,msize=2
 	string acq_mode = GetAcqMode(chan)
-	string units = GetModeOutputUnits(acq_mode)
-	Label bottom, "Amplitude ("+units+")" 
-	Label left, "Firing rate (Hz)"
-	TextBox /A=LT str
+	string output_units = GetModeOutputUnits(acq_mode)
+	string input_units = GetModeInputUnits(acq_mode)
+	Label current_b, "Current ("+output_units+")" 
+	Label frequency, "Firing rate (Hz)"
+	TextBox /A=RB/X=5.00/Y=0.00 str
+	ModifyGraph mode=4,marker=19,msize=2
+	legend /A=RB/X=12.50/Y=10.00
+	//variable minn = 
+	//string str
+	//sprintf str, "R_in = %.4g MOhms; Tau = %.3g ms; C = %.3g pF", r_in/1e6, tau*1000, c*1e12 
+	//TextBox str
+	appendtograph /l=vm /b=time_ w
+	duplicate /o w triangleDF:triangle /wave=tr
+	tr = 0
+	tr[x2pnt(tr,begin),x2pnt(tr,begin+width/2)] = 2*ampl*(x-begin)/width
+	tr[x2pnt(tr,begin+width/2),x2pnt(tr,begin+width)] = 2*ampl*(begin+width-x)/width
+	appendtograph /c=(0,0,0) /l=current_l /b=time_ tr
+	ModifyGraph axisEnab(frequency)={0.5,1},axisEnab(current_b)={0.55,1}
+	ModifyGraph axisEnab(vm)={0.5,1},axisEnab(time_)={0,0.45}
+	ModifyGraph axisEnab(current_l)={0,0.45},freePos(frequency)={0.55,kwFraction}
+	ModifyGraph freePos(current_b)={0.5,kwFraction},freePos(vm)={0,kwFraction}
+	ModifyGraph freePos(time_)={0,kwFraction},freePos(current_l)={0,kwFraction}
+	ModifyGraph lblPos(frequency)=50,lblPos(current_b)=50
+	ModifyGraph lblPos(vm)=50,lblPos(current_l)=50,lblPos(time_)=50
+	Label vm "Membrane Potential ("+input_units+")"
+	Label current_l "Current ("+output_units+")"
+	Label time_ "Time (s)"
 	setdatafolder curr_df
 end
 
