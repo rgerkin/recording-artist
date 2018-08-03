@@ -35,6 +35,10 @@
 #include "Minis"
 #endif
 
+#ifdef Roborig
+#include "Roborig"
+#endif
+
 #endif
 
 #if exists("Core#SetProfile")
