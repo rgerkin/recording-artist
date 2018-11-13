@@ -363,8 +363,8 @@ Function PossiblyKillOldChannelFolder(oldLabel[,secondTry])
 	dfref df=GetChannelDF(oldLabel)
 	if(datafolderrefstatus(df))	
 		variable i
-		for(i=0;i<CountObjectsDFR(df,4);i+=1)
-			string name=GetIndexedObjNameDFR(df,4,i)
+		for(i=0;i<CountObjectsDFR(df,1);i+=1)
+			string name=GetIndexedObjNameDFR(df,1,i)
 			if(stringmatch(name,chanHistoryName))
 				wave w=df:$name
 				if(dimsize(w,0)>0) // Some stimulus information has been stored.  
