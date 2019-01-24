@@ -67,9 +67,14 @@ Function SetAcqInited(val)
 End
 
 // --------------------------------------------------------Initialization Routines ------------------------------------------------------
-Function Initialization([profileName,acqInstance])
+Function Initialization([profileName, acqInstance, create_windows, prompt_experiment_name])
 	string profileName
 	string acqInstance // Name of an acquisition instance to load.  
+	variable create_windows
+	variable prompt_experiment_name
+	
+	create_windows = paramisdefault(create_windows) ? 1 : 0
+	prompt_experiment_name = paramisdefault(prompt_experiment_name) ? 1 : 0
 	
 	// Don't let initialization begin if the current experiment contains data.  
 	if(GetCurrSweep()>0)
@@ -92,12 +97,14 @@ Function Initialization([profileName,acqInstance])
 	BoardInit() // Initializes A/D Interface.  
 	DoWindow /K Selector
 	
-	string sweepsWinInstance = Core#StrPackageSetting(module,"Acq",acqInstance,"sweepsWin")
-	SweepsWindow(instance=sweepsWinInstance)
+	if(create_windows)
+		string sweepsWinInstance = Core#StrPackageSetting(module,"Acq",acqInstance,"sweepsWin")
+		SweepsWindow(instance=sweepsWinInstance)
 	
-	string analysisWinInstance = Core#StrPackageSetting(module,"Acq",acqInstance,"analysisWin")
-	AnalysisWindow(instance=analysisWinInstance)
-	
+		string analysisWinInstance = Core#StrPackageSetting(module,"Acq",acqInstance,"analysisWin")
+		AnalysisWindow(instance=analysisWinInstance)
+	endif
+		
 	string defaultDataDir=SpecialDirPath("Desktop",0,0,0)+"Data"
 	string dataDir=Core#StrPackageSetting(module,"random","","dataDir",default_=defaultDataDir)
 	NewPath /C/Z/O/Q Data, dataDir
@@ -106,7 +113,11 @@ Function Initialization([profileName,acqInstance])
 	endif
 	string extension=".pxp"
 	PutScrapText NewFileName(path="Data")+extension
-	SaveExperiment /P=Data //as NewFileName()+".uxp"//  Sets experiment name
+	if(prompt_experiment_name)
+		SaveExperiment /P=Data //as NewFileName()+".uxp"//  Sets experiment name
+	else
+		SaveExperiment /P=Data as GetScrapText() //  Sets experiment name
+	endif
 	
 #if exists("Sutter#Init")==6
 	Sutter#Init()

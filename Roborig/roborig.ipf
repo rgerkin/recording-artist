@@ -8,15 +8,29 @@ static constant main_panel_ystart = 2
 static strconstant electrode_locations="Midline;Penetrate;Record"
 static strconstant sutter_loc="root:Packages:Sutter:"
 
-Menu "Roborig"
+Menu "Copernicus"
 	"Initialize", Roborig#init()
-	
 End
 
 function init()
+	Core#Def("ReallyNoDAQ")
+	Silent 101
 	Core#LoadModuleManifest(module)
 	Core#LoadPackage(module, "Coordinates")
+	Initialization(create_windows=0, prompt_experiment_name=0)
+	dfref df = getstatusDF()
+	variable /g df:copernicus = 1
 	main_panel(rebuild=1)
+end
+
+function copernicus()
+	dfref df = getstatusDF()
+	nvar /z/sdfr=df copernicus
+	variable result = 0
+	if(nvar_exists(copernicus) && copernicus)
+		result = 1
+	endif
+	return result
 end
 
 // Generate an alert dialog
@@ -33,7 +47,8 @@ function alert(msg, actions)
 	for(i=0;i<itemsinlist(actions);i+=1)
 		
 	endfor
-	DoAlert itemsinlist(actions)-1, msg
+	variable n_actions = max(0, itemsinlist(actions)-1)
+	DoAlert n_actions, msg
 	string action = stringfromlist(v_flag-1,actions)
 	Execute /Q/P action
 end
@@ -49,7 +64,7 @@ Function main_panel([rebuild])
 			return 0
 		endif
 	endif
-	NewPanel /K=1 /W=(0,0,745,500) /N=MainPanel as module
+	NewPanel /K=1 /W=(0,0,645,420) /N=MainPanel as module
 	main_panel_controls()
 End	
 
@@ -83,10 +98,10 @@ Function main_panel_notebook(xx, yy)
 	
 	yy = main_panel_ystart
 	xx += 358
-	GroupBox Logg frame=1, pos={xx,yy}, size={378,400}, title="Log", fstyle=1
+	GroupBox Logg frame=1, pos={xx,yy}, size={278,400}, title="Log", fstyle=1
 	main_panel_timed_entry(xx, yy)
-	NewNotebook /f=1 /K=2 /n=ExperimentLog /HOST=MainPanel /W=(xx+10,yy+25,xx+360,yy+375)
-	Notebook MainPanel#ExperimentLog text = "", margins={0,0,300}
+	NewNotebook /f=1 /K=2 /n=ExperimentLog /HOST=MainPanel /W=(xx+10,yy+25,xx+260,yy+375)
+	Notebook MainPanel#ExperimentLog text = "", margins={0,0,200}
 	string log_default=Core#StrPackageSetting(module,"logging","","log_default")
 	Notebook MainPanel#ExperimentLog text = log_default
 	SetActiveSubwindow MainPanel#ExperimentLog
@@ -99,8 +114,8 @@ function main_panel_timed_entry(xx,yy)
 	
 	xx += 5
 	yy += 16
-	SetVariable Log_Entry,pos={xx,yy},size={275,16},title="Entry:",value= _STR:"",proc=main_panel_setvariables
-	Button Log_Submit,pos={xx+278,yy-2},size={45,20},proc=main_panel_buttons,title="Submit"
+	SetVariable Log_Entry,pos={xx,yy},size={175,16},title="Entry:",value= _STR:"",proc=main_panel_setvariables
+	Button Log_Submit,pos={xx+178,yy-2},size={45,20},proc=main_panel_buttons,title="Submit"
 	Checkbox Log_Timestamp,value=1,pos={xx+327,yy+3}, title="T-stamp"
 end
 
@@ -284,7 +299,7 @@ Function main_panel_buttons(ctrlName) : ButtonControl
 			// Only one detail: "Submit"
 			main_panel_set_log_entry()
 			break
-		case "Drug":
+		case "Drugs":
 			// Only one detail: "Update"
 			main_panel_set_drug()
 			break
@@ -293,6 +308,17 @@ Function main_panel_buttons(ctrlName) : ButtonControl
 			break
 		case "Manipulator":
 			main_panel_set_manipulator(detail)
+			break
+		case "Action":
+			strswitch(detail)
+				case "Seal":
+					SealTest(1)
+					//alert("Seal not implemented yet.", "")
+					break
+				case "Run":
+					alert("Run not implemented yet.", "")
+					break
+			endswitch
 			break
 	endswitch
 	FirstBlankLine("MainPanel#ExperimentLog")

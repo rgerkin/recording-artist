@@ -1,3 +1,4 @@
+#pragma TextEncoding = "UTF-8"
 // $Author: rick $
 // $Rev: 633 $
 // $Date: 2013-03-28 15:53:22 -0700 (Thu, 28 Mar 2013) $
@@ -1950,13 +1951,13 @@ Function Units2Num(units)
 		case "mM":
 			return 1000
 			break
-		case "100 µM":
+		case "100 ÂµM":
 			return 100
 			break
-		case "10 µM":
+		case "10 ÂµM":
 			return 10
 			break
-		case "µM":
+		case "ÂµM":
 			return 1
 			break	
 		case "microM":
@@ -2644,3 +2645,36 @@ Function /S DataFolders([root_folder,no_include])
 	endif
 	return folders
 End
+
+function Prefix2Num(prefix)
+	string prefix
+	
+	variable value = 1
+	strswitch(prefix)
+		case "p":
+			value = 1e-12
+			break
+		case "n":
+			value = 1e-9
+			break
+		case "u":
+		case "Î¼":
+			value = 1e-6
+			break
+		case "m":
+			value = 1e-3
+			break
+		case "k":
+			value = 1e3
+		case "M":
+			value = 1e6
+			break
+		case "G":
+			value = 1e9
+			break
+		case "T":
+			value = 1e12
+			break
+	endswitch
+	return value
+end

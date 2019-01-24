@@ -282,6 +282,15 @@ function /s GetModeOutputPrefix(acqMode)
 	return GetModePrefix(acqMode,"output") // Unit prefix, e.g. "p" for "1e-12".  
 end
 
+function GetChanScale(chan, direction)
+	variable chan
+	string direction // "input" or "output"
+	string mode = GetAcqMode(chan)
+	string prefix = GetModePrefix(mode, direction) // Unit prefix, e.g. "p" for "1e-12".  
+	variable scale = Prefix2Num(prefix)
+	return scale
+end
+
 function /s GetModePrefix(acqMode,direction)
 	string acqMode,direction
 	

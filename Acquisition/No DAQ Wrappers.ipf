@@ -125,7 +125,11 @@ static Function BoardInit([DAQ])
 		PurgeOutput(i)
 	endfor
 	variable /g df:t_init = StopMsTimer(-2) // When the buffer was initialized.  	
-	variable /g df:t_update = 0 // Last time the buffer was updated by Waiting().  
+	variable /g df:t_update = 0 // Last time the buffer was updated by Waiting(). 
+	variable /g df:tau = 1 // Time consant in ms (e.g. the pipette in the bath) 
+	variable /g df:r_in = 10 // Input resistance in MΩ (e.g. the pipette in the bath)
+	variable /g df:noise = 3 // RMS Noise level (e.g. in pA)
+	string /g df:direction = TransferDirection()
 	BoardReset(1,DAQ=DAQ)
 	ZeroAll(DAQ=DAQ)
 End
@@ -212,6 +216,7 @@ static Function StartClock(isi[,DAQ])
 	 
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
 	StopClock()
+	
 	CtrlNamedBackground NoDAQClock, start, period=isi*60, proc=NoDAQ#Waiting
 	return 0
 End
@@ -277,7 +282,8 @@ static function Waiting(s)
 	nvar /z/sdfr=SealTestDF() sealTestOn
 	lastDAQSweepT=StopMSTimer(-2)
 	
-	nvar /sdfr=$noDAQ_path t_init,t_update
+	nvar /sdfr=$noDAQ_path t_init,t_update,tau,r_in,noise
+	svar /sdfr=$noDAQ_path direction
 	variable first_sweep = t_update==0
 	variable then = (t_update - t_init)/1e6
 	variable now = (lastDAQSweepT - t_init)/1e6
@@ -296,7 +302,7 @@ static function Waiting(s)
 		wave /sdfr=outDF out = $("ch"+num2str(chan))
 		nvar /sdfr=outDF out_x = $("x"+num2str(chan))
 		//print wavemax(out),wavemin(out),out_x,numpnts(out)
-		wave response = IO(out,out_x)
+		wave response = IO(out,out_x,tau,r_in,direction,noise)
 		out_x += numpnts(response)
 		wave /sdfr=inDF in = $("ch"+num2str(chan))
 		if(numpnts(response))
@@ -345,24 +351,97 @@ static function PurgeOutput(chan)
 	variable /g df:$("x"+num2str(chan)) = 0 // Buffer cursor.  
 end
 
-static function /wave IO(w,start)
+static function /s TransferDirection()	
+	// Determine how to use the input resistance to scale the response
+	string mode = GetAcqMode(0)
+	string outputType=GetModeOutputType(mode,fundamental=1)
+	string inputType=GetModeInputType(mode,fundamental=1)
+	string ratioString=outputType+"/"+inputType
+	if(stringmatch(ratioString,"Current/Voltage"))
+		string direction = "multiply"
+	else
+		direction = "divide" // Just assume they want voltage clamp if it can't be determined
+	endif
+	return direction
+end
+
+static function /wave IO(w, start, tau, r_in, direction, noise)
 	wave w
-	variable start
+	variable start, tau, r_in, noise
+	string direction
+	
+	variable dt = dimdelta(w,0)
 	
 	duplicate /free w,convolved
-	make /free/n=(1000) expo = exp(-x/200)
+	make /free/n=(1000) expo = exp(-x/(0.001*tau/dt))
 	variable summ = sum(expo)
 	expo /= summ // Normalize to a sum of 1.  
 	Convolve expo,convolved
 	copyscales /p w,convolved
+	
+	// Get scales right (i.e. pico, micro, etc.)
+	
+	// These two lines aren't needed because command output (igor->rig)
+	// is already generated in base units, e.g. V or A.  
+	//variable out_scale = GetChanScale(0, "output")
+	//convolved *= out_scale // e.g. convert from mV to V
+	
+	strswitch(direction)
+		case "multiply":
+			convolved *= r_in*1e6 // e.g. convert from V to A (or vice versa), via the input resistance
+			break
+		case "divide":
+			convolved /= r_in*1e6
+			break
+	endswitch
+	
+	variable in_scale = GetChanScale(0, "input")
+	convolved /= in_scale // e.g. convert the input (rig->igor) from A to pA
+	nvar noise_ = root:Packages:noDAQ:noise
+	convolved += gnoise(noise_) // Add noise in e.g. V or A.  
+	
 	redimension /n=(numpnts(w)) convolved
 	if(start<numpnts(convolved))
 		duplicate /free/r=[start,] convolved,result
-		result += gnoise(0.0001)
-		result *= 1000
-		//print 1000*wavemax(convolved),wavemax(result)
 	else
 		make /free/n=0 result
 	endif
 	return result
+end
+
+function NoDAQPanel()
+	DoWindow /K NoDAQController
+	NewPanel /K=1 /N=NoDAQController /W=(10,10,150,225) as "Demo Mode Controller"
+	
+	dfref df = root:Packages:NoDAQ
+	nvar /sdfr=df r_in, tau
+	
+	GroupBox r_in_group pos={2,2}, size={134,62}
+	make /o/n=5 df:r_in_ticks /wave=tix = {0,1,2,3,4}
+	make /o/t/n=5 df:r_in_tick_labels /wave=labels = {"1","10","100","1000","10000"} 	
+	TitleBox r_in_name title="Input Resistance (MΩ)", pos={5,5}
+	Slider r_in title="Input Resistance (MΩ)", value=log(r_in), limits={0,4,0.1}
+	Slider r_in size={125,45}, vert=0, pos={4, 25}, proc=NoDAQSliderControls, userTicks={tix, labels}
+	
+	GroupBox tau_group pos={2,70}, size={134,62}
+	make /o/n=5 df:tau_ticks /wave=tix = {-1,0,1,2,3} 
+	make /o/t/n=5 df:tau_labels /wave=labels = {"0.1","1","10","100","1000"}
+	TitleBox tau_name title="Time Constant (ms)", pos={5,75}
+	Slider tau title="Time Constant (ms)", value=log(tau), limits={-1,3,0.1}
+	Slider tau size={125,45}, vert=0, pos={4, 95}, proc=NoDAQSliderControls, userTicks={tix, labels}
+
+	GroupBox noise_group pos={2,138}, size={134,62}
+	TitleBox noise_name title="RMS Noise (pA)", pos={5,145}
+	Slider noise title="RMS Noise (pA)", variable=root:Packages:noDAQ:noise, limits={0,25,1}
+	Slider noise size={125,45}, vert=0, pos={4, 165}
+end
+
+function NoDAQSliderControls(info)
+	struct WMSliderAction &info
+	
+	//print(10^info.curval)
+	string var_name = info.ctrlName
+	dfref df = root:Packages:NoDAQ
+	nvar /sdfr=df var = $var_name
+	var = 10^info.curval
 end
