@@ -138,9 +138,14 @@ function /df SealTestChanDF(chan)
 end
 
 function /df SealTestDF()
-	string instance
-	
 	dfref df=Core#PackageHome(module,"sealTest")
+	return df
+end
+
+function /df SealTestInstanceDF()
+	dfref df=SealTestDF()
+	svar /sdfr=df instance 
+	dfref df=Core#InstanceHome(module,"sealTest",instance)
 	return df
 end
 
@@ -276,7 +281,10 @@ Function SealTestWindow([DAQ])
 	dfref df=SealTestDF()
 	svar instance = df:instance
 	dfref instanceDF = df:$instance
+	variable /g instanceDF:target_electrode_resistance = 10 // Megaohms; TODO make this a setting
+	variable /g instanceDF:range_electrode_resistance = 0.2 // Range as a fraction of target value: TODO make this a setting
 	nvar /sdfr=instanceDF left,top,right,bottom,axisMin,axisMax,freq
+	nvar /sdfr=instanceDF target_electrode_resistance, range_electrode_resistance
 	string win="SealTestWin"
 	if(WinType(win))
 		DoWindow /F $win
@@ -290,14 +298,14 @@ Function SealTestWindow([DAQ])
 //		variable axisMin=NumVarOrDefault(folder+"axisMin",-2500)
 		if(winexist("MainPanel"))
 			GetWindow MainPanel wsize
-			right = v_right + (right-left) -200//(right-left) + v_left
+			right = v_right + (v_right-v_left) - 150//(right-left) + v_left
 			left = v_right//left
 			bottom = v_bottom//(bottom-top) + v_bottom
 			top = v_top//bottom
 		endif
 		Display /K=1/W=(left,top,right,bottom)/N=$win as "Seal Test"
+		SetWindow $win userData(daq)=DAQ
 	endif
-	SetWindow $win userData(DAQ)=DAQ 
 	
 //	if(!DataFolderExists("root:sealtest"))
 //		return -1
@@ -325,6 +333,20 @@ Function SealTestWindow([DAQ])
 			ModifyGraph freepos($sweepAxis)={0,kwFraction}, btlen=3
 			AppendToGraph /T=InputHistoryTaxis /R=InputHistoryAxis /C=(red,green,blue) chanDF:inputHistory vs df:thyme
 			String resistanceTitle,pressureTitle
+			if(copernicus())
+				setdrawenv xcoord=prel, ycoord=chan0_axis, fillpat=-1,fillfgc= (26214,26214,26214),dash=3, save
+				setdrawenv fillbgc= (65535,43690,0,26083), save
+				variable top_target = 5000 / target_electrode_resistance
+				variable bottom_target = -top_target
+				variable delta = top_target*range_electrode_resistance
+				drawrect 0.02,0+delta,0.15,0-delta
+				//drawrect 0.87,0+delta,1,0-delta
+				drawrect 0.64,top_target-delta,0.82,top_target+delta
+				drawrect 0.30,bottom_target-delta,0.48,bottom_target+delta
+				setdrawenv ycoord=InputHistoryAxis, save
+				delta = target_electrode_resistance*range_electrode_resistance
+				drawrect 0,target_electrode_resistance+delta,1,target_electrode_resistance-delta
+			endif
 			if(!copernicus())
 				AppendToGraph /T=SeriesHistoryTaxis /R=SeriesHistoryAxis /C=(red,green,blue) chanDF:seriesHistory vs df:thyme
 				AppendToGraph /T=PressureHistoryTaxis /R=PressureHistoryAxis /C=(red,green,blue) chanDF:pressureHistory vs df:thyme
@@ -337,23 +359,31 @@ Function SealTestWindow([DAQ])
 			endif
 			sprintf resistanceTitle,"\K(%d,%d,%d)"+"M"+omega,red,green,blue
 			sprintf pressureTitle,"\K(%d,%d,%d)"+"mBar ",red,green,blue
-			Button $("Zap_"+channel) title="Zap", pos={5,10+count*yJump}, size={30,20}, proc=SealTestWinButtons
 			if(!copernicus())
+				Button $("Zap_"+channel) title="Zap", pos={5,10+count*yJump}, size={30,20}, proc=SealTestWinButtons
 				SetVariable $("ZapDuration_"+channel) title=" ", help={"Zap duration in ms"}, pos={38,12+count*yJump}, size={35,20}, limits={0.5,50,0.5}, value=_NUM:5
 			endif
 			
 			string valName="inputRes_"+channel
-			ValDisplay $valName pos={75,8+count*yJump}, format="%.1f", fsize=18, disable=0
+			xx = 75 - 65*copernicus()
+			ValDisplay $valName pos={xx,8+count*yJump}, format="%.1f", fsize=18, disable=0
 			ValDisplay $valName bodywidth=60, size={100,30}, title=resistanceTitle, value=#JoinPath({getdatafolder(1,chanDF),"inputRes"})
-			ValDisplay $("Aux_"+channel) pos={565,10+count*yJump}, format="%.1f", fsize=14, disable=1
-			
+			if(!copernicus())
+				ValDisplay $("Aux_"+channel) pos={565,10+count*yJump}, format="%.1f", fsize=14, disable=1
+			endif
 			variable no_daq = stringmatch(DAQType(daq),"NoDAQ")
 			string baseline_title = selectstring(copernicus(),"Baseline","Begin")
-			Button $("Baseline_"+channel) title=baseline_title, pos={185,10+count*yJump-7*no_daq}, size={45,15}, proc=SealTestWinButtons
+			Button $("Baseline_"+channel) title=baseline_title, pos={xx+110,10+count*yJump-7*no_daq}, size={45,15}, proc=SealTestWinButtons
 			if(no_daq)
-				Button Explore, pos={185, 22+count*yJump}, title="Explore", size={45,15}, proc=SealTestWinButtons
+				Button Explore, pos={xx+110, 22+count*yJump}, title="Explore", size={45,15}, proc=SealTestWinButtons
 			endif
-			SetVariable $("Range_"+channel) title="Range", pos={242,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
+			if(!copernicus())
+				SetVariable $("Range_"+channel) title="Range", pos={242,12+count*yJump}, size={85,20}, value=_NUM:1200, limits={200,2000,200}, proc=SealTestWinSetVariables
+			endif
+			if(copernicus())
+				SetVariable message pos={415,10}, fsize=14, bodywidth=270, disable=0
+				SetVariable message value=_STR:"Line up the traces in the orange boxes"
+			endif
 			//SetVariable $("Threshold_"+channel) title="Thresh %", pos={252,12+count*yJump}, size={85,20}, value=_NUM:0, proc=SealTestWinSetVariables
 			valName="seriesRes_"+channel
 			//ValDisplay $valName pos={855,8+count*yJump}, format="%.1f", fsize=18, disable=2
@@ -386,7 +416,7 @@ Function SealTestWindow([DAQ])
 		SetAxis /A/R TimeConstantHistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
 		SetAxis /A/R PressureHistoryTaxis// (0.5*(+100)/freq),(0.5*(-100)/freq)
 	endif
-	SetWindow SealTestWin hook=SealTestHook, hookevents=1 // mouse down events
+	SetWindow SealTestWin hook(all)=SealTestHook, hookevents=1 // mouse down events
 	//Wave AcqMode=root:parameters:AcqMode
 	//AcqMode[
 	if(RestoreAxes("View",win=win) || copernicus())	
@@ -420,16 +450,24 @@ Function SealTestWindow([DAQ])
 	Label /Z timeConstantHistoryAxis "Time Constant (ms)"
 	Label /Z pressureHistoryAxis "Pressure (mBar)"
 	xx=335; yy=10
-	GroupBox Controls frame=1, pos={xx,yy-5}, size={505,30}, title=""
+	if(!copernicus())
+		GroupBox Controls frame=1, pos={xx,yy-5}, size={505,30}, title=""
+	endif
 	xx+=5
-	PopupMenu Channels, pos={xx,yy}, userData(selected)=ChannelList(chanBits),mode=0, title="Channels",proc=SealTestWinPopupMenus
-	PopupMenu Channels, value=#("PopupOptions(\"\",\"Channels\",ChannelCombos(\"sealtest\",\"\"),selected=ChannelList("+num2str(chanBits)+"))")
+	if(!copernicus())
+		PopupMenu Channels, pos={xx,yy}, userData(selected)=ChannelList(chanBits),mode=0, title="Channels",proc=SealTestWinPopupMenus
+		PopupMenu Channels, value=#("PopupOptions(\"\",\"Channels\",ChannelCombos(\"sealtest\",\"\"),selected=ChannelList("+num2str(chanBits)+"))")
+	endif
 	xx+=90
 	wave /sdfr=df ampl
 	nvar /sdfr=instanceDF gridOn,seriesOn,pressureOn,timeConstantOn
-	SetVariable Ampl,pos={xx,yy+2},size={60,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
+	if(!copernicus())
+		SetVariable Ampl,pos={xx,yy+2},size={60,20},value=ampl[0],proc=SealTestWinSetVariables,title="Ampl"
+	endif
 	xx+=65
-	SetVariable Freq,pos={xx,yy+2},size={60,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
+	if(!copernicus())
+		SetVariable Freq,pos={xx,yy+2},size={60,20},limits={0.1,20,1}, value=freq,proc=SealTestWinSetVariables,title="Freq"
+	endif
 	xx+=135
 	if(!copernicus())
 		Checkbox Grid, pos={xx,yy+3},variable=gridOn, title="Grid",proc=SealTestWinCheckboxes
@@ -797,7 +835,27 @@ Function SealTestStart(reset,DAQ)
 	Speak(1,outputWaves,0,DAQs=DAQ)
 	Listen(1,1,inputWaves,5,1,listenHook,"ErrorHook()","",DAQs=DAQ)
 	StartClock(1/freq,DAQs=DAQ) // Includes starting stimulation.  
+	if(copernicus())
+		SetSealTestMonitor(1)
+	endif
 End
+
+function SetSealTestMonitor(on)
+	variable on // 1 to turn on; 0 to turn off
+	
+	if(on)
+		CtrlNamedBackground seal_test_monitor, start, period=30, proc=SealTestMonitor
+	else
+		CtrlNamedBackground seal_test_monitor, stop
+	endif
+end
+
+function SealTestMonitor(info)
+	struct WMBackgroundStruct &info
+	
+	copernicus#check_electrode_range()
+	return 0
+end
 
 Function SealTestZap(OutputMultiplex,DAQ)
 	wave OutputMultiplex
@@ -987,9 +1045,9 @@ Function SealTestCollectSweeps(DAQ)
 	endif
 End
 
-Function SealTestHook(infostr)
-	String infostr
-	String event=StringByKey("EVENT",infoStr)
+Function SealTestHook(info)
+	struct WMWinHookStruct &info
+	string event=info.eventName
 	
 	strswitch(event)
 		case "killVote":
@@ -1011,9 +1069,27 @@ Function SealTestHook(infostr)
 				i+=1
 			while(i<100 && numtype(v_min)>0)
 			SaveAxes("View",win="SealTestWin")
-			variable modifiers=NumberByKey("MODIFIERS",infoStr) // 1 if it is programatically killed, 0 if it is killed by a mouse click.  
+			variable modifiers=0//NumberByKey("MODIFIERS",infoStr) // 1 if it is programatically killed, 0 if it is killed by a mouse click.  
+			if(copernicus())
+				SetSealTestMonitor(0)
+			endif
 			SealTestEnd(noStore=modifiers,DAQ=DAQ)
 			break
+		case "mouseDown":
+			variable y_axis_val = AxisValFromPixel("SealTestWin", "chan0_axis", info.mouseLoc.v)
+			df = SealTestDF()
+			svar instance = df:instance
+			dfref instanceDF = df:$instance
+			nvar /sdfr=instanceDF target_electrode_resistance, range_electrode_resistance
+			variable target = 5000/target_electrode_resistance
+			variable upper = target+target*range_electrode_resistance
+			variable lower = target-target*range_electrode_resistance
+			if(y_axis_val>lower && y_axis_val<upper)
+				print("Upper section of this trace must fall within this orange window")
+			endif 
+			if(y_axis_val>-upper && y_axis_val<-lower)
+				print("Lower section of this trace must fall within this orange window")
+			endif 
 	endswitch
 	SetDataFolder root:
 End

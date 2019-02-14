@@ -915,8 +915,9 @@ Function StartAcquisition([DAQ])
 	Variable i; String alert_text,channel
 	if(sealTestOn)
 		DoWindow /K SealTest
-		String infoStr="EVENT:kill"
-		SealTestHook(infoStr)
+		struct WMWinHookStruct info
+		info.eventName = "kill"
+		SealTestHook(info)
 	endif
 	
 	if(acquiring==0)

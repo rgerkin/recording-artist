@@ -1,15 +1,18 @@
 #pragma TextEncoding = "Windows-1252"
 #pragma rtGlobals=3		// Use modern global access method and strict wave access.
 
-#pragma moduleName=Roborig
-static strconstant module=Roborig
+#pragma moduleName=copernicus
+static strconstant module=copernicus
 static constant main_panel_xstart = 3
 static constant main_panel_ystart = 2
 static strconstant electrode_locations="Midline;Penetrate;Record"
 static strconstant sutter_loc="root:Packages:Sutter:"
+static strconstant seal_test_lineup_traces="Lineup the traces in the orange boxes"
+static strconstant seal_test_resistance_low="Resistance too low; get a new electrode"
+static strconstant seal_test_resistance_high="Resistance too high; get a new electrode"
 
 Menu "Copernicus"
-	"Initialize", Roborig#init()
+	"Initialize", copernicus#init()
 End
 
 function init()
@@ -170,14 +173,14 @@ function main_panel_drugs(xx,yy)
 		xx+=17
 		SetVariable $("DrugConc_"+num2str(i)),pos={xx,yy-2},size={30,18},limits={0,1000,1}, variable=conc, title=" "
 		xx+=50
-		PopupMenu $("DrugUnits_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"Roborig\",\"drugs\",\"\",\"units\",brackets=0)"
+		PopupMenu $("DrugUnits_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"units\",brackets=0)"
 		xx+=40
-		PopupMenu $("DrugName_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"Roborig\",\"drugs\",\"\",\"names\",brackets=0)"
+		PopupMenu $("DrugName_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"names\",brackets=0)"
 		yy+=25
 	endfor
 	
 	Button UpdateDrugs,pos={xx+50,yy0},size={100,20},title="Update",proc=main_panel_buttons
-	PopupMenu DrugPresets,pos={xx+80,yy0+35},size={328,30},mode=0,value=#"Core#PopupMenuOptions(\"Roborig\",\"drugs\",\"\",\"presets\",brackets=0)",proc=main_panel_popupmenus,title="Presets"
+	PopupMenu DrugPresets,pos={xx+80,yy0+35},size={328,30},mode=0,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"presets\",brackets=0)",proc=main_panel_popupmenus,title="Presets"
 end
 
 // Create a widget for cell/electrode coordinate logging
@@ -578,3 +581,26 @@ Function update_main_panel_coords(location)
 //		endif
 //	endfor
 End
+
+// Check whether electrode parameters are in range during the seal test
+function check_electrode_range()
+	dfref df = SealTestInstanceDF()
+	nvar /sdfr=df target_electrode_resistance, range_electrode_resistance
+	dfref df = SealTestChanDF(0)
+	nvar /sdfr=df inputRes
+	variable lower = target_electrode_resistance - target_electrode_resistance*range_electrode_resistance
+	variable upper = target_electrode_resistance + target_electrode_resistance*range_electrode_resistance
+	if(inputRes < lower)
+		update_seal_test_message(seal_test_resistance_low)
+	elseif(inputRes > upper)
+		update_seal_test_message(seal_test_resistance_high)
+	else
+		update_seal_test_message(seal_test_lineup_traces)
+	endif
+	
+end
+
+function update_seal_test_message(msg)
+	string msg
+	SetVariable message win=SealTestWin, value=_STR:msg
+end

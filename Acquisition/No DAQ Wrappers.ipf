@@ -129,6 +129,7 @@ static Function BoardInit([DAQ])
 	variable /g df:tau = 1 // Time consant in ms (e.g. the pipette in the bath) 
 	variable /g df:r_in = 10 // Input resistance in MΩ (e.g. the pipette in the bath)
 	variable /g df:noise = 3 // RMS Noise level (e.g. in pA)
+	variable /g df:offset = 0 // Pipette offset (i.e leak) (e.g. in pA)
 	string /g df:direction = TransferDirection()
 	BoardReset(1,DAQ=DAQ)
 	ZeroAll(DAQ=DAQ)
@@ -282,7 +283,7 @@ static function Waiting(s)
 	nvar /z/sdfr=SealTestDF() sealTestOn
 	lastDAQSweepT=StopMSTimer(-2)
 	
-	nvar /sdfr=$noDAQ_path t_init,t_update,tau,r_in,noise
+	nvar /sdfr=$noDAQ_path t_init,t_update,tau,r_in,noise,offset
 	svar /sdfr=$noDAQ_path direction
 	variable first_sweep = t_update==0
 	variable then = (t_update - t_init)/1e6
@@ -303,6 +304,7 @@ static function Waiting(s)
 		nvar /sdfr=outDF out_x = $("x"+num2str(chan))
 		//print wavemax(out),wavemin(out),out_x,numpnts(out)
 		wave response = IO(out,out_x,tau,r_in,direction,noise)
+		response += offset
 		out_x += numpnts(response)
 		wave /sdfr=inDF in = $("ch"+num2str(chan))
 		if(numpnts(response))
@@ -411,10 +413,10 @@ end
 
 function NoDAQPanel()
 	DoWindow /K NoDAQController
-	NewPanel /K=1 /N=NoDAQController /W=(10,10,150,225) as "Demo Mode Controller"
+	NewPanel /K=1 /N=NoDAQController /W=(10,10,150,325) as "Demo Mode Controller"
 	
 	dfref df = root:Packages:NoDAQ
-	nvar /sdfr=df r_in, tau
+	nvar /sdfr=df r_in, tau, offset
 	
 	GroupBox r_in_group pos={2,2}, size={134,62}
 	make /o/n=5 df:r_in_ticks /wave=tix = {0,1,2,3,4}
@@ -434,6 +436,13 @@ function NoDAQPanel()
 	TitleBox noise_name title="RMS Noise (pA)", pos={5,145}
 	Slider noise title="RMS Noise (pA)", variable=root:Packages:noDAQ:noise, limits={0,25,1}
 	Slider noise size={125,45}, vert=0, pos={4, 165}
+	
+	GroupBox offset_group pos={2,206}, size={134,62}
+	make /o/n=5 df:offset_ticks /wave=tix = {-500,-250,0,250,500} 
+	make /o/t/n=5 df:offset_labels /wave=labels = {"-500","-250","0","250","500"}
+	TitleBox offset_name title="Pipette Offset (pA)", pos={5,208}
+	Slider offset title="Pipette Offset (pA)", variable=root:Packages:noDAQ:offset, limits={-500,500,10}, userTicks={tix, labels}
+	Slider offset size={125,45}, vert=0, pos={4, 228}
 end
 
 function NoDAQSliderControls(info)
