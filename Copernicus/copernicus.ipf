@@ -10,6 +10,11 @@ static strconstant sutter_loc="root:Packages:Sutter:"
 static strconstant seal_test_lineup_traces="Lineup the traces in the orange boxes"
 static strconstant seal_test_resistance_low="Resistance too low; get a new electrode"
 static strconstant seal_test_resistance_high="Resistance too high; get a new electrode"
+static strconstant seal_test_find_cell="Target a cell; then provide negative pressure"
+static strconstant seal_test_good_seal="Great seal; Now break in with suction"
+static strconstant seal_test_good_breakin="Good break-in; now begin experiment"
+static strconstant seal_test_bad_breakin="Bad break-in; get a new electrode"
+static strconstant seal_test_noise_high="Too noisy; ground your rig"
 
 Menu "Copernicus"
 	"Initialize", copernicus#init()
@@ -23,6 +28,7 @@ function init()
 	Initialization(create_windows=0, prompt_experiment_name=0)
 	dfref df = getstatusDF()
 	variable /g df:copernicus = 1
+	string /g df:copernicus_state = "Initialized"
 	main_panel(rebuild=1)
 end
 
@@ -34,6 +40,19 @@ function copernicus()
 		result = 1
 	endif
 	return result
+end
+
+function /s get_state()
+	dfref df = getstatusDF()
+	svar /sdfr=df copernicus_state
+	return copernicus_state
+end
+
+function set_state(state)
+	string state
+	dfref df = getstatusDF()
+	svar /sdfr=df copernicus_state
+	copernicus_state = state
 end
 
 // Generate an alert dialog
@@ -190,9 +209,11 @@ function main_panel_coords(xx, yy)
 	xx = main_panel_xstart
 	yy = 138
 	
-	wave /t names = Core#WavTPackageSetting(module, "coordinates", "", "names")
-	wave coords = Core#WavTPackageSetting(module, "coordinates", "", "values")
-	
+	wave /t/z names = Core#WavTPackageSetting(module, "coordinates", "", "names")
+	//wave coords = Core#WavTPackageSetting(module, "coordinates", "", "values")
+	if(!waveexists(names))
+		make /free/n=(3)/t names
+	endif
 	//redimension /n=2 names
 	//redimension /n=(2,3) coords
 	//names = {"Here","There"}
@@ -271,7 +292,7 @@ function main_panel_actions(xx, yy)
 	xx = main_panel_xstart
 	yy += 15
 	Button Action_Seal, fsize=24, pos={xx,yy}, size={75,40}, disable=0, proc=main_panel_buttons, title="Seal"
-	Button Action_Run, fsize=24,  pos={xx+80,yy}, size={75,40}, disable=2, proc=main_panel_buttons, title="Run"
+	Button Action_Run, fsize=24,  pos={xx+80,yy}, size={75,40}, disable=0, proc=main_panel_buttons, title="Run"
 end
 
 function main_panel_status(xx, yy)
@@ -315,11 +336,13 @@ Function main_panel_buttons(ctrlName) : ButtonControl
 		case "Action":
 			strswitch(detail)
 				case "Seal":
+					copernicus#set_state("SealTest:Start")
 					SealTest(1)
 					//alert("Seal not implemented yet.", "")
 					break
 				case "Run":
-					alert("Run not implemented yet.", "")
+					Copernicus#DataWindow()
+					//alert("Run not implemented yet.", "")
 					break
 			endswitch
 			break
@@ -585,22 +608,149 @@ End
 // Check whether electrode parameters are in range during the seal test
 function check_electrode_range()
 	dfref df = SealTestInstanceDF()
-	nvar /sdfr=df target_electrode_resistance, range_electrode_resistance
+	nvar /sdfr=df target_electrode_resistance, range_electrode_resistance, target_seal_resistance, max_noise
 	dfref df = SealTestChanDF(0)
-	nvar /sdfr=df inputRes
-	variable lower = target_electrode_resistance - target_electrode_resistance*range_electrode_resistance
-	variable upper = target_electrode_resistance + target_electrode_resistance*range_electrode_resistance
-	if(inputRes < lower)
-		update_seal_test_message(seal_test_resistance_low)
-	elseif(inputRes > upper)
-		update_seal_test_message(seal_test_resistance_high)
-	else
-		update_seal_test_message(seal_test_lineup_traces)
-	endif
-	
+	nvar /sdfr=df inputRes, timeConstant, leak, noise
+	variable target = 5000 / target_electrode_resistance
+	variable delta = target*range_electrode_resistance
+	string state = get_state()
+	strswitch(state)
+		case "SealTest:Start":
+			variable lower = target_electrode_resistance - target_electrode_resistance*range_electrode_resistance
+			variable upper = target_electrode_resistance + target_electrode_resistance*range_electrode_resistance
+			if(noise > max_noise)
+				update_seal_test_message(seal_test_noise_high)
+			elseif(inputRes < lower)
+				update_seal_test_message(seal_test_resistance_low)
+			elseif(inputRes > upper)
+				update_seal_test_message(seal_test_resistance_high)
+			elseif(leak > delta || leak < -delta)
+				update_seal_test_message(seal_test_lineup_traces)
+			else
+				update_seal_test_message(seal_test_find_cell)
+			endif
+			break
+		case "SealTest:Seal":
+			if(inputRes > target_seal_resistance)
+				update_seal_test_message(seal_test_good_seal)
+				copernicus#set_state("SealTest:Breakin")
+			else
+				update_seal_test_message(seal_test_find_cell)
+				copernicus#set_state("SealTest:Seal")
+			endif	
+			break
+		case "SealTest:Breakin":
+			//if(inputRes > target_seal_resistance)
+			//	update_seal_test_message(seal_test_good_breakin)
+			//else
+			//	update_seal_test_message(seal_test_bad_breakin)
+			//endif	
+			string tc = num2str(timeConstant)
+			update_seal_test_message(tc)
+			break
+		default:
+			update_seal_test_message("State unhandled!")			
+	endswitch
 end
 
 function update_seal_test_message(msg)
 	string msg
 	SetVariable message win=SealTestWin, value=_STR:msg
+	strswitch(msg)
+		case seal_test_find_cell:
+			Button Baseline_0 disable=0, win=SealTestWin
+			break
+		default:
+			Button Baseline_0 disable=2, win=SealTestWin
+			break
+	endswitch
+end
+
+function update_data_message(msg)
+	string msg
+	SetVariable message win=DataWin, value=_STR:msg
+end
+
+function DataWindow()
+	string win="DataWin"
+	if(WinType(win))
+		DoWindow /F $win
+	else
+		string DAQ = MasterDAQ()
+		if(winexist("MainPanel"))
+			GetWindow MainPanel wsize
+			variable right = v_right + (v_right-v_left) - 150//(right-left) + v_left
+			variable left = v_right//left
+			variable bottom = v_bottom//(bottom-top) + v_bottom
+			variable top = v_top//bottom
+		endif
+		Display /K=1/W=(left,top,right,bottom)/N=$win as "Data"
+		ControlBar /T 40
+		SetWindow $win userData(daq)=DAQ
+		SetVariable message pos={315,10}, fsize=14, bodywidth=270, disable=2
+		SetVariable message value=_STR:"Beginning data collection..."
+		AppendToGraph root:parameters:Acq:DAQs:daq0:input_0
+		start_acquisition()
+		Button StartStop, pos={10, 10}, title="Stop", proc=DataWinButtons
+	endif
+end
+
+function DataWinButtons(info)
+	struct WMButtonAction &info
+	
+	switch(info.eventCode)
+		case 2: // Mouse Up
+			string daq = MasterDAQ()
+			dfref df = GetDaqDF(daq)
+			nvar /sdfr=df acquiring
+			strswitch(info.ctrlName)
+				case "StartStop":
+					if(acquiring)
+						stop_acquisition()
+						SetAcquisitionMonitor(0)
+						Button StartStop, title="Start", win=DataWin
+					else
+						start_acquisition()
+					endif
+					break
+			endswitch
+			break
+	endswitch
+end
+
+function start_acquisition()
+	string daq = MasterDAQ()
+	StartAcquisition()
+	copernicus#set_state("Acquisition:Start")
+	SetAcquisitionMonitor(1)
+	Button StartStop, title="Stop", win=DataWin
+End
+
+function stop_acquisition()
+	string daq = MasterDAQ()
+	StopAcquisition()
+	copernicus#set_state("Acquisition:Stop")
+	SetAcquisitionMonitor(0)
+	Button StartStop, title="Start", win=DataWin
+End
+
+function SetAcquisitionMonitor(on)
+	variable on // 1 to turn on; 0 to turn off
+	
+	if(on)
+		CtrlNamedBackground acquisition_monitor, start, period=30, proc=AcquisitionMonitor
+	else
+		CtrlNamedBackground acquisition_monitor, stop
+	endif
+end
+
+function AcquisitionMonitor(info)
+	struct WMBackgroundStruct &info
+	
+	copernicus#check_acquisition_quality()
+	return 0
+end
+
+function check_acquisition_quality()
+	print("Acqusition quality is good")
 end

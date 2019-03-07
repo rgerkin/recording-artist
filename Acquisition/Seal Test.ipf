@@ -70,6 +70,8 @@ Function SealTest(chanBits[,instance,DAQ])
 			variable /G chanDF:seriesRes
 			variable /G chanDF:timeConstant
 			variable /G chanDF:pressure
+			variable /G chanDF:leak
+			variable /G chanDF:noise
 			variable /G chanDF:supplyVolts
 			nvar /sdfr=chanDF supplyVolts
 			if(supplyVolts==0)
@@ -282,7 +284,11 @@ Function SealTestWindow([DAQ])
 	svar instance = df:instance
 	dfref instanceDF = df:$instance
 	variable /g instanceDF:target_electrode_resistance = 10 // Megaohms; TODO make this a setting
+	variable /g instanceDF:target_seal_resistance = 1000 // Megaohms; TODO make this a setting
+	variable /g instanceDF:target_time_constant = 50 // ms; TODO make this a setting
 	variable /g instanceDF:range_electrode_resistance = 0.2 // Range as a fraction of target value: TODO make this a setting
+	variable /g instanceDF:range_time_constant = 0.5 // Range as a fraction of target value: TODO make this a setting
+	variable /g instanceDF:max_noise = 10 // Maximum RMS noise (pA)
 	nvar /sdfr=instanceDF left,top,right,bottom,axisMin,axisMax,freq
 	nvar /sdfr=instanceDF target_electrode_resistance, range_electrode_resistance
 	string win="SealTestWin"
@@ -333,7 +339,7 @@ Function SealTestWindow([DAQ])
 			ModifyGraph freepos($sweepAxis)={0,kwFraction}, btlen=3
 			AppendToGraph /T=InputHistoryTaxis /R=InputHistoryAxis /C=(red,green,blue) chanDF:inputHistory vs df:thyme
 			String resistanceTitle,pressureTitle
-			if(copernicus())
+			if(copernicus() && stringmatch(copernicus#get_state(),"SealTest:Start"))
 				setdrawenv xcoord=prel, ycoord=chan0_axis, fillpat=-1,fillfgc= (26214,26214,26214),dash=3, save
 				setdrawenv fillbgc= (65535,43690,0,26083), save
 				variable top_target = 5000 / target_electrode_resistance
@@ -373,7 +379,7 @@ Function SealTestWindow([DAQ])
 			endif
 			variable no_daq = stringmatch(DAQType(daq),"NoDAQ")
 			string baseline_title = selectstring(copernicus(),"Baseline","Begin")
-			Button $("Baseline_"+channel) title=baseline_title, pos={xx+110,10+count*yJump-7*no_daq}, size={45,15}, proc=SealTestWinButtons
+			Button $("Baseline_"+channel) title=baseline_title, pos={xx+110,10+count*yJump-7*no_daq}, size={45,15}, proc=SealTestWinButtons, disable=2
 			if(no_daq)
 				Button Explore, pos={xx+110, 22+count*yJump}, title="Explore", size={45,15}, proc=SealTestWinButtons
 			endif
@@ -382,7 +388,7 @@ Function SealTestWindow([DAQ])
 			endif
 			if(copernicus())
 				SetVariable message pos={415,10}, fsize=14, bodywidth=270, disable=0
-				SetVariable message value=_STR:"Line up the traces in the orange boxes"
+				SetVariable message value=_STR:"State not found"
 			endif
 			//SetVariable $("Threshold_"+channel) title="Thresh %", pos={252,12+count*yJump}, size={85,20}, value=_NUM:0, proc=SealTestWinSetVariables
 			valName="seriesRes_"+channel
@@ -504,7 +510,12 @@ Function SealTestWinButtons(ctrlName)
 			Variable /G df:zap=2^str2num(channel)
 			break
 		case "Baseline":
+			if(copernicus())
+				drawaction delete
+				copernicus#set_state("SealTest:Seal")
+			endif
 			SealTestTracker(chan,1)
+			SetAxis /W=SealTestWin /A
 			break
 		case "ZeroPressure":
 			nvar /sdfr=chanDF supplyVolts
@@ -836,6 +847,7 @@ Function SealTestStart(reset,DAQ)
 	Listen(1,1,inputWaves,5,1,listenHook,"ErrorHook()","",DAQs=DAQ)
 	StartClock(1/freq,DAQs=DAQ) // Includes starting stimulation.  
 	if(copernicus())
+		copernicus#set_state("SealTest:Start")
 		SetSealTestMonitor(1)
 	endif
 End
@@ -918,7 +930,7 @@ Function SealTestCollectSweeps(DAQ)
 			dfref chanDF=SealTestChanDF(i)
 			//string channel=num2str(i)
 			wave /sdfr=chanDF Sweep,InputHistory,SeriesHistory,TimeConstantHistory,PressureHistory
-			nvar /sdfr=chanDF inputRes,seriesRes,timeConstant,pressure
+			nvar /sdfr=chanDF inputRes,seriesRes,timeConstant,pressure,leak,noise
 			variable inputGain=GetModeInputGain(mode)
 		
 			String daq_type=DAQType(Chan2DAQ(i))
@@ -936,6 +948,8 @@ Function SealTestCollectSweeps(DAQ)
 				WaveStats /Q Sweep
 				inputRes=V_sdev // Compute RMS noise
 				seriesRes=V_adev
+				leak=v_avg
+				noise=v_sdev
 			else // Seal Test
 				string outputType=GetModeOutputType(mode,fundamental=1)
 				string inputType=GetModeInputType(mode,fundamental=1)
@@ -946,6 +960,9 @@ Function SealTestCollectSweeps(DAQ)
 					in=abs(mean(sweep,0.29/freq,0.49/freq)-mean(sweep,0.6233/freq,0.8233/freq))
 					biphasic=1
 				endif
+				wavestats /q/r=(0,0.1/freq) sweep
+				leak=v_avg
+				noise=v_sdev
 				variable out=abs((1+biphasic)*Ampl[i])
 				variable ratioFactor=UnitsRatio(GetModeOutputPrefix(mode),GetModeInputPrefix(mode))
 				variable ratio=ratioFactor*out/in
@@ -968,12 +985,13 @@ Function SealTestCollectSweeps(DAQ)
 				else
 					seriesRes=NaN
 				endif
-				if(timeConstantOn)
+		
+				if(timeConstantOn || (copernicus() && stringmatch(copernicus#get_state(), "SealTest:Breakin")))
 					wavestats /q/m=1 sweep
-					variable v_fitoptions=4
+					variable v_fitoptions=6 // Suppress curve window and use robust fitting
 					variable start = x2pnt(sweep,v_minloc+0.005)
 					variable finish = x2pnt(sweep,v_minloc+0.02)
-					if(finish-start>10 && sweep[start])
+					if(finish-start>10 && sweep[start] && (v_avg-v_min)>25)
 						curvefit /q exp sweep[start,finish]
 						timeConstant = 1000/K2
 					else
