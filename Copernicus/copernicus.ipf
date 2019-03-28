@@ -86,7 +86,7 @@ Function main_panel([rebuild])
 			return 0
 		endif
 	endif
-	NewPanel /K=1 /W=(0,0,645,420) /N=MainPanel as module
+	NewPanel /K=1 /W=(0,0,645,410) /N=MainPanel as module
 	main_panel_controls()
 End	
 
@@ -306,7 +306,7 @@ function main_panel_status(xx, yy)
 		string str = stringfromlist(i,"Input;Access;Rest")
 		string name = "Status_SealQuality_"+str
 		ValDisplay $name mode=1,limits={0,1,0.5},highColor=(2,39321,1),lowColor=(65535,0,0),zeroColor=(65535,65532,16385)
-		ValDisplay $name pos={xx,yy+40*i}, size={50,25}, bodywidth=25, barmisc={0,0}, value=_NUM:0.3+0.3*i
+		ValDisplay $name pos={xx+75*i,yy}, size={50,25}, bodywidth=25, barmisc={0,0}, value=_NUM:0.3+0.3*i
 		ValDisplay $name title=str
 	endfor
 	Button Run, disable=1
@@ -646,7 +646,11 @@ function check_electrode_range()
 			//	update_seal_test_message(seal_test_bad_breakin)
 			//endif	
 			string tc = num2str(timeConstant)
-			update_seal_test_message(tc)
+			if(numtype(timeconstant))
+				update_seal_test_message(seal_test_good_seal)
+			else
+				update_seal_test_message("Time constant is %d ms")
+			endif
 			break
 		default:
 			update_seal_test_message("State unhandled!")			
@@ -684,12 +688,16 @@ function DataWindow()
 			variable bottom = v_bottom//(bottom-top) + v_bottom
 			variable top = v_top//bottom
 		endif
+		WaveSelector()
+		String selector_win=DAQ+"_Selector"
+		DoWindow /HIDE=1 $selector_win 
 		Display /K=1/W=(left,top,right,bottom)/N=$win as "Data"
 		ControlBar /T 40
 		SetWindow $win userData(daq)=DAQ
 		SetVariable message pos={315,10}, fsize=14, bodywidth=270, disable=2
 		SetVariable message value=_STR:"Beginning data collection..."
 		AppendToGraph root:parameters:Acq:DAQs:daq0:input_0
+		auto_configure_stimulus()
 		start_acquisition()
 		Button StartStop, pos={10, 10}, title="Stop", proc=DataWinButtons
 	endif
@@ -752,5 +760,27 @@ function AcquisitionMonitor(info)
 end
 
 function check_acquisition_quality()
-	print("Acqusition quality is good")
+	compute_input_resistance()
+	//check_access_resistance()
+	//print("Acqusition quality is good")
+end
+
+function compute_input_resistance()
+	wave w = root:parameters:Acq:DAQs:daq0:input_0
+	variable tps = Core#VarPackageSetting("Acq","AcqModes","VC","testPulseStart")
+	variable tpl = Core#VarPackageSetting("Acq","AcqModes","VC","testPulseLength")
+	variable tpa = Core#VarPackageSetting("Acq","AcqModes","VC","testPulseAmpl")
+	variable baseline = mean(w,0,tps-0.001)
+	variable pulse_depth = mean(w,tps+tpl-0.25*tpl,tps+tpl-0.001)
+	variable r_in = 1000*tpa / abs(baseline - pulse_depth)
+	variable quality = 1/(1+exp((-r_in+50)/10))
+	//print r_in, quality
+	ValDisplay status_sealquality_input value=_NUM:quality, win=MainPanel
+	//print(r_in)
+end
+
+function auto_configure_stimulus()
+	// For now, just a blank stimulus with a test pulse
+	wave test_pulse = Core#WavPackageSetting("Acq","stimuli",GetChanName(0),"testPulseOn")
+	test_pulse = 1
 end

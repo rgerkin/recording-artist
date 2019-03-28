@@ -414,7 +414,7 @@ end
 
 function NoDAQPanel()
 	DoWindow /K NoDAQController
-	NewPanel /K=1 /N=NoDAQController /W=(10,10,150,325) as "Demo Mode Controller"
+	NewPanel /K=1 /N=NoDAQController /W=(10,10,150,350) as "Demo Mode Controller"
 	
 	dfref df = root:Packages:NoDAQ
 	nvar /sdfr=df r_in, tau
@@ -448,9 +448,9 @@ function NoDAQPanel()
 	GroupBox r_a_group pos={2,274}, size={134,62}
 	//make /o/n=5 df:offset_ticks /wave=tix = {-500,-250,0,250,500} 
 	//make /o/t/n=5 df:offset_labels /wave=labels = {"-500","-250","0","250","500"}
-	TitleBox offset_name title="Access Resistance (pA)", pos={5,272}
-	Slider offset title="Access Resistance (pA)", variable=root:Packages:noDAQ:r_a, limits={0,40,1}//, userTicks={tix, labels}
-	Slider offset size={125,45}, vert=0, pos={4, 306}
+	TitleBox r_a__name title="Access Resistance (pA)", pos={5,280}
+	Slider r_a title="Access Resistance (pA)", variable=root:Packages:noDAQ:r_a, limits={0,40,1}//, userTicks={tix, labels}
+	Slider r_a size={125,45}, vert=0, pos={4, 300}
 end
 
 function NoDAQSliderControls(info)

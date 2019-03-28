@@ -653,7 +653,9 @@ Function CollectSweep(DAQ) // This function is called when the input data has be
 		SweepT [currSweep] = {(lastSweepT-bootT) / (60*1000000)} // Convert from microseconds to minutes.  
 		//UpdateDrugs() // TO DO: Add this back.  
 		SaveSweepParameters()
-		OnlineAnalysis(ISI)
+		if(!copernicus())
+			OnlineAnalysis(ISI)
+		endif
 		currSweep+=1
 		BumpRemainderBoxes(DAQ=DAQ)
 		waveformSweeps+=1

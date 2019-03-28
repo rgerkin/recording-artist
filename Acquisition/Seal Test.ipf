@@ -515,7 +515,9 @@ Function SealTestWinButtons(ctrlName)
 				copernicus#set_state("SealTest:Seal")
 			endif
 			SealTestTracker(chan,1)
-			SetAxis /W=SealTestWin /A
+			string chan_axis
+			sprintf chan_axis, "chan%d_axis", chan
+			SetAxis /W=SealTestWin /A $chan_axis
 			break
 		case "ZeroPressure":
 			nvar /sdfr=chanDF supplyVolts
@@ -988,7 +990,8 @@ Function SealTestCollectSweeps(DAQ)
 		
 				if(timeConstantOn || (copernicus() && stringmatch(copernicus#get_state(), "SealTest:Breakin")))
 					wavestats /q/m=1 sweep
-					variable v_fitoptions=6 // Suppress curve window and use robust fitting
+					variable v_fiterror = 0 // Suppress errors
+					variable v_fitoptions = 6 // Suppress curve window and use robust fitting
 					variable start = x2pnt(sweep,v_minloc+0.005)
 					variable finish = x2pnt(sweep,v_minloc+0.02)
 					if(finish-start>10 && sweep[start] && (v_avg-v_min)>25)
