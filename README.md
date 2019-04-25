@@ -1,4 +1,4 @@
-# Recording Artist for Igor Pro #
+# Recording Artist for Igor Pro: Copernicus Interface #
 
 ### What is it? ###
 
@@ -7,6 +7,10 @@
 ### Who uses it? ###
 
 14 research labs in 4 countries on 3 continents, including labs located at Stanford University, M.I.T., Northwestern University, and Carnegie Mellon.  
+
+### What is Copernicus ###
+
+Copernicus is a user interface and control system to get a new experimentalist (including undergraduate students) up to speed on patch clamp, allowing them to collect useful data on the very first day!
 
 ### How can I use it? ###
 
