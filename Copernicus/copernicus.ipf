@@ -15,6 +15,58 @@ static strconstant seal_test_good_seal="Great seal; Now break in with suction"
 static strconstant seal_test_good_breakin="Good break-in; now begin experiment"
 static strconstant seal_test_bad_breakin="Bad break-in; get a new electrode"
 static strconstant seal_test_noise_high="Too noisy; ground your rig"
+static strconstant protocol_sequence_location = "root:parameters:copernicus:protocol_sequence"
+
+function /wave get_protocol_sequence()
+	wave /z/t sequence = $protocol_sequence_location
+	if(!waveexists(sequence))
+		wave /t sequence = make_protocol_sequece
+	endif
+	return sequence
+end
+
+function /wave make_protocol_sequence()
+	make /o/t/n=(1,99) $protocol_sequence_location /wave=sequence=""
+	setdimlabel 0,-1,Protocol,sequence
+	setdimlabel 1,0,Name,sequence
+	setdimlabel 1,1,Repeats,sequence
+	
+	// BEGIN SEQUENCE EDITING
+	sequence[0][] = {{"AIBS_Ramp"}, {"1"}}
+	sequence[1][] = {{"AIBS_Square_Suprathreshold"}, {"3"}}
+	sequence[2][] = {{"AIBS_Square_Subthreshold"}, {"8"}}
+	// END SEQUENCE EDITING
+		
+	variable i
+	for(i=0; i<dimsize(sequence,0); i+=1)
+		if(!strlen(sequence[i][0]))
+			redimension /n=(i,2) sequence
+			break
+		endif
+		string protocol = sequence[i][0]
+		string stimuli_available = StimulusList()
+		if(whichlistitem(protocol, stimuli_available) < 0)
+			DoAlert 0, protocol+" is not an available stimulus protocol"
+		endif
+		switch(i)
+			case 0:
+				setdimlabel 0,i,p1st,sequence
+				break
+			case 1:
+				setdimlabel 0,i,p2nd,sequence
+				break
+			case 2:
+				setdimlabel 0,2,p3rd,sequence
+				break
+			default:
+				setdimlabel 0,i,$("p"+num2str(i)+"st"),sequence
+		endswitch
+	endfor
+	if(dimsize(sequence,0)==0)
+		doalert 0, "Protocol Sequencer has no listed protocols"
+	endif 
+	return sequence
+end
 
 Menu "Copernicus"
 	"Initialize", copernicus#init()
@@ -756,6 +808,7 @@ function AcquisitionMonitor(info)
 	struct WMBackgroundStruct &info
 	
 	copernicus#check_acquisition_quality()
+	copernicus#check_acquisition_stage()
 	return 0
 end
 
@@ -763,6 +816,9 @@ function check_acquisition_quality()
 	compute_input_resistance()
 	//check_access_resistance()
 	//print("Acqusition quality is good")
+end
+
+function check_acquisition_stage()
 end
 
 function compute_input_resistance()

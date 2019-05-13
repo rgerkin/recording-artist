@@ -13,7 +13,7 @@ Function EditModule(module[,package])
 	
 	dowindow /k $moduleEditor
 	newpanel /k=1/n=$moduleEditor as "Edit Module "+module
-	setwindow $moduleEditor hook(slide)=slideHook
+	setwindow $moduleEditor hook(slide)=ProcGlobal#SlideHook
 	string packages=ListPackages(modules=module)
 	package=selectstring(!paramisdefault(package),stringfromlist(0,packages),package)
 	variable tab=max(0,WhichListItem(package,packages,";",0,0))
@@ -226,7 +226,7 @@ function ShowPackageInstance(module,package,instance,x,y[,generic,sub,hideVars,f
 	if(!datafolderrefstatus(manifestDF))
 		return -1
 	endif
-	variable xjump=85,yjump=30,yStart=y
+	variable xjump=85,yjump=20,yStart=y
 	variable i,j//,isSubPackage_=0
 	nvar /z/sdfr=manifestDF noNew
 	if(nvar_exists(noNew) && noNew && new)
@@ -266,14 +266,14 @@ function ShowPackageInstance(module,package,instance,x,y[,generic,sub,hideVars,f
 						rows=1
 						break
 					default:
-						button $addRow, pos={x,y},size={20,20},title="+",disable=0,userData(ACTION)="Add Row",proc=EditPackagesButtons
-						button $subtractRow, pos={x+20,y},size={20,20},title="-",disable=0,userData(ACTION)="Subtract Row",proc=EditPackagesButtons
+						button $addRow, pos={x,y+10},size={20,10},title="+",disable=0,userData(ACTION)="Add Row",proc=EditPackagesButtons
+						button $subtractRow, pos={x+20,y+10},size={20,10},title="-",disable=0,userData(ACTION)="Subtract Row",proc=EditPackagesButtons
 						controlsToModify+=addRow+";"+subtractRow+";"
 						y+=yJump
 						break
 				endswitch
 				for(j=0;j<rows;j+=1)
-					ShowPackageInstanceObject(module,package,instance,object,info+"_"+num2str(j),x,y,yJump,row=j,generic=generic,sub=sub,hideVars=hideVars,firstInstance=firstInstance)
+					ShowPackageInstanceObject(module,package,instance,object,info+"_"+num2str(j),x,y,yJump-5,row=j,generic=generic,sub=sub,hideVars=hideVars,firstInstance=firstInstance)
 				endfor
 				break
 			case "VAR":

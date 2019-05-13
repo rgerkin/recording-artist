@@ -35,7 +35,7 @@
 #include "Minis"
 #endif
 
-#ifdef Roborig
+#ifdef Copernicus
 #include "Copernicus"
 #endif
 

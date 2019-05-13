@@ -666,6 +666,26 @@ Function /S DWTDenoise(theWave,threshold[,type,coefs])
 	return dest_name
 End
 
+// Creates a pink noise wave with standard deviation `sd`.  
+function /wave PinkNoise(duration, delta, sd)
+	variable duration, delta, sd
+	
+	variable n_points = round(duration / delta)
+	variable extra_points = 1000 // Padding at the beginning that we will remove
+	make /free/n=(extra_points + n_points) w = gnoise(1)
+	make /free/n=(4,2) filter_coefs
+	// Magic values given at https://ccrma.stanford.edu/~jos/sasp/Example_Synthesis_1_F_Noise.html
+	filter_coefs[][0] = {0.049922,-0.0959935,0.0506127,-0.00440879}
+	filter_coefs[][1] = {1,-2.49496,2.01727,-0.522189}
+	filteriir /coef=filter_coefs w
+	deletepoints 0, extra_points, w // Delete the padding
+	setscale x, 0, duration, w
+	wavestats /q w
+	variable factor =sd / v_sdev
+	w *= factor
+	return w
+end
+
 Function PSD(w[,winSize,overlap])
 	wave w
 	variable winSize,overlap

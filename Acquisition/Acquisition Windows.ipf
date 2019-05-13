@@ -3815,6 +3815,7 @@ Function SlideHook(info)
 	Struct WMWinHookStruct &info
 	
 	if(info.eventCode == 22)
+		
 		string controls = ControlNameList(info.winName)
 		variable i
 		for(i=0;i<itemsinlist(controls);i+=1)
