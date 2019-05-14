@@ -339,7 +339,7 @@ Function SealTestWindow([DAQ])
 			ModifyGraph freepos($sweepAxis)={0,kwFraction}, btlen=3
 			AppendToGraph /T=InputHistoryTaxis /R=InputHistoryAxis /C=(red,green,blue) chanDF:inputHistory vs df:thyme
 			String resistanceTitle,pressureTitle
-			if(copernicus() && stringmatch(copernicus#get_state(),"SealTest:Start"))
+			if(copernicus() && stringmatch(get_state(),"SealTest:Start"))
 				setdrawenv xcoord=prel, ycoord=chan0_axis, fillpat=-1,fillfgc= (26214,26214,26214),dash=3, save
 				setdrawenv fillbgc= (65535,43690,0,26083), save
 				variable top_target = 5000 / target_electrode_resistance
@@ -512,7 +512,7 @@ Function SealTestWinButtons(ctrlName)
 		case "Baseline":
 			if(copernicus())
 				drawaction delete
-				copernicus#set_state("SealTest:Seal")
+				set_state("SealTest:Seal")
 			endif
 			SealTestTracker(chan,1)
 			string chan_axis
@@ -849,7 +849,7 @@ Function SealTestStart(reset,DAQ)
 	Listen(1,1,inputWaves,5,1,listenHook,"ErrorHook()","",DAQs=DAQ)
 	StartClock(1/freq,DAQs=DAQ) // Includes starting stimulation.  
 	if(copernicus())
-		copernicus#set_state("SealTest:Start")
+		set_state("SealTest:Start")
 		SetSealTestMonitor(1)
 	endif
 End
@@ -867,7 +867,7 @@ end
 function SealTestMonitor(info)
 	struct WMBackgroundStruct &info
 	
-	copernicus#check_electrode_range()
+	check_electrode_range()
 	return 0
 end
 
@@ -988,7 +988,7 @@ Function SealTestCollectSweeps(DAQ)
 					seriesRes=NaN
 				endif
 		
-				if(timeConstantOn || (copernicus() && stringmatch(copernicus#get_state(), "SealTest:Breakin")))
+				if(timeConstantOn || (copernicus() && stringmatch(get_state(), "SealTest:Breakin")))
 					wavestats /q/m=1 sweep
 					variable v_fiterror = 0 // Suppress errors
 					variable v_fitoptions = 6 // Suppress curve window and use robust fitting
