@@ -64,6 +64,10 @@ function set_state(state)
 	copernicus_state = state
 end
 
+function /df get_df()
+	return Core#ModuleHome(module)
+end
+
 
 // Generate an alert dialog
 static function alert(msg, actions)
