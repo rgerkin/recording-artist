@@ -3,6 +3,8 @@
 
 #pragma moduleName = copernicus
 static strconstant module=copernicus
+static strconstant font="Arial Black"
+static constant font_size=10
 
 #include "copernicus_logging"
 #include "copernicus_actions"
@@ -15,6 +17,8 @@ static strconstant module=copernicus
 
 Menu "Copernicus"
 	"Initialize", copernicus#init()
+	"Edit Protocols", copernicus#view_protocol_sequence()
+	"Virtual Cell Parameters", NoDAQPanel()
 End
 
 function init()
@@ -26,6 +30,7 @@ function init()
 	dfref df = getstatusDF()
 	variable /g df:copernicus = 1
 	string /g df:copernicus_state = "Initialized"
+	DefaultGUIFont all={font, font_size, 0} 
 	// Build the logging panel
 	logging_panel(rebuild=1)
 	// Build the actions panel
@@ -35,5 +40,9 @@ function init()
 
 	make_protocol_sequence()
 	// Build the data window
-	data_window(rebuild=1)
+	//data_window(rebuild=1)
+	
+	// Set other defaults
+	//SetAcqSetting("DAQs", "daq0", "Duration", "2")
+	//SetAcqSetting("DAQs", "daq0", "ISI", "3")
 end

@@ -37,7 +37,7 @@ function data_window([rebuild])
 	appendtograph input_0
 	string state = get_state()
 	string stopped = stringbykey("Acquisition", state, ":")
-	string title = selectstring(stringmatch(stopped,"Stop"), "Stop", "Start")
+	string title = selectstring(stringmatch(stopped, "Start"), "Start", "Stop")
 	Button StartStop, pos={10, 10}, title=title, proc=DataWinButtons
 	Label bottom "Time (s)"
 	Label left "Membrane Potential (mV)"
@@ -62,8 +62,6 @@ function DataWinButtons(info)
 				case "StartStop":
 					if(acquiring)
 						stop_acquisition()
-						SetAcquisitionMonitor(0)
-						Button StartStop, title="Start", win=DataWin
 					else
 						start_acquisition()
 					endif

@@ -6,12 +6,14 @@ static strconstant module=copernicus
 
 // Upper left corner of logging panel
 static constant logging_x = 0
-static constant logging_y = 0
-static constant logging_width = 650
-static constant logging_height = 305
+static constant logging_y = 40
+static constant logging_width = 275
+static constant logging_height = 325
+static constant tab_width = 270
+static strconstant logging_tabs = "Animal;Electrode;Pharma;Notebook"
 
-static strconstant logging_name="LoggingPanel"
-static strconstant logging_title="Logging"
+static strconstant logging_win_name="LoggingPanel"
+static strconstant logging_win_title="Logging"
 
 static strconstant electrode_locations="Midline;Penetrate;Record"
 static strconstant sutter_loc="root:Packages:Sutter:"
@@ -20,7 +22,7 @@ static strconstant sutter_loc="root:Packages:Sutter:"
 // Launch the logging panel
 Function logging_panel([rebuild])
 	variable rebuild
-	build_panel(rebuild,logging_name,logging_title,logging_x,logging_y,logging_width,logging_height)
+	build_panel(rebuild,logging_win_name,logging_win_title,logging_x,logging_y,logging_width,logging_height,float=0)
 	logging_panel_controls()
 End	
 
@@ -29,6 +31,11 @@ End
 function logging_panel_controls()	
 	variable xx = logging_x
 	variable yy = logging_y
+	
+	variable i
+	for(i=0; i<itemsinlist(logging_tabs); i+=1)
+		TabControl logging_tab_control, size={tab_width,125}, tablabel(i)=stringfromlist(i, logging_tabs), focusring=0, font="Arial Black", proc=set_logging_tab, win=$logging_win_name
+	endfor
 	
 	// Animal specs
 	logging_panel_animal_specs()
@@ -41,24 +48,59 @@ function logging_panel_controls()
 	
 	// Notebook and Timed Entry
 	logging_panel_notebook()
+	
+	struct WMTabControlAction info
+	info.tab=0
+	set_logging_tab(info)
 End
+
+function set_logging_tab(info)
+	STRUCT WMTabControlAction &info
+	
+	string tab = stringfromlist(info.tab, logging_tabs)
+	variable i
+	for(i=0; i<itemsinlist(logging_tabs);i+=1)
+		string other_tab = stringfromlist(i, logging_tabs)
+		string controls = ControlNameList(logging_win_name,";",other_tab+"*")
+		variable self = stringmatch(tab, other_tab)
+		ModifyControlList controls, disable=!self, win=$logging_win_name
+	endfor
+	Notebook $(logging_win_name)#ExperimentLog visible=stringmatch(tab, "Notebook")
+	strswitch(tab)
+		case "Animal":
+			variable tab_height = 115
+			break
+		case "Electrode":
+			tab_height = 180
+			break
+		case "Pharma":
+			tab_height = 110
+			break
+		case "Notebook":
+			tab_height = 320
+			break
+	endswitch
+	TabControl logging_tab_control, size={tab_width, tab_height}
+	GetWindow $logging_win_name wsize
+	MoveWindow /W=$logging_win_name v_left, v_top, v_left+tab_width*0.9, v_top+tab_height*0.90
+end
 
 
 // Render the logging panel notebook
 Function logging_panel_notebook([xx, yy])
 	variable xx, yy
 	
-	xx = paramisdefault(xx) ? 358 : xx
-	yy = paramisdefault(yy) ? 3 : yy
+	xx = paramisdefault(xx) ? 0 : xx
+	yy = paramisdefault(yy) ? 20 : yy
 	
-	GroupBox Logg frame=1, pos={xx,yy}, size={278,300}, title="Log", fstyle=1
+	//GroupBox Notebook_box frame=1, pos={xx,yy}, size={278,300}, title="", fstyle=1
 	logging_panel_timed_entry(xx, yy)
-	NewNotebook /f=1 /K=2 /n=ExperimentLog /HOST=$logging_name /W=(xx+10,yy+25,xx+260,yy+275)
-	Notebook $(logging_name)#ExperimentLog text = "", margins={0,0,200}
+	NewNotebook /f=1 /K=2 /n=ExperimentLog /HOST=$logging_win_name /W=(xx,yy+25,xx+260,yy+275)
+	Notebook $(logging_win_name)#ExperimentLog text = "", margins={0,0,200}
 	string log_default=Core#StrPackageSetting(module,"logging","","log_default")
-	Notebook $(logging_name)#ExperimentLog text = log_default
+	Notebook $(logging_win_name)#ExperimentLog text = log_default
 	SetActiveSubwindow LoggingPanel#ExperimentLog
-	Notebook $(logging_name)#ExperimentLog selection={endOfFile,endOfFile}
+	Notebook $(logging_win_name)#ExperimentLog selection={endOfFile,endOfFile}
 End
 
 
@@ -68,9 +110,9 @@ function logging_panel_timed_entry(xx,yy)
 	
 	xx += 5
 	yy += 16
-	SetVariable Log_Entry,pos={xx,yy},size={175,16},title="Entry:",value= _STR:"",proc=logging_panel_setvariables
-	Button Log_Submit,pos={xx+178,yy-2},size={40,20},proc=logging_panel_buttons,title="Submit"
-	Checkbox Log_Timestamp,value=1,pos={xx+223,yy+3}, title="T-stamp"
+	SetVariable Notebook_Entry,pos={xx,yy},size={175,16},title="Entry:",value= _STR:"",proc=logging_panel_setvariables
+	//Button Log_Submit,pos={xx+178,yy-2},size={40,20},proc=logging_panel_buttons,title="✔", help={"Your log entry here"}
+	Checkbox Notebook_Timestamp,value=1,pos={xx+190,yy+3}, title="⏰"
 end
 
 
@@ -78,27 +120,27 @@ end
 function logging_panel_animal_specs([xx,yy])
 	variable xx,yy
 	
-	yy = paramisdefault(yy) ? 3 : 0
+	yy = paramisdefault(yy) ? 15 : 0
 	
 	// Animal DOB
-	GroupBox Specs frame=1, pos={xx,yy}, size={350,35}, title="Specs", fstyle=1
+	//GroupBox Animal frame=1, pos={xx,yy}, size={350,35}, title="Specs", fstyle=1
 	xx+=5; yy+=14
 	String dait=ReplaceString("/",Secs2Date(DateTime,0),";")	
-	SetVariable Specs_DOB_Month,pos={xx,yy},size={65,16},proc=logging_panel_setvariables, title="DOB:"
-	SetVariable Specs_DOB_Month,limits={1,12,1},value=_NUM:str2num(StringFromList(0,dait))
-	SetVariable Specs_DOB_Day,pos={xx+72,yy},size={40,16},proc=logging_panel_setvariables
-	SetVariable Specs_DOB_Day,limits={1,31,1},value=_NUM:str2num(StringFromList(1,dait))
-	SetVariable Specs_DOB_Year,pos={xx+120,yy},size={50,16},proc=logging_panel_setvariables
-	SetVariable Specs_DOB_Year,value=_NUM:str2num(StringFromList(2,dait))
+	SetVariable Animal_DOB_Month,pos={xx,yy},size={65,16},proc=logging_panel_setvariables, title="DOB:"
+	SetVariable Animal_DOB_Month,limits={1,12,1},value=_NUM:str2num(StringFromList(0,dait))
+	SetVariable Animal_DOB_Day,pos={xx+72,yy},size={40,16},proc=logging_panel_setvariables
+	SetVariable Animal_DOB_Day,limits={1,31,1},value=_NUM:str2num(StringFromList(1,dait))
+	SetVariable Animal_DOB_Year,pos={xx+120,yy},size={50,16},proc=logging_panel_setvariables
+	SetVariable Animal_DOB_Year,value=_NUM:str2num(StringFromList(2,dait))
 	
 	// Animal Weight
-	xx+=185
-	SetVariable Specs_Weight,pos={xx,yy},size={103,16},bodyWidth=50,proc=logging_panel_setvariables,title="Weight (g)"
-	SetVariable Specs_Weight,value= _NUM:0
+	yy+=30
+	SetVariable Animal_Weight,pos={xx+6,yy},size={103,16},bodyWidth=50,proc=logging_panel_setvariables,title="Weight (g)"
+	SetVariable Animal_Weight,value= _NUM:0
 	
 	// Cohort
-	xx+=120
-	PopupMenu Cohort, pos={xx,yy}, value="A;B;C"
+	yy+=30
+	PopupMenu Animal_Cohort, pos={xx,yy}, value="A;B;C", title="Cohort"
 end
 
 
@@ -106,10 +148,12 @@ end
 function logging_panel_drugs([xx,yy])
 	variable xx, yy
 	
-	yy = paramisdefault(yy) ? 45 : yy
+	xx = paramisdefault(xx) ? 10 : xx
+	yy = paramisdefault(yy) ? 15 : yy
+	variable x_start = xx
 	
 	variable max_drugs=3
-	GroupBox Drugs frame=1, pos={xx,yy}, size={181,12+max_drugs*25}, title="Drugs", fstyle=1
+	//GroupBox Pharma frame=1, pos={xx,yy}, size={181,12+max_drugs*25}, title="Drugs", fstyle=1
 	yy+=17
 	variable yy0 = yy
 	variable i,j
@@ -120,20 +164,20 @@ function logging_panel_drugs([xx,yy])
 		dfref df=Core#InstanceHome("Acq","drugs",name)
 		nvar /z/sdfr=df active,conc
 		svar /z/sdfr=df units
-		xx=logging_x+5
-		Checkbox $("Drug_"+num2str(i)), pos={xx,yy+2}, variable=active, title=" "
+		xx=x_start
+		Checkbox $("Pharma_"+num2str(i)), pos={xx,yy+3}, variable=active, title=" "
 		xx+=17
-		SetVariable $("DrugConc_"+num2str(i)),pos={xx,yy},size={30,18},limits={0,1000,1}, variable=conc, title=" "
+		SetVariable $("Pharma_Conc_"+num2str(i)),pos={xx,yy},size={30,18},limits={0,1000,1}, variable=conc, title=" "
 		xx+=35
-		PopupMenu $("DrugUnits_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"units\",brackets=0)"
-		xx+=32
-		PopupMenu $("DrugName_"+num2str(i)),pos={xx,yy-2},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"names\",brackets=0)"
+		PopupMenu $("Pharma_Units_"+num2str(i)),pos={xx,yy},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"units\",brackets=0)"
+		xx+=40
+		PopupMenu $("Pharma_Name_"+num2str(i)),pos={xx,yy},size={21,18},mode=1,value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"names\",brackets=0)"
 		yy+=25
 	endfor
 	
-	Button UpdateDrugs,pos={xx+33,yy0+10},size={50,20},title="Update",proc=logging_panel_buttons
-	PopupMenu DrugPresets pos={xx+33,yy0+35},size={328,30},mode=0,proc=logging_panel_popupmenus,title="Presets"
-	PopupMenu DrugPresets value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"presets\",brackets=0)"
+	Button Pharma_Update,pos={xx+31,yy0+10},size={50,20},title="Update",proc=logging_panel_buttons
+	PopupMenu Pharma_Presets pos={xx+31,yy0+35},size={328,30},mode=0,proc=logging_panel_popupmenus,title="Presets"
+	PopupMenu Pharma_Presets value=#"Core#PopupMenuOptions(\"copernicus\",\"drugs\",\"\",\"presets\",brackets=0)"
 end
 
 
@@ -141,7 +185,7 @@ end
 function logging_panel_coords([xx, yy])
 	variable xx, yy
 	
-	yy = paramisdefault(yy) ? 142 : yy
+	yy = paramisdefault(yy) ? 5 : yy
 	
 	wave /t names = Core#WavTPackageSetting(module, "coordinates", "", "names")
 	wave coords = Core#WavTPackageSetting(module, "coordinates", "", "values")
@@ -153,27 +197,27 @@ function logging_panel_coords([xx, yy])
 		endif
 	endfor
 	
-	GroupBox Coordinates frame=1, pos={xx,yy}, size={285,90+26*numpnts(names)}, title="Coordinates", fstyle=1
+	//GroupBox Electrode_box frame=1, pos={xx,yy}, size={285,90+26*numpnts(names)}, title="Coordinates", fstyle=1
 	
 	string axes = "X;Y;Z"
 	xx = 10
-	yy += 22
-	GroupBox CurrCoordinates frame=1, pos={xx-2,yy+20}, size={230,25}
+	yy += 25
+	GroupBox Electrode_current_box frame=1, pos={xx-2,yy+25}, size={235,30}
 	for(j=0;j<ItemsInList(axes);j+=1)
 		string axis=StringFromList(j,axes)
-		TitleBox $("Coords_Title_"+axis),title=axis,pos={xx+12,yy}
-		ValDisplay $("Coords_NowRel_"+axis),pos={xx,yy+27}, size={30,15},value= _NUM:12500
-		SetVariable $("Coords_Now_"+axis),pos={xx,yy+50}, size={40,15},value= _NUM:12500, proc=logging_panel_setvariables
-		xx += 45
+		TitleBox $("Electrode_Title_"+axis),title=axis,pos={xx+12,yy}
+		ValDisplay $("Electrode_NowRel_"+axis),pos={xx,yy+30}, size={55,15},value= _NUM:12500
+		SetVariable $("Electrode_Now_"+axis),pos={xx,yy+55}, size={55,15},value= _NUM:12500, proc=logging_panel_setvariables
+		xx += 55
 	endfor
-	Titlebox Coords_NowRel_Title, pos={xx,yy+25}, size={100,15}, title="Relative"
-	SetVariable $("Coords_Now_Name"), pos={xx,yy+51}, size={95,15}, value= _STR:""
-	Button Coords_Now_Save, proc=logging_panel_buttons, title="Save"
+	Titlebox Electrode_NowRel_Title, pos={xx+5,yy+28}, size={100,15}, title="Relative"
+	SetVariable $("Electrode_Now_Name"), pos={xx+5,yy+56}, size={55,15}, value= _STR:""
+	//Button Electrode_Now_Save, proc=logging_panel_buttons, title="Save"
 	
 	xx = 10
-	yy += 75
+	yy += 80
 	
-	variable max_names = 5
+	variable max_names = 3
 	for(i=0;i<max_names;i+=1)
 		variable disable=1
 		string name = ""
@@ -186,16 +230,16 @@ function logging_panel_coords([xx, yy])
 		xx = 10
 		for(j=0;j<ItemsInList(axes);j+=1)
 			axis=StringFromList(j,axes)
-			string ctrl_name = "Coords_"+num2str(i)+"_"+axis
+			string ctrl_name = "Electrode_"+num2str(i)+"_"+axis
 			SetVariable $ctrl_name, pos={xx,yy}, size={40,15}, limits={0,25000,500}, title=" "
 			SetVariable $ctrl_name, value=coords[i][j], disable=disable, proc=logging_panel_setvariables
 			xx+=60
 		endfor
-		Checkbox $("Coords_"+num2str(i)+"_relative"), pos={xx-15,yy+3}, proc=logging_panel_checkboxes,value=0, title=" ",pos={xx-15,yy+2}, disable=disable, proc=main_panel_checkboxes
-		Titlebox $("Coords_"+num2str(i)+"_name"), pos={xx,yy}, bodywidth=50, title=name, disable=disable
-		ControlInfo Coords_Now_Save
-		Button $("Coords_"+num2str(i)+"_delete"), pos={v_left,yy}, proc=logging_panel_buttons, title="Delete", disable=disable
-		yy += 25*(!disable)
+		Checkbox $("Electrode_"+num2str(i)+"_relative"), pos={xx-15,yy+3}, proc=logging_panel_checkboxes,value=0, title=" ",pos={xx-15,yy+2}, disable=disable, proc=main_panel_checkboxes
+		Titlebox $("Electrode_"+num2str(i)+"_name"), pos={xx,yy}, bodywidth=50, title=name, disable=disable
+		ControlInfo Electrode_Now_Name
+		Button $("Electrode_"+num2str(i)+"_delete"), pos={v_left+10,yy+2}, size={15,15}, proc=logging_panel_buttons, title="✘", disable=disable
+		yy += 23//*(!disable)
 	endfor
 end
 
@@ -211,22 +255,22 @@ Function logging_panel_buttons(ctrlName) : ButtonControl
 			// Only one detail: "Submit"
 			logging_panel_set_log_entry()
 			break
-		case "UpdateDrugs":
+		case "Pharma_Update":
 			// Only one detail: "Update"
 			logging_panel_set_drug()
 			break
-		case "Coords":
+		case "Electrode":
 			logging_panel_set_coords(detail)
 			break
 	endswitch
-	FirstBlankLine(logging_name+"#ExperimentLog")
+	FirstBlankLine(logging_win_name+"#ExperimentLog")
 End
 
 
 
 // Handle timed log entries
 function logging_panel_set_log_entry()
-	ControlInfo /W=$logging_name Log_Entry
+	ControlInfo /W=$logging_win_name Log_Entry
 	String text=S_Value
 	log_text(text)
 end
@@ -238,11 +282,11 @@ function logging_panel_set_drug()
    string text = ""
    variable i=1,j
 	do
-		ControlInfo $("Drug_"+num2str(i))
+		ControlInfo $("Pharma_"+num2str(i))
 		if(v_flag && v_value)
-			ControlInfo $("DrugConc_"+num2str(i)); variable conc=v_value
-			ControlInfo $("DrugUnits_"+num2str(i)); string units=s_value
-			ControlInfo $("DrugName_"+num2str(i)); string name=s_value
+			ControlInfo $("Pharma_Conc_"+num2str(i)); variable conc=v_value
+			ControlInfo $("Pharma_Units_"+num2str(i)); string units=s_value
+			ControlInfo $("Pharma_Name_"+num2str(i)); string name=s_value
 			string one_text
 			sprintf one_text, "%.2g%s %s," conc, units, name
 			text += one_text
@@ -261,7 +305,7 @@ function /s add_timestamp(text [,timestamp])
 	variable timestamp
 	
 	if(paramisdefault(timestamp))
-		ControlInfo /W=$logging_name Log_Timestamp
+		ControlInfo /W=$logging_win_name Log_Timestamp
 		timestamp = v_value
 	endif
 	if(timestamp)
@@ -275,12 +319,12 @@ function log_text(text [,timestamp])
 	variable timestamp
 	
 	if(paramisdefault(timestamp))
-		ControlInfo /W=$logging_name Log_Timestamp
+		ControlInfo /W=$logging_win_name Log_Timestamp
 		timestamp = v_value
 	endif
 	text = add_timestamp(text, timestamp=timestamp)
-	FirstBlankLine(logging_name+"#ExperimentLog")
-	Notebook $(logging_name)#ExperimentLog text=text+"\r"
+	FirstBlankLine(logging_win_name+"#ExperimentLog")
+	Notebook $(logging_win_name)#ExperimentLog text=text+"\r"
 end
 
 
@@ -300,15 +344,15 @@ function logging_panel_set_coords(detail)
 			strswitch(action)
 				case "Save": // Save coordinate set
 					redimension /n=(num_saved+1) names
-					controlinfo Coords_Now_Name
+					controlinfo Electrode_Now_Name
 					names[num_saved] = S_value
 					redimension /n=(num_saved+1,3) coords
-					controlinfo Coords_Now_Name
+					controlinfo Electrode_Now_Name
 					variable i
 					string axes = "X;Y;Z"
 					for(i=0;i<3;i+=1)
 						string axis = stringfromlist(i,axes)
-						controlinfo $("Coords_Now_"+axis)
+						controlinfo $("Electrode_Now_"+axis)
 						coords[num_saved][i] = v_value
 						//string ctrl_name = "Coords_"+num2str(num_saved)+"_"+axis
 						//SetVariable $ctrl_name, value=coords[num_saved][i]
@@ -341,10 +385,11 @@ Function logging_panel_setvariables(info) : SetVariableControl
 	strswitch(section)
 		case "Log":
 			if(info.eventCode==2)
-				//main_panel_set_log_entry()
+				//print info
+				logging_panel_set_log_entry()
 			endif
 			break
-		case "Specs":
+		case "Animal":
 			strswitch(detail)
 				case "Weight":
 					logging_panel_set_weight()
@@ -354,9 +399,9 @@ Function logging_panel_setvariables(info) : SetVariableControl
 					break
 			endswitch
 			break
-		case "Drugs":
+		case "Pharma":
 			break
-		case "Coords":
+		case "Electrode":
 			// All set variables are coordinates, so recompute relative coordinates.  
 			logging_panel_update_coords()
 			break
@@ -371,7 +416,7 @@ function logging_panel_update_coords()
 	make /free/n=3 subtract = {0,0,0}
 	wave coords = Core#WavTPackageSetting(module, "coordinates", "", "values")
 	for(i=0; i<max_names; i+=1)
-		ControlInfo $("Coords_"+num2str(i)+"_relative")
+		ControlInfo $("Electrode_"+num2str(i)+"_relative")
 		if(v_value)
 			duplicate /free/r=[i,i][0,2] coords subtract
 			redimension /n=3 subtract
@@ -381,8 +426,8 @@ function logging_panel_update_coords()
 	variable yy=v_top
 	for(i=0; i<3; i+=1)
 		string axis = stringfromlist(i,"X;Y;Z")
-		ControlInfo $("Coords_Now_"+axis)
-		ValDisplay $("Coords_NowRel_"+axis),value= _NUM:(v_value - subtract[i])
+		ControlInfo $("Electrode_Now_"+axis)
+		ValDisplay $("Electrode_NowRel_"+axis),value= _NUM:(v_value - subtract[i])
 	endfor
 end
 
@@ -429,13 +474,12 @@ Function logging_panel_popup_menus(info) : PopupMenuControl
 		return 0
 	endif
 	strswitch(info.ctrlName)
-		case "Drug":
+		case "Pharma":
 			// Not implemented yet
 			break
 	endswitch
-	FirstBlankLine(logging_name+"#ExperimentLog")
+	FirstBlankLine(logging_win_name+"#ExperimentLog")
 End
-
 
 
 // Handle checkbox interactions
@@ -448,7 +492,7 @@ Function logging_panel_checkboxes(info) : CheckboxControl
 	endif
 	String action=StringFromList(0,info.ctrlName,"_")
 	strswitch(action)
-		case "Coords":
+		case "Electrode":
 			logging_panel_update_coords()
 			break
 	endswitch

@@ -9,6 +9,7 @@ function start_acquisition()
 	string daq = MasterDAQ()
 	StartAcquisition()
 	set_state("Acquisition:Start")
+	
 	SetAcquisitionMonitor(1)
 	Button StartStop, title="Stop", win=DataWin
 End
@@ -34,18 +35,40 @@ end
 function AcquisitionMonitor(info)
 	struct WMBackgroundStruct &info
 	
-	check_acquisition_quality()
-	check_acquisition_stage()
+	string quality = check_acquisition_quality()
+	string stage = check_acquisition_stage()
+	strswitch(stage)
+		case "finished":
+			StopAcquisition()
+			DoAlert 0, "Experiment is finished"
+			return 1
+			break
+		default:
+			break
+	endswitch
 	return 0
 end
 
-function check_acquisition_quality()
+function /s check_acquisition_quality()
 	compute_input_resistance()
 	//check_access_resistance()
 	//print("Acqusition quality is good")
+	return "good"
 end
 
-function check_acquisition_stage()
+function /s check_acquisition_stage()
+	//wave /t sequence = get_protocol_sequence()
+	string stage = ""
+	variable result = auto_configure_stimulus()
+	switch(result)
+		case 0:
+			break
+		case 1:
+			// Out of protocols. Experiment is finshed.
+			stage = "finished"
+			break
+	endswitch
+	return stage
 end
 
 

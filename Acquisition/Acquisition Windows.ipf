@@ -73,7 +73,7 @@ Function WaveSelector([coords2,DAQ,instance])
 
 	// Pulse sets.  
 	ControlInfo /W=$win PulseSets
-	TabControl PulseSets value=(V_flag ? V_Value : 1)
+	TabControl PulseSets value=(V_flag ? V_Value : 1), win=$win
 	STRUCT WMTabControlAction info
 	info.eventCode=2; info.tab=1; info.win=win
 	PulseSetTab(info)
@@ -148,10 +148,10 @@ Function WaveSelector([coords2,DAQ,instance])
 	SetVariable NumChannels, limits={1,Inf,1}, pos={5,5}, variable=numDAQChannels, size={90,20}, title="# Channels", proc=WaveSelectorSetVariables, userData=num2str(DAQChan)
 	Variable Universal_ypos=5+y_offset+numDAQChannels*y_height
 	SetDrawEnv fillpat=0; DrawRect 5,Universal_ypos-4,865,Universal_ypos+24
-	Button Preview,pos={605,Universal_ypos},size={75,20},title="\\Z10Preview",proc=WaveSelectorButtons
-	Button Start,pos={690,Universal_ypos},size={75,20},title="\\Z10Start",proc=WaveSelectorButtons
-	Button Reset,pos={775,Universal_ypos},size={75,20},title="\\Z10Reset",proc=WaveSelectorButtons
-	Button Advanced,pos={907,Universal_ypos},size={90,20},title="\\Z10Advanced",proc=WaveSelectorButtons
+	Button Preview,pos={605,Universal_ypos},size={75,20},title="\\Z10Preview",proc=WaveSelectorButtons, win=$win
+	Button Start,pos={690,Universal_ypos},size={75,20},title="\\Z10Start",proc=WaveSelectorButtons, win=$win
+	Button Reset,pos={775,Universal_ypos},size={75,20},title="\\Z10Reset",proc=WaveSelectorButtons, win=$win
+	Button Advanced,pos={907,Universal_ypos},size={90,20},title="\\Z10Advanced",proc=WaveSelectorButtons, win=$win
 	if(acquiring==1)
 		Button Start,title="\\Z10Stop"
 	endif
@@ -160,13 +160,13 @@ Function WaveSelector([coords2,DAQ,instance])
 	endif
 	
 	nvar /z/sdfr=GetDaqDF(DAQ) duration,isi,continuous,realTime,sweepsLeft,kHz,saveMode
-	SetVariable Duration,pos={8,Universal_ypos+2},size={95,17},title="Duration",limits={0,Inf,0.1},value=duration
-	SetVariable ISI,pos={113,Universal_ypos+2},size={65,17},title="ISI",limits={0,Inf,1},value=isi
-	Checkbox Continuous,pos={190,Universal_ypos+3},size={65,17},title="Continuous",variable=continuous,proc=WaveSelectorCheckboxes
-	Checkbox RealTime,pos={270,Universal_ypos+3},size={65,17},title="Real Time", variable=realTime
-	SetVariable SweepsLeft,pos={358,Universal_ypos+2},size={65,17},title="Left",variable=sweepsLeft,proc=WaveSelectorSetVariables
-	SetVariable KHz,pos={438,Universal_ypos+2},size={65,17},title="KHz",variable=kHz,limits={0.1,Inf,1},proc=WaveSelectorSetVariables
-	PopupMenu SaveMode,pos={518,Universal_ypos},size={65,17},mode=0,title="Save",value=#("SaveModes(\""+DAQ+"\",brackets=1)"),proc=WaveSelectorPopupMenus
+	SetVariable Duration,pos={8,Universal_ypos+2},size={95,17},title="Duration",limits={0,Inf,0.1},value=duration, win=$win
+	SetVariable ISI,pos={113,Universal_ypos+2},size={65,17},title="ISI",limits={0,Inf,1},value=isi, win=$win
+	Checkbox Continuous,pos={190,Universal_ypos+3},size={65,17},title="Continuous",variable=continuous,proc=WaveSelectorCheckboxes, win=$win
+	Checkbox RealTime,pos={270,Universal_ypos+3},size={65,17},title="Real Time", variable=realTime, win=$win
+	SetVariable SweepsLeft,pos={358,Universal_ypos+2},size={65,17},title="Left",variable=sweepsLeft,proc=WaveSelectorSetVariables, win=$win
+	SetVariable KHz,pos={438,Universal_ypos+2},size={65,17},title="KHz",variable=kHz,limits={0.1,Inf,1},proc=WaveSelectorSetVariables, win=$win
+	PopupMenu SaveMode,pos={518,Universal_ypos},size={65,17},mode=0,title="Save",value=#("SaveModes(\""+DAQ+"\",brackets=1)"),proc=WaveSelectorPopupMenus, win=$win
 End
 
 Function WaveSelectorTabs(info)
@@ -801,7 +801,7 @@ Function PulseSetTabs(num,hide[,win])
 		WaveStats /Q Divisor
 	endif
 	TitleBox Title_Remainder disable=(hide || V_max<=1)
-	PulseSetTabLabels()
+	PulseSetTabLabels(win=win)
 End
 
 function CurrPulseSet(DAQ)
@@ -836,7 +836,10 @@ Function BumpRemainderBoxes([DAQ])
 	endfor
 End
 
-Function PulseSetTabLabels()
+Function PulseSetTabLabels([win])
+	string win
+	
+	win=SelectString(ParamIsDefault(win),win,GetDAQWin())
 	string labels="-;"
 	string DAQ=GetWinDAQ()
 	variable pulseSets=GetNumPulseSets(daq)
@@ -864,13 +867,13 @@ Function PulseSetTabLabels()
 	variable width=0
 	for(i=0;i<=pulseSets+1;i+=1)
 		string text=stringfromlist(i,labels)
-		TabControl PulseSets tabLabel(i)=text
+		TabControl PulseSets tabLabel(i)=text, win=$win
 		width+=FontSizeStringWidth("Default", 9, 0, text)+25
 	endfor
 	for(j=99;j>=i;j-=1)
-		TabControl PulseSets tabLabel(j)=""
+		TabControl PulseSets tabLabel(j)="", win=$win
 	endfor
-	TabControl PulseSets size={width,20}
+	TabControl PulseSets size={width,20}, win=$win
 End
 
 Function MakeQuickPulseSetsPanel([DAQ])
@@ -2100,6 +2103,15 @@ Function SelectedAxis()
 	endfor
 	return -1
 End
+
+function /s GetFont()
+	if(copernicus())
+		string font = "Arial Black"
+	else
+		font = "Arial"
+	endif
+	return font
+end
 
 function GetFontSize()
 	return Core#VarPackageSetting(module,"random","","fsize",default_=9)

@@ -5,10 +5,8 @@
 static strconstant module=copernicus
 
 // Upper left corner of status panel
-static constant status_x=650
+static constant status_x=0
 static constant status_y=0
-static constant status_width=200
-static constant status_height=305
 static strconstant status_name=StatusPanel
 static strconstant status_title="Status"
 
@@ -25,18 +23,26 @@ static strconstant seal_test_noise_high="Too noisy; ground your rig"
 function status_panel([rebuild])
 	variable rebuild
 	
-	build_panel(rebuild,status_name,status_title,status_x,status_y,status_width,status_height)
 	variable xx = 10
 	variable yy = 10
-	variable yJump = 45
+	variable indicator_height = 40
+	variable indicator_width = 140
+	variable yJump = indicator_height+5
 	variable i
-	for(i=0;i<3;i+=1)
-		string str = stringfromlist(i,"Input;Access;Rest")
+	string indicators = "Input;Access;Rest;Spike;Quiet"
+	
+	variable status_height = (indicator_height+5)*itemsinlist(indicators)+5
+	variable status_width = indicator_width+10
+	build_panel(rebuild, status_name, status_title, status_x, status_y, status_width, status_height, float=0)
+	for(i=0; i<itemsinlist(indicators); i+=1)
+		string str = stringfromlist(i, indicators)
 		string name = "Status_SealQuality_"+str
-		Groupbox $"Groupbox_"+name, pos={xx-5,yy+yJump*i-5}, size={120,40}
+		Groupbox $"Groupbox_"+name, pos={xx-5, yy+yJump*i-5}, size={indicator_width, indicator_height}, labelBack=(50000, 50000, 50000)
+		Titlebox $"Titlebox_"+name, pos={xx+20, yy+yJump*i+5}, title="\Z20\F'Arial Black'"+str
+		Titlebox $"Titlebox_"+name, frame=0, fcolor=(20000,20000,20000), anchor=mc
 		ValDisplay $name mode=1,limits={0,1,0.5},highColor=(2,39321,1),lowColor=(65535,0,0),zeroColor=(65535,65532,16385)
-		ValDisplay $name pos={xx+55,yy+yJump*i}, size={50,25}, bodywidth=25, barmisc={0,0}, value=_NUM:0.3+0.3*i
-		ValDisplay $name title="\Z20\F'Arial Black'"+str
+		ValDisplay $name pos={xx+75,yy+yJump*i+3}, size={50,25}, bodywidth=27, barmisc={0,0}, value=_NUM:0.3+0.3*i
+		ValDisplay $name fcolor=(30000,30000,30000)
 	endfor
 	Button Run, disable=1
 end

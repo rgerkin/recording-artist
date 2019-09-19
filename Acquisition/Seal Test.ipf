@@ -341,7 +341,7 @@ Function SealTestWindow([DAQ])
 			String resistanceTitle,pressureTitle
 			if(copernicus() && stringmatch(get_state(),"SealTest:Start"))
 				setdrawenv xcoord=prel, ycoord=chan0_axis, fillpat=-1,fillfgc= (26214,26214,26214),dash=3, save
-				setdrawenv fillbgc= (65535,43690,0,26083), save
+				setdrawenv fillbgc= (65535,43690,26083), save
 				variable top_target = 5000 / target_electrode_resistance
 				variable bottom_target = -top_target
 				variable delta = top_target*range_electrode_resistance

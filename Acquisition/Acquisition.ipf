@@ -92,7 +92,9 @@ Function Initialization([profileName, acqInstance, create_windows, prompt_experi
 	variable defaults=stringmatch(acqInstance,"_default_")
 
 	variable fsize=GetFontSize()
-	DefaultGuiFont all= {"Arial",fsize,0}
+	string font=GetFont()
+	print font, fsize
+	DefaultGuiFont all= {font,fsize,0}
 	Make /o/D/n=0 root:SweepT // Time of each sweep, in minutes since experiment start.  
 	BoardInit() // Initializes A/D Interface.  
 	DoWindow /K Selector
@@ -566,7 +568,6 @@ Function StartSweep([DAQ])
 	if(err)
 		return err
 	endif
-	//print 1,LIH#SamplesAvailable2Read("daq0")
 	acquiring=1
 	Speak(1,outputWaves,SelectNumber(continuous,32,0),DAQs=DAQ)
 	Listen(1,boardGain,inputWaves,5,continuous,"CollectSweep("+DAQ+")","ErrorSweep()","",DAQs=DAQ)
@@ -579,7 +580,6 @@ Function StartSweep([DAQ])
 #ifdef Img
 	AcquireMovie(now=0)
 #endif
-	//print 2,LIH#SamplesAvailable2Read("daq0")
 	if(StartClock(isi,DAQs=DAQ)) // If Start_Clock returns an error.  
 		StopAcquisition(DAQ=DAQ) // Stop acquisition.  
 	endif
@@ -612,6 +612,9 @@ Function CollectSweep(DAQ) // This function is called when the input data has be
 	//WaveStats /Q/M=1 sweepDAQsCompleted
 	//KillWaves /Z sweepDAQsCompleted
 	//if(V_min>=1) // If all the DAQs have completed and gotten through CollectSweep, it is finally time to run this last section.  
+	if(copernicus())
+		set_remaining(sweepsLeft-1)
+	endif
 	if(sweepsLeft==1)
 		StopAcquisition(DAQ=DAQ)
 	else
@@ -693,8 +696,8 @@ Function CollectSweepIndividual(chan,currSweepNum,DAQ)
 	sprintf inputWaveName,inputWaveTemplate,chan
 	inputWaveName=joinpath({getdatafolder(1,daqDF),inputWaveName})
 	wave InputWave=$inputWaveName
-	variable parent=IsChild(chan)
 	
+	variable parent=IsChild(chan)
 	// Finally copy a hidden sweep onto the current sweep, so the visible sweep is always all-filtered or all-unfiltered.  
 	if(!realTime && stringmatch(DAQType(DAQ),"LIH"))
 		wave /z Clone=$(inputWaveName+"_buff")

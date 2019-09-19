@@ -323,7 +323,7 @@ Function SelectPackageInstance(package,instance[,special])
 			Core#CopyInstance(module,package,instance,name)
 			break
 	endswitch
-	if(WinType(DAQ+"_Selector") && !stringmatch(package,"DAQs"))
+	if(WinType(DAQ+"_Selector") && !stringmatch(package,"DAQs") && !copernicus())
 		RedrawSelector(win=DAQ+"_Selector")
 	endif
 End

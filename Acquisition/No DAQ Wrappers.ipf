@@ -16,6 +16,10 @@ static constant num_outputs=2
 static constant Hz = 10000
 static constant max_buffer_size = 1e6
 
+static function /s GetDAQPath()
+	return noDAQ_path
+end
+
 static function /s InputChannelList([DAQ])
 	string DAQ
 	
@@ -170,7 +174,6 @@ static Function Speak(device,list,param[,now,DAQ])
 	variable continuous = Core#VarPackageSetting(module,"DAQs",MasterDAQ(),"continuous")
 	dfref df = $output_path
 	string output_waves = Core#StrPackageSetting(module,"DAQs",MasterDAQ(),"outputWaves")
-	//print output_waves
 	variable i
 	for(i=0;i<min(num_outputs,itemsinlist(output_waves));i+=1)
 		string output_wave = stringfromlist(i,output_waves)
@@ -228,6 +231,14 @@ static Function StopClock([DAQ])
 	
 	DAQ=selectstring(!paramisdefault(DAQ),MasterDAQ(type=DAQType),DAQ)
 	CtrlNamedBackground NoDAQClock, stop
+	
+	variable i
+	for(i=0;i<num_inputs;i+=1)	
+		PurgeInput(i)
+	endfor
+	for(i=0;i<num_outputs;i+=1)	
+		PurgeOutput(i)
+	endfor
 End
 
 static Function ErrorHook([DAQ]) // This static Functionis called when a scanning or waveform generation error is encountered
@@ -246,6 +257,8 @@ static Function SlaveHook(DAQ)
 End
 
 static function Listening(s)
+	// This background function checks the input buffer and writes
+	// to the input waves(s) when there is enough data in the buffer
 	struct wmbackgroundstruct &s
 	
 	dfref df = $input_path
@@ -262,8 +275,10 @@ static function Listening(s)
 		wave /sdfr=df buffer = $("ch"+num2str(chan))
 		nvar /sdfr=df xx = $("x"+num2str(i))
 		if(numpnts(buffer)-xx >=numpnts(w))
+			// Write to the wave with the last input wave duration worth of data
 			w = buffer[p+xx]
 			xx += numpnts(w)
+			//redimension /n=(xx) buffer
 			//printf "Reading from the buffer...\r"
 		endif
 		if(numpnts(buffer)>max_buffer_size)
@@ -274,6 +289,8 @@ static function Listening(s)
 end
 
 static function Waiting(s)
+	// This function fills the input and output buffers with data
+	// from a virtual A/D device, then calls CollectSweep()
 	struct wmbackgroundstruct &s
 	
 	Speak(1,"",0)
@@ -303,13 +320,11 @@ static function Waiting(s)
 		endif
 		wave /sdfr=outDF out = $("ch"+num2str(chan))
 		nvar /sdfr=outDF out_x = $("x"+num2str(chan))
-		//print wavemax(out),wavemin(out),out_x,numpnts(out)
 		wave response = IO(out,out_x,tau,r_in,r_a,direction,noise)
 		response += offset
 		out_x += numpnts(response)
 		wave /sdfr=inDF in = $("ch"+num2str(chan))
 		if(numpnts(response))
-			//print wavemax(response)
 			concatenate /np {response},in
 		endif
 		//printf "Added %d points to the input buffer.\r",numpnts(response)
@@ -373,7 +388,11 @@ static function /wave IO(w, start, tau, r_in, r_a, direction, noise)
 	variable start, tau, r_in, r_a, noise
 	string direction
 	
+	// Override with result from TransferDirection()
+	direction = TransferDirection()
+	
 	variable dt = dimdelta(w,0)
+	
 	
 	duplicate /free w,convolved
 	make /free/n=(1000) expo = exp(-x/(0.001*tau/dt))
@@ -389,19 +408,24 @@ static function /wave IO(w, start, tau, r_in, r_a, direction, noise)
 	//variable out_scale = GetChanScale(0, "output")
 	//convolved *= out_scale // e.g. convert from mV to V
 	
+	//variable in_scale = GetChanScale(0, "input")
+	//variable out_scale = GetChanScale(0, "output")
+	//convolved *= in_scale
+	//convolved /= out_scale
+	
+	
 	strswitch(direction)
 		case "multiply":
-			convolved *= r_in*1e6 // e.g. convert from V to A (or vice versa), via the input resistance
+			convolved *= r_in*1e-3 // Multiply by GOhms (MOms * 1e-3)
 			break
 		case "divide":
-			convolved /= r_in*1e6
+			convolved /= r_in*1e-3 // Divide by GOhms (MOms * 1e-3)
 			break
 	endswitch
 	
-	variable in_scale = GetChanScale(0, "input")
-	convolved /= in_scale // e.g. convert the input (rig->igor) from A to pA
+	//convolved /= in_scale // e.g. convert the input (rig->igor) from A to pA
 	nvar noise_ = root:Packages:noDAQ:noise
-	convolved += gnoise(noise_) // Add noise in e.g. V or A.  
+	convolved += gnoise(noise_) // Add noise in e.g. mV or pA.  
 	
 	redimension /n=(numpnts(w)) convolved
 	if(start<numpnts(convolved))
@@ -417,7 +441,7 @@ function NoDAQPanel()
 	NewPanel /K=1 /N=NoDAQController /W=(10,10,150,350) as "Demo Mode Controller"
 	
 	dfref df = root:Packages:NoDAQ
-	nvar /sdfr=df r_in, tau
+	nvar /sdfr=df r_in, tau, noise
 	
 	GroupBox r_in_group pos={2,2}, size={134,62}
 	make /o/n=5 df:r_in_ticks /wave=tix = {0,1,2,3,4}
@@ -434,9 +458,11 @@ function NoDAQPanel()
 	Slider tau size={125,45}, vert=0, pos={4, 95}, proc=NoDAQSliderControls, userTicks={tix, labels}
 
 	GroupBox noise_group pos={2,138}, size={134,62}
-	TitleBox noise_name title="RMS Noise (pA)", pos={5,145}
-	Slider noise title="RMS Noise (pA)", variable=root:Packages:noDAQ:noise, limits={0,25,1}
-	Slider noise size={125,45}, vert=0, pos={4, 165}
+	make /o/n=5 df:noise_ticks /wave=tix = {-1,0,1,2,3} 
+	make /o/t/n=5 df:noise_labels /wave=labels = {"0.01","0.1","1","10","100"}
+	TitleBox noise_name title="RMS Noise", pos={5,145}
+	Slider noise title="RMS Noise", value=log(noise), limits={-2,2,0.1}
+	Slider noise size={125,45}, vert=0, pos={4, 165}, proc=NoDAQSliderControls, userTicks={tix, labels}
 	
 	GroupBox offset_group pos={2,206}, size={134,62}
 	//make /o/n=5 df:offset_ticks /wave=tix = {-500,-250,0,250,500} 

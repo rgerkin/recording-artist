@@ -17,11 +17,11 @@ function copernicus()
 end
 
 
-function build_panel(rebuild, name, title, xx, yy, width, height)
-	variable rebuild, xx, yy, width, height
+function build_panel(rebuild, name, title, xx, yy, width, height[,float])
+	variable rebuild, xx, yy, width, height, float
 	string name, title
 	
-	if(rebuild)
+	if(rebuild || float)
 		DoWindow /K $name
 	else
 		if(WinType(name))
@@ -29,7 +29,7 @@ function build_panel(rebuild, name, title, xx, yy, width, height)
 			return 0
 		endif
 	endif
-	NewPanel /K=1 /W=(xx,yy,xx+width,yy+height) /N=$name as title
+	NewPanel /K=1 /W=(xx,yy,xx+width,yy+height) /N=$name /FLT=(float) as title
 end
 
 function build_window(rebuild, name, title, xx, yy, width, height)
