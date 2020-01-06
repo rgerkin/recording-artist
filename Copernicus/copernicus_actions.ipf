@@ -11,6 +11,7 @@ static constant action_panel_y = 400
 static strconstant action_panel_name = ActionsPanel
 static strconstant action_panel_title = "Actions"
 
+#ifdef copernicus
 
 // The action panel
 function action_panel([rebuild])
@@ -46,20 +47,24 @@ Function action_panel_buttons(ctrlName) : ButtonControl
 			set_state("SealTest:Start")
 			SetAcqMode("VC", 0)
 			if(stringmatch(daq_type, "NoDAQ"))
-				nvar /sdfr=$NoDAQ#GetDAQPath() t_init,t_update,tau,r_in,r_a,noise,offset
+#ifdef nodaq
+				nvar /sdfr=$GetDAQPath() t_init,t_update,tau,r_in,r_a,noise,offset
 				offset = 0
 				noise = 1
 				r_in = 10
+#endif
 			endif
 			SealTest(1)
 			break
 		case "Run":
 			SetAcqMode("CC", 0)
 			if(stringmatch(daq_type, "NoDAQ"))
-				nvar /sdfr=$NoDAQ#GetDAQPath() t_init,t_update,tau,r_in,r_a,noise,offset
+#ifdef nodaq
+				nvar /sdfr=$GetDAQPath() t_init,t_update,tau,r_in,r_a,noise,offset
 				offset = 0
 				noise = 0.1
 				r_in = 100
+#endif
 			endif
 			data_window()
 			break
@@ -68,3 +73,5 @@ Function action_panel_buttons(ctrlName) : ButtonControl
 			break
 	endswitch
 End
+
+#endif

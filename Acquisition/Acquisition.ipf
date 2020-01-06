@@ -612,9 +612,11 @@ Function CollectSweep(DAQ) // This function is called when the input data has be
 	//WaveStats /Q/M=1 sweepDAQsCompleted
 	//KillWaves /Z sweepDAQsCompleted
 	//if(V_min>=1) // If all the DAQs have completed and gotten through CollectSweep, it is finally time to run this last section.  
+#ifdef copernicus
 	if(copernicus())
 		set_remaining(sweepsLeft-1)
 	endif
+#endif
 	if(sweepsLeft==1)
 		StopAcquisition(DAQ=DAQ)
 	else

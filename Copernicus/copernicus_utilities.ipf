@@ -5,18 +5,6 @@
 static strconstant module=copernicus
 
 
-// Is copernicus active?
-function copernicus()
-	dfref df = getstatusDF()
-	nvar /z/sdfr=df copernicus
-	variable result = 0
-	if(nvar_exists(copernicus) && copernicus)
-		result = 1
-	endif
-	return result
-end
-
-
 function build_panel(rebuild, name, title, xx, yy, width, height[,float])
 	variable rebuild, xx, yy, width, height, float
 	string name, title

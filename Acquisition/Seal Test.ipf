@@ -339,6 +339,7 @@ Function SealTestWindow([DAQ])
 			ModifyGraph freepos($sweepAxis)={0,kwFraction}, btlen=3
 			AppendToGraph /T=InputHistoryTaxis /R=InputHistoryAxis /C=(red,green,blue) chanDF:inputHistory vs df:thyme
 			String resistanceTitle,pressureTitle
+#ifdef copernicus
 			if(copernicus() && stringmatch(get_state(),"SealTest:Start"))
 				setdrawenv xcoord=prel, ycoord=chan0_axis, fillpat=-1,fillfgc= (26214,26214,26214),dash=3, save
 				setdrawenv fillbgc= (65535,43690,26083), save
@@ -353,6 +354,7 @@ Function SealTestWindow([DAQ])
 				delta = target_electrode_resistance*range_electrode_resistance
 				drawrect 0,target_electrode_resistance+delta,1,target_electrode_resistance-delta
 			endif
+#endif
 			if(!copernicus())
 				AppendToGraph /T=SeriesHistoryTaxis /R=SeriesHistoryAxis /C=(red,green,blue) chanDF:seriesHistory vs df:thyme
 				AppendToGraph /T=PressureHistoryTaxis /R=PressureHistoryAxis /C=(red,green,blue) chanDF:pressureHistory vs df:thyme
@@ -510,10 +512,12 @@ Function SealTestWinButtons(ctrlName)
 			Variable /G df:zap=2^str2num(channel)
 			break
 		case "Baseline":
+#ifdef copernicus
 			if(copernicus())
 				drawaction delete
 				set_state("SealTest:Seal")
 			endif
+#endif
 			SealTestTracker(chan,1)
 			string chan_axis
 			sprintf chan_axis, "chan%d_axis", chan
@@ -526,7 +530,9 @@ Function SealTestWinButtons(ctrlName)
 			supplyVolts=5*V_avg/offsetAt5volts
 			break
 		case "Explore":
+#ifdef nodaq
 			NoDAQPanel()
+#endif
 			break
 	endswitch
 End
@@ -848,10 +854,12 @@ Function SealTestStart(reset,DAQ)
 	Speak(1,outputWaves,0,DAQs=DAQ)
 	Listen(1,1,inputWaves,5,1,listenHook,"ErrorHook()","",DAQs=DAQ)
 	StartClock(1/freq,DAQs=DAQ) // Includes starting stimulation.  
+#ifdef copernicus
 	if(copernicus())
 		set_state("SealTest:Start")
 		SetSealTestMonitor(1)
 	endif
+#endif
 End
 
 function SetSealTestMonitor(on)
@@ -867,7 +875,9 @@ end
 function SealTestMonitor(info)
 	struct WMBackgroundStruct &info
 	
+#ifdef copernicus
 	check_electrode_range()
+#endif
 	return 0
 end
 
