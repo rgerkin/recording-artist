@@ -6,6 +6,7 @@ static strconstant module=copernicus
 static strconstant font="Arial Black"
 static constant font_size=10
 
+#include "copernicus_loading"
 #include "copernicus_logging"
 #include "copernicus_actions"
 #include "copernicus_status"
