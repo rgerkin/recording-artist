@@ -23,7 +23,7 @@ Menu "Copernicus"
 End
 
 function init()
-	Core#Def("ReallyNoDAQ")
+	//Core#Def("ReallyNoDAQ")
 	Silent 101
 	Core#LoadModuleManifest(module)
 	Core#LoadPackage(module, "Coordinates")
