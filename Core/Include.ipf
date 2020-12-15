@@ -41,12 +41,16 @@
 
 // Is copernicus active?
 function copernicus()
+#if exists("getstatusdf")
 	dfref df = getstatusDF()
 	nvar /z/sdfr=df copernicus
 	variable result = 0
 	if(nvar_exists(copernicus) && copernicus)
 		result = 1
 	endif
+#else
+	variable result = 0
+#endif
 	return result
 end
 
