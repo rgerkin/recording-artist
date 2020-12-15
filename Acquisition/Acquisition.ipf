@@ -113,12 +113,12 @@ Function Initialization([profileName, acqInstance, create_windows, prompt_experi
 	if(v_flag)
 		NewPath /C/O/Q Data, defaultDataDir
 	endif
-	string extension=".pxp"
+	string extension=".uxp"
 	PutScrapText NewFileName(path="Data")+extension
 	if(prompt_experiment_name)
-		SaveExperiment /P=Data //as NewFileName()+".uxp"//  Sets experiment name
+		SaveExperiment /P=Data /F={0, "", 1} //as NewFileName()+".uxp"//  Sets experiment name
 	else
-		SaveExperiment /P=Data as GetScrapText() //  Sets experiment name
+		SaveExperiment /P=Data /F={0, "", 1} as GetScrapText() //  Sets experiment name
 	endif
 	
 #if exists("Sutter#Init")==6
