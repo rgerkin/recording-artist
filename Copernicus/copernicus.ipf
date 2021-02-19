@@ -53,3 +53,8 @@ function zeromq_init()
 	zeromq_server_bind("tcp://127.0.0.1:5555") // Create a ZeroMQ server and begin listening
 	zeromq_handler_start() // Prepare to handle incoming messages	
 end
+
+Function zeromq_receive_test_results( TestResults)
+	string TestResults
+	print TestResults
+End
