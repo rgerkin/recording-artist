@@ -676,7 +676,7 @@ End
 
 // Creates two waves: one a text wave with a point for each unique entry in the text wave 
 // 'InWave', and the other a numeric wave with the number of instance of each entry in 'InWave'.  
-Function TextHistogram(InWave)
+Function TextHistogram_old(InWave)
 	Wave /T InWave
 	Make /o/n=0 TH_Counts
 	Make /o/T/n=0 TH_Entries
